@@ -1,0 +1,80 @@
+---
+- name: Configure production runtime on control node
+  hosts: control
+  become: true
+  tasks:
+    - name: Set volatile systemd runtime secrets for control node
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - set-environment
+          - "POSTGRES_PASSWORD={{ lookup('env', 'POSTGRES_PASSWORD') }}"
+          - "GRAFANA_ADMIN_PASSWORD={{ lookup('env', 'GRAFANA_ADMIN_PASSWORD') }}"
+          - "JWT_SECRET_KEY={{ lookup('env', 'JWT_SECRET_KEY') }}"
+      no_log: true
+
+    - name: Install control stack systemd unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/forex-control-stack.service
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Forex AI Control Tower Data and Observability Stack
+          After=docker.service network-online.target
+          Wants=docker.service network-online.target
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=true
+          WorkingDirectory=/opt/forex-ai-control-tower
+          PassEnvironment=POSTGRES_PASSWORD GRAFANA_ADMIN_PASSWORD
+          ExecStart=/usr/bin/docker compose -f /opt/forex-ai-control-tower/control-stack.compose.yml up -d
+          ExecStop=/usr/bin/docker compose -f /opt/forex-ai-control-tower/control-stack.compose.yml down
+          TimeoutStartSec=300
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Reload systemd
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+
+    - name: Start and enable control stack
+      ansible.builtin.systemd_service:
+        name: forex-control-stack
+        state: started
+        enabled: true
+
+    - name: Restart control API with runtime JWT secret
+      ansible.builtin.systemd_service:
+        name: forex-control-api
+        state: restarted
+        enabled: true
+
+- name: Configure production runtime on Windows MT5 bridge
+  hosts: mt5_bridge_windows
+  gather_facts: false
+  tasks:
+    - name: Set MT5 bridge machine environment secrets
+      ansible.windows.win_environment:
+        state: present
+        level: machine
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+      loop:
+        - name: BRIDGE_API_TOKEN
+          value: "{{ lookup('env', 'BRIDGE_API_TOKEN') }}"
+        - name: EXECUTION_GUARD_SIGNING_KEY
+          value: "{{ lookup('env', 'EXECUTION_GUARD_SIGNING_KEY') }}"
+      no_log: true
+
+    - name: Restart MT5 bridge scheduled task
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        Stop-ScheduledTask -TaskName "ForexAI-MT5-Bridge" -ErrorAction SilentlyContinue
+        Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "C:\ForexAI\*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-ScheduledTask -TaskName "ForexAI-MT5-Bridge"
+        Start-Sleep -Seconds 8
+        (Invoke-WebRequest -Uri "http://127.0.0.1:8501/health" -UseBasicParsing -TimeoutSec 10).StatusCode

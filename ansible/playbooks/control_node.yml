@@ -9,7 +9,7 @@
         state: directory
         owner: aiops
         group: aiops
-        mode: "0750"
+        mode: "0755"
 
     - name: Copy control Docker Compose file
       ansible.builtin.copy:
@@ -18,6 +18,22 @@
         owner: aiops
         group: aiops
         mode: "0640"
+
+    - name: Create monitoring config directory
+      ansible.builtin.file:
+        path: /opt/forex-ai-control-tower/monitoring
+        state: directory
+        owner: aiops
+        group: aiops
+        mode: "0755"
+
+    - name: Copy Prometheus config
+      ansible.builtin.copy:
+        src: ../../monitoring/prometheus.yml
+        dest: /opt/forex-ai-control-tower/monitoring/prometheus.yml
+        owner: aiops
+        group: aiops
+        mode: "0644"
 
     - name: Validate control stack compose file
       ansible.builtin.command:

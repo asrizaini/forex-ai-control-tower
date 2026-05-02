@@ -79,6 +79,7 @@
           Group=aiops
           WorkingDirectory=/opt/forex-ai-control-tower/app
           Environment=PYTHONPATH=/opt/forex-ai-control-tower/app
+          PassEnvironment=JWT_SECRET_KEY
           ExecStart=/opt/forex-ai-control-tower/.venv/bin/python -m uvicorn control.api.main:app --host 0.0.0.0 --port 8000
           Restart=always
           RestartSec=5
