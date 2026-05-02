@@ -4,35 +4,35 @@ all:
       hosts:
         fx-control:
           ansible_host: 10.10.1.81
-          ansible_user: fxcontrol
+          ansible_user: fx-control
           ansible_password: "{{ lookup('env', 'LINUX_STANDARD_SSH_PASSWORD') }}"
           ansible_become_password: "{{ lookup('env', 'LINUX_STANDARD_SUDO_PASSWORD') }}"
     llm_reason:
       hosts:
         fx-llm-local-reason:
           ansible_host: 10.10.1.82
-          ansible_user: fxllmreason
+          ansible_user: fx-llm-local-reason
           ansible_password: "{{ lookup('env', 'LINUX_STANDARD_SSH_PASSWORD') }}"
           ansible_become_password: "{{ lookup('env', 'LINUX_STANDARD_SUDO_PASSWORD') }}"
     llm_code:
       hosts:
         fx-llm-local-code:
           ansible_host: 10.10.1.83
-          ansible_user: fxllmcode
+          ansible_user: fx-llm-local-code
           ansible_password: "{{ lookup('env', 'LINUX_STANDARD_SSH_PASSWORD') }}"
           ansible_become_password: "{{ lookup('env', 'LINUX_STANDARD_SUDO_PASSWORD') }}"
     market_worker:
       hosts:
         fx-market-worker:
           ansible_host: 10.10.1.84
-          ansible_user: fxmarket
+          ansible_user: fx-market-worker
           ansible_password: "{{ lookup('env', 'LINUX_STANDARD_SSH_PASSWORD') }}"
           ansible_become_password: "{{ lookup('env', 'LINUX_STANDARD_SUDO_PASSWORD') }}"
     strategy_risk_worker:
       hosts:
         fx-strategy-risk-worker:
           ansible_host: 10.10.1.85
-          ansible_user: fxstrategy
+          ansible_user: fx-strategy-risk-worker
           ansible_password: "{{ lookup('env', 'LINUX_STANDARD_SSH_PASSWORD') }}"
           ansible_become_password: "{{ lookup('env', 'LINUX_STANDARD_SUDO_PASSWORD') }}"
     mt5_bridge_windows:
