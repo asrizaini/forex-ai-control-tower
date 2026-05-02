@@ -32,7 +32,7 @@ Build the Dockerized Ansible runner:
 
 ```powershell
 docker compose -f docker/controller-runner.compose.yml build
-docker compose -f docker/controller-runner.compose.yml run --rm controller ansible-playbook --syntax-check ansible/playbooks/site.yml
+docker compose -f docker/controller-runner.compose.yml run --rm controller ansible-playbook --syntax-check -i ansible/inventory.yml ansible/playbooks/site.yml
 ```
 
 ## GitHub Setup
@@ -62,3 +62,9 @@ Real deployment is a later phase. Before deploying, provide credentials through 
 - `WINDOWS_MT5_SSH_PASSWORD`
 
 Do not commit generated real inventory files, `.env` files, keys, tokens, or logs.
+
+To deploy after the required environment variables are set:
+
+```powershell
+docker compose -f docker/controller-runner.compose.yml run --rm controller ansible-playbook -i ansible/inventory.yml ansible/playbooks/site.yml
+```
