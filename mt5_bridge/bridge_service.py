@@ -4,7 +4,7 @@ import os
 import time
 from typing import Any
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel, Field
 from starlette.responses import Response
@@ -34,6 +34,14 @@ class OrderRequest(BaseModel):
     sl: float | None = None
     tp: float | None = None
     deviation: int = 20
+
+
+def require_bridge_token(x_bridge_token: str | None = Header(default=None)) -> None:
+    expected = os.getenv("BRIDGE_API_TOKEN")
+    if not expected:
+        raise HTTPException(status_code=503, detail="BRIDGE_API_TOKEN is not configured")
+    if not x_bridge_token or x_bridge_token != expected:
+        raise HTTPException(status_code=401, detail="Bridge API token required")
 
 
 def client() -> MT5Client:
@@ -80,16 +88,17 @@ def health() -> dict[str, Any]:
         "allow_live_trading": ALLOW_LIVE_TRADING,
         "require_order_check": REQUIRE_ORDER_CHECK,
         "mt5_connected": connected,
+        "mt5_terminal_path_configured": bool(os.getenv("MT5_TERMINAL_PATH")),
         "error": error,
     }
 
 
-@app.get("/metrics")
+@app.get("/metrics", dependencies=[Depends(require_bridge_token)])
 def metrics() -> Response:
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
-@app.get("/account")
+@app.get("/account", dependencies=[Depends(require_bridge_token)])
 def account() -> dict[str, Any]:
     try:
         return client().account_info()
@@ -97,7 +106,7 @@ def account() -> dict[str, Any]:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-@app.get("/symbols")
+@app.get("/symbols", dependencies=[Depends(require_bridge_token)])
 def symbols() -> dict[str, Any]:
     try:
         return {"symbols": client().symbols()}
@@ -105,7 +114,7 @@ def symbols() -> dict[str, Any]:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-@app.get("/rates/{symbol}")
+@app.get("/rates/{symbol}", dependencies=[Depends(require_bridge_token)])
 def rates(symbol: str) -> dict[str, Any]:
     try:
         return {"symbol": symbol, "timeframe": "M1", "rates": client().rates(symbol)}
@@ -113,7 +122,7 @@ def rates(symbol: str) -> dict[str, Any]:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-@app.get("/ticks/{symbol}")
+@app.get("/ticks/{symbol}", dependencies=[Depends(require_bridge_token)])
 def ticks(symbol: str) -> dict[str, Any]:
     try:
         return {"symbol": symbol, "tick": client().ticks(symbol)}
@@ -121,7 +130,7 @@ def ticks(symbol: str) -> dict[str, Any]:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-@app.post("/order/check")
+@app.post("/order/check", dependencies=[Depends(require_bridge_token)])
 def order_check(order: OrderRequest) -> dict[str, Any]:
     if order.live_order and not ALLOW_LIVE_TRADING:
         raise HTTPException(status_code=403, detail="Live trading is disabled")
@@ -133,7 +142,7 @@ def order_check(order: OrderRequest) -> dict[str, Any]:
     return {"client_order_id": order.client_order_id, "check_passed": result.get("retcode") == 0, "result": result}
 
 
-@app.post("/order/send")
+@app.post("/order/send", dependencies=[Depends(require_bridge_token)])
 def order_send(order: OrderRequest, x_execution_guard_token: str | None = Header(default=None)) -> dict[str, Any]:
     if order.live_order and not ALLOW_LIVE_TRADING:
         raise HTTPException(status_code=403, detail="Live trading is disabled")
@@ -148,7 +157,7 @@ def order_send(order: OrderRequest, x_execution_guard_token: str | None = Header
     return {"client_order_id": order.client_order_id, "sent": True, "result": result}
 
 
-@app.get("/positions")
+@app.get("/positions", dependencies=[Depends(require_bridge_token)])
 def positions() -> dict[str, Any]:
     try:
         return {"positions": client().positions()}
@@ -156,7 +165,7 @@ def positions() -> dict[str, Any]:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-@app.get("/history")
+@app.get("/history", dependencies=[Depends(require_bridge_token)])
 def history() -> dict[str, Any]:
     try:
         return {"history": client().history()}

@@ -7,7 +7,9 @@ from hashlib import sha256
 
 
 def create_approval_token(account_id: str, strategy_id: str, ttl_seconds: int = 60) -> str:
-    secret = os.getenv("EXECUTION_GUARD_SIGNING_KEY", "dev-only-nonsecret-signing-key")
+    secret = os.getenv("EXECUTION_GUARD_SIGNING_KEY")
+    if not secret:
+        raise RuntimeError("EXECUTION_GUARD_SIGNING_KEY is required")
     expires_at = int(time.time()) + ttl_seconds
     payload = f"{account_id}:{strategy_id}:{expires_at}"
     signature = hmac.new(secret.encode(), payload.encode(), sha256).hexdigest()
@@ -15,6 +17,8 @@ def create_approval_token(account_id: str, strategy_id: str, ttl_seconds: int = 
 
 
 def validate_approval_token(token: str | None) -> bool:
+    if not os.getenv("EXECUTION_GUARD_SIGNING_KEY"):
+        return False
     if not token:
         return False
     parts = token.split(":")

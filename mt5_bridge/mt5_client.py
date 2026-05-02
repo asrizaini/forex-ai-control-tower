@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 
@@ -16,6 +17,9 @@ class MT5Client:
         self.mt5 = mt5
 
     def connect(self) -> bool:
+        terminal_path = os.getenv("MT5_TERMINAL_PATH")
+        if terminal_path:
+            return bool(self.mt5.initialize(path=terminal_path))
         return bool(self.mt5.initialize())
 
     def shutdown(self) -> None:
