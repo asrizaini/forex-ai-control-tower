@@ -3,7 +3,7 @@ import { Activity, ShieldCheck, Globe2, RadioTower } from 'lucide-react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 
-const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
+const apiBase = import.meta.env.VITE_API_BASE || `${window.location.protocol}//${window.location.hostname}:8000`;
 
 function App() {
   const [health, setHealth] = useState({ status: 'loading', environment: 'demo', trading_mode: 'monitor_only' });

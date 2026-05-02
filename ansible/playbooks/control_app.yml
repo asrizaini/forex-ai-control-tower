@@ -1,0 +1,113 @@
+---
+- name: Deploy control API and dashboard
+  hosts: control
+  become: true
+  tasks:
+    - name: Create application source directory
+      ansible.builtin.file:
+        path: /opt/forex-ai-control-tower/app
+        state: directory
+        owner: aiops
+        group: aiops
+        mode: "0750"
+
+    - name: Copy control Python package
+      ansible.builtin.copy:
+        src: ../../control/
+        dest: /opt/forex-ai-control-tower/app/control/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
+    - name: Create dashboard web directory
+      ansible.builtin.file:
+        path: /opt/forex-ai-control-tower/dashboard
+        state: directory
+        owner: aiops
+        group: aiops
+        mode: "0755"
+
+    - name: Copy built dashboard assets
+      ansible.builtin.copy:
+        src: ../../control/dashboard/dist/
+        dest: /opt/forex-ai-control-tower/dashboard/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
+    - name: Create Python virtual environment
+      ansible.builtin.command:
+        cmd: python3 -m venv /opt/forex-ai-control-tower/.venv
+        creates: /opt/forex-ai-control-tower/.venv/bin/python
+
+    - name: Install control API requirements
+      ansible.builtin.pip:
+        requirements: /opt/forex-ai-control-tower/app/control/requirements.txt
+        virtualenv: /opt/forex-ai-control-tower/.venv
+
+    - name: Install control API systemd unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/forex-control-api.service
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Forex AI Control Tower API
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=aiops
+          Group=aiops
+          WorkingDirectory=/opt/forex-ai-control-tower/app
+          Environment=PYTHONPATH=/opt/forex-ai-control-tower/app
+          ExecStart=/opt/forex-ai-control-tower/.venv/bin/python -m uvicorn control.api.main:app --host 0.0.0.0 --port 8000
+          Restart=always
+          RestartSec=5
+          NoNewPrivileges=true
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Install dashboard systemd unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/forex-dashboard.service
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Forex AI Control Tower Dashboard
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=aiops
+          Group=aiops
+          WorkingDirectory=/opt/forex-ai-control-tower/dashboard
+          ExecStart=/usr/bin/python3 -m http.server 5173 --bind 0.0.0.0 --directory /opt/forex-ai-control-tower/dashboard
+          Restart=always
+          RestartSec=5
+          NoNewPrivileges=true
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Reload systemd
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+
+    - name: Start and enable control API
+      ansible.builtin.systemd_service:
+        name: forex-control-api
+        state: restarted
+        enabled: true
+
+    - name: Start and enable dashboard
+      ansible.builtin.systemd_service:
+        name: forex-dashboard
+        state: restarted
+        enabled: true
