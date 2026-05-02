@@ -8,11 +8,53 @@
         path: C:\ForexAI\mt5_bridge
         state: directory
 
+    - name: Create Execution Guard package directory
+      ansible.windows.win_file:
+        path: C:\ForexAI\execution_guard
+        state: directory
+
+    - name: Ensure Python 3.12 is installed
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        $machinePath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+        $userPath = [System.Environment]::GetEnvironmentVariable("Path", "User")
+        $env:Path = "$machinePath;$userPath"
+        if (-not (Get-Command py -ErrorAction SilentlyContinue)) {
+          winget install --id Python.Python.3.12 --exact --silent --accept-package-agreements --accept-source-agreements
+        }
+      changed_when: false
+
+    - name: Ensure Git is installed
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        $machinePath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+        $userPath = [System.Environment]::GetEnvironmentVariable("Path", "User")
+        $env:Path = "$machinePath;$userPath"
+        if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+          winget install --id Git.Git --exact --silent --accept-package-agreements --accept-source-agreements
+        }
+      changed_when: false
+
     - name: Copy MT5 bridge setup scripts
       ansible.windows.win_copy:
         src: ../../mt5_bridge/
         dest: C:\ForexAI\mt5_bridge\
 
+    - name: Copy Execution Guard support package
+      ansible.windows.win_copy:
+        src: ../../execution_guard/
+        dest: C:\ForexAI\execution_guard\
+
     - name: Configure Windows firewall for bridge
       ansible.windows.win_shell: powershell.exe -ExecutionPolicy Bypass -File C:\ForexAI\mt5_bridge\configure_firewall.ps1
+      changed_when: false
+
+    - name: Create MT5 bridge virtual environment
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        $machinePath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+        $userPath = [System.Environment]::GetEnvironmentVariable("Path", "User")
+        $env:Path = "$machinePath;$userPath"
+        Set-Location C:\ForexAI\mt5_bridge
+        powershell.exe -ExecutionPolicy Bypass -File .\setup_venv.ps1
       changed_when: false
