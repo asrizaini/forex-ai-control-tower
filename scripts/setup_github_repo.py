@@ -10,10 +10,15 @@ import urllib.request
 from pathlib import Path
 
 
-def run(command: list[str], cwd: Path, sensitive: bool = False) -> None:
+def run(command: list[str], cwd: Path, sensitive: bool = False, env: dict[str, str] | None = None) -> None:
     printable = " ".join(command)
     print("+ [sensitive command redacted]" if sensitive else f"+ {printable}")
-    subprocess.run(command, cwd=cwd, check=True)
+    try:
+        subprocess.run(command, cwd=cwd, check=True, env=env)
+    except subprocess.CalledProcessError as exc:
+        if sensitive:
+            raise SystemExit(f"Sensitive command failed with exit code {exc.returncode}") from None
+        raise
 
 
 def require_env(name: str) -> str:
@@ -94,17 +99,15 @@ def main() -> None:
             print("No local changes to commit.")
         run(["git", "branch", "-M", "main"], root)
         run(
-            [
-                "git",
-                "-c",
-                "http.https://github.com/.extraheader=AUTHORIZATION: bearer " + token,
-                "push",
-                "-u",
-                "origin",
-                "main",
-            ],
+            ["git", "push", "-u", "origin", "main"],
             root,
             sensitive=True,
+            env={
+                **os.environ,
+                "GIT_CONFIG_COUNT": "1",
+                "GIT_CONFIG_KEY_0": "http.https://github.com/.extraheader",
+                "GIT_CONFIG_VALUE_0": "AUTHORIZATION: bearer " + token,
+            },
         )
 
 
