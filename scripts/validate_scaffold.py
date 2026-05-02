@@ -26,6 +26,8 @@ SECRET_PATTERNS = [
     re.compile(r"(?i)(password|token|api_key)\s*=\s*['\"][^<][^'\"]{8,}['\"]"),
 ]
 
+SKIP_DIRS = {".git", "node_modules", "dist", "build", "__pycache__", ".pytest_cache", ".venv"}
+
 
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
@@ -35,7 +37,9 @@ def main() -> int:
         return 1
     bad = []
     for path in root.rglob("*"):
-        if path.is_file() and ".git" not in path.parts and path.suffix not in {".png", ".jpg", ".ico"}:
+        if any(part in SKIP_DIRS for part in path.parts):
+            continue
+        if path.is_file() and path.suffix not in {".png", ".jpg", ".ico"}:
             text = path.read_text(encoding="utf-8", errors="ignore")
             for pattern in SECRET_PATTERNS:
                 if pattern.search(text):
