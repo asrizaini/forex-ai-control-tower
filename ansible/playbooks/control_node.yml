@@ -22,4 +22,7 @@
     - name: Validate control stack compose file
       ansible.builtin.command:
         cmd: docker compose -f /opt/forex-ai-control-tower/control-stack.compose.yml config
+      environment:
+        POSTGRES_PASSWORD: compose-validation-placeholder
+        GRAFANA_ADMIN_PASSWORD: compose-validation-placeholder
       changed_when: false
