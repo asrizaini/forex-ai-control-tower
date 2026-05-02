@@ -30,4 +30,4 @@ worker_nodes
 linux_nodes
 
 [mt5_bridge_windows]
-fx-mt5-bridge ansible_host=10.10.1.86 ansible_user={{ lookup('env','WINDOWS_MT5_USER') }} ansible_password={{ lookup('env','WINDOWS_MT5_PASSWORD') }} ansible_connection=winrm ansible_winrm_transport=ntlm ansible_winrm_server_cert_validation=ignore
+fx-mt5-bridge ansible_host=10.10.1.86 ansible_port=5985 ansible_user={{ lookup('env','WINDOWS_MT5_USER') }} ansible_password={{ lookup('env','WINDOWS_MT5_PASSWORD') }} ansible_connection=winrm ansible_winrm_transport=ntlm ansible_winrm_scheme=http ansible_winrm_server_cert_validation=ignore
