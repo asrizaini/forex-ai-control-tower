@@ -36,8 +36,15 @@ def create_remote(owner: str, repo: str, token: str) -> None:
             "Accept": "application/vnd.github+json",
         },
     )
-    with urllib.request.urlopen(login_request, timeout=30) as response:
-        login = json.loads(response.read().decode())["login"]
+    try:
+        with urllib.request.urlopen(login_request, timeout=30) as response:
+            login = json.loads(response.read().decode())["login"]
+    except urllib.error.HTTPError as exc:
+        if exc.code == 401:
+            raise SystemExit("GitHub authentication failed. Check GITHUB_TOKEN and rotate it if there is any doubt.") from None
+        if exc.code == 403:
+            raise SystemExit("GitHub token is authenticated but not authorized for this operation.") from None
+        raise SystemExit(f"GitHub authentication check failed with HTTP {exc.code}.") from None
     url = "https://api.github.com/user/repos" if owner == login else f"https://api.github.com/orgs/{owner}/repos"
     payload = json.dumps({"name": repo, "private": True, "auto_init": False}).encode()
     request = urllib.request.Request(
@@ -57,7 +64,11 @@ def create_remote(owner: str, repo: str, token: str) -> None:
         if exc.code == 422:
             print("GitHub repo already exists or cannot be created with current owner/token.")
             return
-        raise
+        if exc.code == 401:
+            raise SystemExit("GitHub authentication failed while creating the repo.") from None
+        if exc.code == 403:
+            raise SystemExit("GitHub token is not authorized to create repos for this owner.") from None
+        raise SystemExit(f"GitHub repo creation failed with HTTP {exc.code}.") from None
 
 
 def main() -> None:
