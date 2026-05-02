@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -19,6 +20,21 @@ def run(command: list[str], cwd: Path, sensitive: bool = False, env: dict[str, s
         if sensitive:
             raise SystemExit(f"Sensitive command failed with exit code {exc.returncode}") from None
         raise
+
+
+def write_git_askpass() -> Path:
+    script = Path(tempfile.gettempdir()) / "forex_ai_git_askpass.cmd"
+    script.write_text(
+        "@echo off\n"
+        "echo %* | findstr /I \"Username\" >nul\n"
+        "if %errorlevel%==0 (\n"
+        "  echo x-access-token\n"
+        ") else (\n"
+        "  echo %GITHUB_TOKEN%\n"
+        ")\n",
+        encoding="utf-8",
+    )
+    return script
 
 
 def require_env(name: str) -> str:
@@ -115,9 +131,9 @@ def main() -> None:
             sensitive=True,
             env={
                 **os.environ,
-                "GIT_CONFIG_COUNT": "1",
-                "GIT_CONFIG_KEY_0": "http.https://github.com/.extraheader",
-                "GIT_CONFIG_VALUE_0": "AUTHORIZATION: bearer " + token,
+                "GITHUB_TOKEN": token,
+                "GIT_ASKPASS": str(write_git_askpass()),
+                "GIT_TERMINAL_PROMPT": "0",
             },
         )
 
