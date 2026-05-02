@@ -1,0 +1,9 @@
+trading:
+  BUY: BELI
+  SELL: JUAL
+  risk: risiko
+  approval: kelulusan
+  account: akaun
+notes:
+  - "Use Bahasa Melayu Malaysia style, not Indonesian Bahasa."
+  - "Do not translate symbols, code, JSON keys, environment variables, order IDs, or log IDs."

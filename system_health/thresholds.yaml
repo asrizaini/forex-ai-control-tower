@@ -1,0 +1,6 @@
+warning: 80
+critical: 70
+disable_execution_below: 70
+disable_execution_if:
+  - mt5_bridge_offline
+  - risk_engine_offline

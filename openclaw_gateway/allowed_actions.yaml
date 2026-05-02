@@ -1,0 +1,14 @@
+enabled: false
+allowed:
+  - admin_chat
+  - user_chat
+  - daily_summaries
+  - status_queries
+  - approved_api_calls
+forbidden:
+  - direct_mt5_execution
+  - broker_password_access
+  - risk_engine_bypass
+  - admin_approval_bypass
+  - unrestricted_shell_commands
+  - direct_production_modification

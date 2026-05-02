@@ -1,0 +1,17 @@
+services:
+  controller:
+    build:
+      context: ..
+      dockerfile: docker/controller-runner.Dockerfile
+    working_dir: /workspace
+    volumes:
+      - ..:/workspace
+    environment:
+      GITHUB_OWNER: ${GITHUB_OWNER:-}
+      GITHUB_REPO: ${GITHUB_REPO:-forex-ai-control-tower}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      LINUX_STANDARD_SSH_PASSWORD: ${LINUX_STANDARD_SSH_PASSWORD:-}
+      LINUX_STANDARD_SUDO_PASSWORD: ${LINUX_STANDARD_SUDO_PASSWORD:-}
+      WINDOWS_MT5_USER: ${WINDOWS_MT5_USER:-}
+      WINDOWS_MT5_PASSWORD: ${WINDOWS_MT5_PASSWORD:-}
+      WINDOWS_MT5_SSH_PASSWORD: ${WINDOWS_MT5_SSH_PASSWORD:-}

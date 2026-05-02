@@ -1,0 +1,22 @@
+default_environment: demo
+production_live_default: false
+environments:
+  dev:
+    live_trading_allowed: false
+    default_trading_mode: monitor_only
+  staging:
+    live_trading_allowed: false
+    default_trading_mode: simulation
+    requires_pre_production_validation: true
+  demo:
+    live_trading_allowed: false
+    default_trading_mode: monitor_only
+    default_execution_mode: demo
+  production-live:
+    live_trading_allowed: true
+    default: false
+    requires_admin_approval: true
+    requires_backtest: true
+    requires_forward_test: true
+    requires_demo_validation: true
+    live_auto_trading_default: false

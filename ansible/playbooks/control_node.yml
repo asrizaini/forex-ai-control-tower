@@ -1,0 +1,25 @@
+---
+- name: Phase 4 - Control node services
+  hosts: control
+  become: true
+  tasks:
+    - name: Create application directory
+      ansible.builtin.file:
+        path: /opt/forex-ai-control-tower
+        state: directory
+        owner: aiops
+        group: aiops
+        mode: "0750"
+
+    - name: Copy control Docker Compose file
+      ansible.builtin.copy:
+        src: ../../docker/control-stack.compose.yml
+        dest: /opt/forex-ai-control-tower/control-stack.compose.yml
+        owner: aiops
+        group: aiops
+        mode: "0640"
+
+    - name: Validate control stack compose file
+      ansible.builtin.command:
+        cmd: docker compose -f /opt/forex-ai-control-tower/control-stack.compose.yml config
+      changed_when: false

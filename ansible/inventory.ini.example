@@ -1,0 +1,33 @@
+[control]
+fx-control ansible_host=10.10.1.81 ansible_user=fxcontrol ansible_password={{ lookup('env','LINUX_STANDARD_SSH_PASSWORD') }} ansible_become_password={{ lookup('env','LINUX_STANDARD_SUDO_PASSWORD') }}
+
+[llm_reason]
+fx-llm-local-reason ansible_host=10.10.1.82 ansible_user=fxllmreason ansible_password={{ lookup('env','LINUX_STANDARD_SSH_PASSWORD') }} ansible_become_password={{ lookup('env','LINUX_STANDARD_SUDO_PASSWORD') }}
+
+[llm_code]
+fx-llm-local-code ansible_host=10.10.1.83 ansible_user=fxllmcode ansible_password={{ lookup('env','LINUX_STANDARD_SSH_PASSWORD') }} ansible_become_password={{ lookup('env','LINUX_STANDARD_SUDO_PASSWORD') }}
+
+[market_worker]
+fx-market-worker ansible_host=10.10.1.84 ansible_user=fxmarket ansible_password={{ lookup('env','LINUX_STANDARD_SSH_PASSWORD') }} ansible_become_password={{ lookup('env','LINUX_STANDARD_SUDO_PASSWORD') }}
+
+[strategy_risk_worker]
+fx-strategy-risk-worker ansible_host=10.10.1.85 ansible_user=fxstrategy ansible_password={{ lookup('env','LINUX_STANDARD_SSH_PASSWORD') }} ansible_become_password={{ lookup('env','LINUX_STANDARD_SUDO_PASSWORD') }}
+
+[llm_nodes:children]
+llm_reason
+llm_code
+
+[worker_nodes:children]
+market_worker
+strategy_risk_worker
+
+[linux_nodes:children]
+control
+llm_nodes
+worker_nodes
+
+[all_ai_nodes:children]
+linux_nodes
+
+[mt5_bridge_windows]
+fx-mt5-bridge ansible_host=10.10.1.86 ansible_user={{ lookup('env','WINDOWS_MT5_USER') }} ansible_password={{ lookup('env','WINDOWS_MT5_PASSWORD') }} ansible_connection=winrm ansible_winrm_transport=ntlm ansible_winrm_server_cert_validation=ignore

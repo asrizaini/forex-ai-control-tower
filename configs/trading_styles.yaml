@@ -1,0 +1,91 @@
+styles:
+  scalping:
+    timeframes: [M1, M5]
+    risk_profile: very_low_per_trade
+    session_filter: liquid_sessions_only
+    spread_slippage_limit: strict
+    holding_period: seconds_to_minutes
+    strategy_eligibility: low_latency_only
+    news_behavior: halt_high_impact
+    test_requirements: [tick_backtest, forward_test, demo_validation]
+  intraday:
+    timeframes: [M5, M15, M30, H1]
+    risk_profile: low
+    session_filter: london_new_york
+    spread_slippage_limit: moderate
+    holding_period: same_day
+    strategy_eligibility: approved_intraday
+    news_behavior: reduce_or_halt
+    test_requirements: [backtest, forward_test, demo_validation]
+  day_trading:
+    timeframes: [M15, M30, H1]
+    risk_profile: low_to_medium
+    session_filter: major_sessions
+    spread_slippage_limit: moderate
+    holding_period: same_day
+    strategy_eligibility: approved_day_trading
+    news_behavior: halt_high_impact
+    test_requirements: [backtest, forward_test]
+  swing:
+    timeframes: [H1, H4, D1]
+    risk_profile: medium
+    session_filter: all_sessions
+    spread_slippage_limit: relaxed
+    holding_period: days
+    strategy_eligibility: approved_swing
+    news_behavior: risk_review_required
+    test_requirements: [multi_year_backtest, walk_forward]
+  position:
+    timeframes: [D1, W1]
+    risk_profile: medium_low_frequency
+    session_filter: all_sessions
+    spread_slippage_limit: relaxed
+    holding_period: weeks_to_months
+    strategy_eligibility: approved_position
+    news_behavior: macro_review_required
+    test_requirements: [multi_year_backtest, forward_test]
+  news_reaction:
+    timeframes: [M1, M5, M15]
+    risk_profile: restricted
+    session_filter: event_window
+    spread_slippage_limit: strict_dynamic
+    holding_period: minutes
+    strategy_eligibility: news_approved_only
+    news_behavior: primary_driver
+    test_requirements: [event_backtest, demo_validation]
+  breakout:
+    timeframes: [M15, H1, H4]
+    risk_profile: medium
+    session_filter: liquid_sessions
+    spread_slippage_limit: moderate
+    holding_period: intraday_to_days
+    strategy_eligibility: volatility_aware
+    news_behavior: halt_high_impact
+    test_requirements: [backtest, walk_forward]
+  trend_following:
+    timeframes: [H1, H4, D1]
+    risk_profile: medium
+    session_filter: all_sessions
+    spread_slippage_limit: moderate
+    holding_period: days_to_weeks
+    strategy_eligibility: trend_filters_required
+    news_behavior: macro_context_required
+    test_requirements: [multi_year_backtest, forward_test]
+  mean_reversion:
+    timeframes: [M15, H1, H4]
+    risk_profile: low_to_medium
+    session_filter: stable_liquidity
+    spread_slippage_limit: moderate
+    holding_period: hours_to_days
+    strategy_eligibility: range_detection_required
+    news_behavior: halt_high_impact
+    test_requirements: [regime_backtest, walk_forward]
+  custom_strategy:
+    timeframes: []
+    risk_profile: admin_defined
+    session_filter: admin_defined
+    spread_slippage_limit: admin_defined
+    holding_period: admin_defined
+    strategy_eligibility: governance_required
+    news_behavior: admin_defined
+    test_requirements: [backtest, forward_test, demo_validation, admin_review]

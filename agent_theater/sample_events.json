@@ -1,0 +1,17 @@
+{
+  "events": [
+    {
+      "agent": "Risk Manager Agent",
+      "summary": "Rejected execution because trading mode is monitor_only.",
+      "input_sources": [
+        "signal",
+        "risk_policy",
+        "environment"
+      ],
+      "result": "blocked",
+      "confidence": 0.99,
+      "risk_status": "safe",
+      "next_action": "wait_for_admin_mode_change"
+    }
+  ]
+}

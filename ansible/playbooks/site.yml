@@ -1,0 +1,7 @@
+---
+- import_playbook: phase1_preflight.yml
+- import_playbook: linux_bootstrap.yml
+- import_playbook: control_node.yml
+- import_playbook: ollama_nodes.yml
+- import_playbook: workers.yml
+- import_playbook: windows_mt5_bridge.yml

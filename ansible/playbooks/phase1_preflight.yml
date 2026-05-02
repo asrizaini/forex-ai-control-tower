@@ -1,0 +1,14 @@
+---
+- name: Phase 1 - Linux connectivity preflight
+  hosts: linux_nodes
+  gather_facts: false
+  tasks:
+    - name: Confirm Linux SSH connectivity
+      ansible.builtin.ping:
+
+- name: Phase 1 - Windows connectivity preflight
+  hosts: mt5_bridge_windows
+  gather_facts: false
+  tasks:
+    - name: Confirm WinRM connectivity
+      ansible.windows.win_ping:

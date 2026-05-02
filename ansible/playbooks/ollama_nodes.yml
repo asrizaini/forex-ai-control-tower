@@ -1,0 +1,45 @@
+---
+- name: Phase 5 - Ollama reasoning node
+  hosts: llm_reason
+  become: true
+  tasks:
+    - name: Install Ollama
+      ansible.builtin.shell: curl -fsSL https://ollama.com/install.sh | sh
+      args:
+        creates: /usr/local/bin/ollama
+
+    - name: Enable Ollama
+      ansible.builtin.service:
+        name: ollama
+        state: started
+        enabled: true
+
+    - name: Pull reasoning models
+      ansible.builtin.command: ollama pull {{ item }}
+      loop:
+        - qwen3:8b
+        - qwen3:14b
+        - llama3.1:8b
+      changed_when: false
+
+- name: Phase 5 - Ollama coding node
+  hosts: llm_code
+  become: true
+  tasks:
+    - name: Install Ollama
+      ansible.builtin.shell: curl -fsSL https://ollama.com/install.sh | sh
+      args:
+        creates: /usr/local/bin/ollama
+
+    - name: Enable Ollama
+      ansible.builtin.service:
+        name: ollama
+        state: started
+        enabled: true
+
+    - name: Pull coding models
+      ansible.builtin.command: ollama pull {{ item }}
+      loop:
+        - qwen3-coder
+        - deepseek-coder:6.7b
+      changed_when: false

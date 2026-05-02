@@ -1,0 +1,6 @@
+fastapi>=0.115.0
+MetaTrader5>=5.0.45
+prometheus-client>=0.20.0
+pydantic>=2.7.0
+python-json-logger>=2.0.7
+uvicorn>=0.30.0
