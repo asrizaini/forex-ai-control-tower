@@ -7,4 +7,5 @@ router = APIRouter(prefix="/news", tags=["news"])
 
 @router.get("")
 def list_resource() -> dict:
-    return {"module": "news", "description": "News and fundamental analysis status", "mode": "mock-safe"}
+    return {"module": "news", "description": "News and fundamental analysis status", "mode": "production-required"}
+

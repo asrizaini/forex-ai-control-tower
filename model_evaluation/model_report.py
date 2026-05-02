@@ -1,2 +1,2 @@
 def model_report(model: str) -> dict:
-    return {"model": model, "mock": True}
+    return {"model": model, "status": "not_evaluated"}

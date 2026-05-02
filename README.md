@@ -1,6 +1,6 @@
 # Forex AI Control Tower
 
-A secure, expandable, admin-controlled scaffold for a bilingual Forex AI operating system.
+A secure, expandable, admin-controlled deployment base for a bilingual Forex AI operating system.
 
 Core principle:
 

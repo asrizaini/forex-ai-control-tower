@@ -7,7 +7,7 @@ router = APIRouter(prefix="/mobile", tags=["mobile"])
 
 @router.get("")
 def list_resource() -> dict:
-    return {"module": "mobile", "description": "Mobile bootstrap and push registration", "mode": "mock-safe"}
+    return {"module": "mobile", "description": "Mobile bootstrap and push registration", "mode": "production-required"}
 
 
 @router.get("/bootstrap")
@@ -18,3 +18,4 @@ def bootstrap() -> dict:
 @router.post("/push/register")
 def register_push(payload: dict) -> dict:
     return {"registered": True, "provider": payload.get("provider", "fcm"), "secret_stored": False}
+

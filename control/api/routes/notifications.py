@@ -7,4 +7,5 @@ router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 @router.get("")
 def list_resource() -> dict:
-    return {"module": "notifications", "description": "Notification preferences and routing", "mode": "mock-safe"}
+    return {"module": "notifications", "description": "Notification preferences and routing", "mode": "production-required"}
+

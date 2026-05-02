@@ -1,3 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
-echo "PostgreSQL restore placeholder."
+: "${POSTGRES_HOST:?POSTGRES_HOST is required}"
+: "${POSTGRES_DB:?POSTGRES_DB is required}"
+: "${POSTGRES_USER:?POSTGRES_USER is required}"
+: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+: "${POSTGRES_RESTORE_FILE:?POSTGRES_RESTORE_FILE is required}"
+export PGPASSWORD="$POSTGRES_PASSWORD"
+psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" "$POSTGRES_DB" < "$POSTGRES_RESTORE_FILE"

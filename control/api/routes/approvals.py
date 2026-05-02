@@ -7,4 +7,5 @@ router = APIRouter(prefix="/approvals", tags=["approvals"])
 
 @router.get("")
 def list_resource() -> dict:
-    return {"module": "approvals", "description": "Manual approval workflow", "mode": "mock-safe"}
+    return {"module": "approvals", "description": "Manual approval workflow", "mode": "production-required"}
+

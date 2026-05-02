@@ -7,4 +7,5 @@ router = APIRouter(prefix="/signals", tags=["signals"])
 
 @router.get("")
 def list_resource() -> dict:
-    return {"module": "signals", "description": "Signal review queue", "mode": "mock-safe"}
+    return {"module": "signals", "description": "Signal review queue", "mode": "production-required"}
+

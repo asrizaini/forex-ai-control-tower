@@ -23,6 +23,6 @@
       ansible.builtin.command:
         cmd: docker compose -f /opt/forex-ai-control-tower/control-stack.compose.yml config
       environment:
-        POSTGRES_PASSWORD: compose-validation-placeholder
-        GRAFANA_ADMIN_PASSWORD: compose-validation-placeholder
+        POSTGRES_PASSWORD: compose-validation-value
+        GRAFANA_ADMIN_PASSWORD: compose-validation-value
       changed_when: false

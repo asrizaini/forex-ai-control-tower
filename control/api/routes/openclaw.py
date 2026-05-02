@@ -7,4 +7,5 @@ router = APIRouter(prefix="/openclaw", tags=["openclaw"])
 
 @router.get("")
 def list_resource() -> dict:
-    return {"module": "openclaw", "description": "Optional OpenClaw gateway, disabled by default", "mode": "mock-safe"}
+    return {"module": "openclaw", "description": "Optional OpenClaw gateway, disabled by default", "mode": "production-required"}
+

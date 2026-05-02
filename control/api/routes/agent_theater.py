@@ -7,4 +7,5 @@ router = APIRouter(prefix="/agent-theater", tags=["agent-theater"])
 
 @router.get("")
 def list_resource() -> dict:
-    return {"module": "agent_theater", "description": "Human-readable agent event summaries", "mode": "mock-safe"}
+    return {"module": "agent_theater", "description": "Human-readable agent event summaries", "mode": "production-required"}
+

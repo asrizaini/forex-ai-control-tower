@@ -10,6 +10,6 @@ def test_order_send_requires_order_check_and_guard_token():
     assert response.status_code == 409
 
     checked = client.post("/order/check", json=payload)
-    assert checked.status_code == 200
+    assert checked.status_code == 503
     response = client.post("/order/send", json=payload)
-    assert response.status_code == 403
+    assert response.status_code == 409

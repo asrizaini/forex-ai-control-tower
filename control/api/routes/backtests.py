@@ -7,4 +7,5 @@ router = APIRouter(prefix="/backtests", tags=["backtests"])
 
 @router.get("")
 def list_resource() -> dict:
-    return {"module": "backtests", "description": "Backtest jobs and results", "mode": "mock-safe"}
+    return {"module": "backtests", "description": "Backtest jobs and results", "mode": "production-required"}
+

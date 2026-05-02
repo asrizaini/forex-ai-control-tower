@@ -11,13 +11,29 @@
         group: aiops
         mode: "0750"
 
-    - name: Copy control Python package
+    - name: Copy control package marker
       ansible.builtin.copy:
-        src: ../../control/
-        dest: /opt/forex-ai-control-tower/app/control/
+        src: ../../control/__init__.py
+        dest: /opt/forex-ai-control-tower/app/control/__init__.py
+        owner: aiops
+        group: aiops
+        mode: "0644"
+
+    - name: Copy control API package
+      ansible.builtin.copy:
+        src: ../../control/api/
+        dest: /opt/forex-ai-control-tower/app/control/api/
         owner: aiops
         group: aiops
         mode: preserve
+
+    - name: Copy control API requirements
+      ansible.builtin.copy:
+        src: ../../control/requirements.txt
+        dest: /opt/forex-ai-control-tower/app/control/requirements.txt
+        owner: aiops
+        group: aiops
+        mode: "0644"
 
     - name: Create dashboard web directory
       ansible.builtin.file:

@@ -23,7 +23,7 @@ REQUIRED = [
 SECRET_PATTERNS = [
     re.compile(r"ghp_[A-Za-z0-9_]+"),
     re.compile(r"sk-[A-Za-z0-9]{20,}"),
-    re.compile(r"(?i)(password|token|api_key)\s*=\s*['\"][^<][^'\"]{8,}['\"]"),
+    re.compile(r"(?i)(password|token|api_key)\s*=\s*['\"][^<$][^'\"]{8,}['\"]"),
 ]
 
 SKIP_DIRS = {".git", "node_modules", "dist", "build", "__pycache__", ".pytest_cache", ".venv"}

@@ -7,4 +7,5 @@ router = APIRouter(prefix="/accounts", tags=["accounts"])
 
 @router.get("")
 def list_resource() -> dict:
-    return {"module": "accounts", "description": "Account isolation and account-group management", "mode": "mock-safe"}
+    return {"module": "accounts", "description": "Account isolation and account-group management", "mode": "production-required"}
+
