@@ -259,13 +259,13 @@ This checklist tracks the original full-system prompt. The current deployment is
 
 ## OpenClaw Optional Gateway
 
-- `[~]` OpenClaw gateway scaffold.
+- `[x]` OpenClaw gateway scaffold.
 - `[x]` Disabled by default.
-- `[~]` Allowed actions file.
-- `[ ]` Real OpenClaw bridge.
-- `[ ]` Admin/user chat workflows.
-- `[ ]` Approval-only API action layer.
-- `[ ]` Safety policy tests.
+- `[x]` Allowed actions file.
+- `[~]` Real OpenClaw bridge; safety API bridge exists, external OpenClaw runtime adapter still pending.
+- `[~]` Admin/user chat workflows through Orchestrator/Agent Theater; direct OpenClaw runtime chat adapter still pending.
+- `[x]` Approval-only API action layer.
+- `[x]` Safety policy tests.
 
 ## Observability
 
