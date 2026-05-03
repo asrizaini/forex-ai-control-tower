@@ -31,6 +31,14 @@ services:
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
 
+  blackbox:
+    image: prom/blackbox-exporter:latest
+    restart: unless-stopped
+    ports:
+      - "9115:9115"
+    volumes:
+      - ./monitoring/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+
   grafana:
     image: grafana/grafana:latest
     restart: unless-stopped
@@ -38,6 +46,10 @@ services:
       - "3000:3000"
     environment:
       GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in environment}"
+      GF_METRICS_ENABLED: "true"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards/forex-ai-control-tower:ro
 
   loki:
     image: grafana/loki:latest

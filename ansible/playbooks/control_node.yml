@@ -35,6 +35,22 @@
         group: aiops
         mode: "0644"
 
+    - name: Copy Blackbox exporter config
+      ansible.builtin.copy:
+        src: ../../monitoring/blackbox.yml
+        dest: /opt/forex-ai-control-tower/monitoring/blackbox.yml
+        owner: aiops
+        group: aiops
+        mode: "0644"
+
+    - name: Copy Grafana provisioning and dashboards
+      ansible.builtin.copy:
+        src: ../../monitoring/grafana/
+        dest: /opt/forex-ai-control-tower/monitoring/grafana/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
     - name: Validate control stack compose file
       ansible.builtin.command:
         cmd: docker compose -f /opt/forex-ai-control-tower/control-stack.compose.yml config
