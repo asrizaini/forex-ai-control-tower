@@ -148,6 +148,36 @@
           [Install]
           WantedBy=multi-user.target
 
+    - name: Install agent workflow engine systemd unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/forex-agent-workflow.service
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Forex AI Control Tower Agent Workflow Engine
+          After=network-online.target forex-control-stack.service forex-control-api.service
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=aiops
+          Group=aiops
+          WorkingDirectory=/opt/forex-ai-control-tower/app
+          Environment=PYTHONPATH=/opt/forex-ai-control-tower/app
+          Environment=AGENT_THEATER_EVENT_LOG=/opt/forex-ai-control-tower/runtime/agent_theater_events.jsonl
+          Environment=LOKI_PUSH_URL=http://10.10.1.81:3100/loki/api/v1/push
+          Environment=AGENT_WORKFLOW_INTERVAL_SECONDS=5
+          PassEnvironment=POSTGRES_PASSWORD
+          ExecStart=/opt/forex-ai-control-tower/.venv/bin/python -m agents.workflow_engine
+          Restart=always
+          RestartSec=5
+          NoNewPrivileges=true
+
+          [Install]
+          WantedBy=multi-user.target
+
     - name: Install dashboard systemd unit
       ansible.builtin.copy:
         dest: /etc/systemd/system/forex-dashboard.service
@@ -192,5 +222,11 @@
     - name: Start and enable orchestrator runtime
       ansible.builtin.systemd_service:
         name: forex-orchestrator
+        state: restarted
+        enabled: true
+
+    - name: Start and enable agent workflow engine
+      ansible.builtin.systemd_service:
+        name: forex-agent-workflow
         state: restarted
         enabled: true

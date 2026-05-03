@@ -56,6 +56,12 @@
         state: restarted
         enabled: true
 
+    - name: Restart agent workflow engine with runtime database secret
+      ansible.builtin.systemd_service:
+        name: forex-agent-workflow
+        state: restarted
+        enabled: true
+
 - name: Configure production runtime on Linux worker nodes
   hosts: worker_nodes
   become: true

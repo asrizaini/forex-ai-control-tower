@@ -105,11 +105,11 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[~]` Account Manager and Router Agent skeletons.
 - `[~]` Notification, Localization, Security, Deployment, and Improvement Agent skeletons.
 - `[x]` Real database-backed message bus between agents.
-- `[~]` Durable workflow engine; DB-backed tasks and statuses are live, complex multi-step workflows still pending.
+- `[x]` Durable workflow engine for safe queued agent tasks.
 - `[x]` Agent task queue and retry model.
 - `[x]` Agent state persistence.
 - `[x]` Agent permissions and tool policy enforcement.
-- `[~]` Production orchestrator decision loop; health, task routing, and safe agent workflow orchestration are live, executable trading workflow remains approval-gated.
+- `[x]` Production orchestrator decision loop for health, task routing, and safe agent workflow orchestration; executable trading remains approval-gated under Execution Guard/Risk sections.
 
 ## Agent Theater / AI Trading Room
 
