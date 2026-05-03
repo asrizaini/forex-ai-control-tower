@@ -309,16 +309,16 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[ ]` Real Android/iOS app.
 - `[ ]` FCM credentials and push sender.
 - `[~]` Mobile 2FA; JWT login and TOTP backend are ready, mobile-specific screens/client flow still pending.
-- `[ ]` Mobile approval/rejection live flow.
+- `[~]` Mobile approval/rejection flow; API records and mobile pending approval feed are wired, push delivery and MT5 execution handoff still pending.
 
 ## Production Readiness Gates Before Live Trading
 
-- `[ ]` Real user/account persistence.
-- `[ ]` Full RBAC and audit persistence.
-- `[ ]` Real risk policies per account.
-- `[ ]` Real strategy validation pipeline.
+- `[x]` Real user/account persistence.
+- `[x]` Full RBAC and audit persistence.
+- `[x]` Real risk policies per account.
+- `[~]` Real strategy validation pipeline; plugin governance, lifecycle order, backtest/forward/tuning job records, and permissions are wired, historical execution engine still pending.
 - `[ ]` Demo trading validation reports.
-- `[ ]` Manual approval workflow proven.
+- `[~]` Manual approval workflow proven at API/database level; notification delivery and MT5 handoff still pending.
 - `[ ]` Restricted live auto-trading reviewed and approved.
 - `[ ]` Secret manager deployed.
 - `[ ]` Backup/restore drill passed.

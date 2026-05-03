@@ -513,3 +513,45 @@ class MobilePushRegistrationOut(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class TradeApprovalCreate(BaseModel):
+    user_id: str = Field(min_length=1, max_length=80)
+    account_id: str = Field(min_length=1, max_length=80)
+    strategy_id: str = Field(min_length=1, max_length=100)
+    symbol: str = Field(min_length=1, max_length=40)
+    side: str = Field(pattern="^(BUY|SELL)$")
+    volume: float = Field(gt=0)
+    environment: str = Field(default="demo", pattern="^(dev|staging|demo|production-live)$")
+    trading_mode: str = Field(default="manual_live", max_length=40)
+    reason: str = Field(default="", max_length=1000)
+    guard_check_json: dict[str, Any] = Field(default_factory=dict)
+    expires_minutes: int = Field(default=10, ge=1, le=120)
+
+
+class TradeApprovalDecision(BaseModel):
+    decision: str = Field(pattern="^(approved|rejected)$")
+    reason: str = Field(default="", max_length=1000)
+
+
+class TradeApprovalOut(BaseModel):
+    id: int
+    approval_id: str
+    user_id: str
+    account_id: str
+    strategy_id: str
+    symbol: str
+    side: str
+    volume: float
+    environment: str
+    trading_mode: str
+    status: str
+    requested_by: str
+    decided_by: str | None
+    reason: str
+    guard_check_json: dict[str, Any]
+    expires_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}

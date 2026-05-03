@@ -13,7 +13,7 @@ from ..control_schemas import MobilePushRegisterRequest, MobilePushRegistrationO
 from ..crud import audit
 from ..db import get_db
 from ..dependencies import current_principal
-from ..models import Account, AccountSnapshot, MobilePushRegistration, NotificationEvent, PermissionAssignment
+from ..models import Account, AccountSnapshot, MobilePushRegistration, NotificationEvent, PermissionAssignment, TradeApproval
 
 router = APIRouter(prefix="/mobile", tags=["mobile"])
 
@@ -140,6 +140,14 @@ def mobile_summary(
     notifications = list(
         db.scalars(select(NotificationEvent).where(NotificationEvent.user_id == principal.user_id).order_by(NotificationEvent.created_at.desc()).limit(20))
     )
+    approvals = list(
+        db.scalars(
+            select(TradeApproval)
+            .where(TradeApproval.user_id == principal.user_id, TradeApproval.status == "pending")
+            .order_by(TradeApproval.created_at.desc())
+            .limit(20)
+        )
+    )
     return {
         "user_id": principal.user_id,
         "role": principal.role,
@@ -156,7 +164,19 @@ def mobile_summary(
             }
             for notification in notifications
         ],
-        "approval_flow": "manual_approval_api_pending",
+        "pending_approvals": [
+            {
+                "approval_id": approval.approval_id,
+                "account_id": approval.account_id,
+                "strategy_id": approval.strategy_id,
+                "symbol": approval.symbol,
+                "side": approval.side,
+                "volume": approval.volume,
+                "expires_at": approval.expires_at.isoformat() if approval.expires_at else None,
+            }
+            for approval in approvals
+        ],
+        "approval_flow": "manual_approval_api_ready",
         "execution": "blocked_without_execution_guard",
     }
 

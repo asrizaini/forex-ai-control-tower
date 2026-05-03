@@ -354,3 +354,26 @@ class MobilePushRegistration(Base):
     preferences_json: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class TradeApproval(Base):
+    __tablename__ = "trade_approvals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    approval_id: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    user_id: Mapped[str] = mapped_column(String(80), index=True)
+    account_id: Mapped[str] = mapped_column(String(80), index=True)
+    strategy_id: Mapped[str] = mapped_column(String(100), index=True)
+    symbol: Mapped[str] = mapped_column(String(40), index=True)
+    side: Mapped[str] = mapped_column(String(8))
+    volume: Mapped[float] = mapped_column(Float, default=0.0)
+    environment: Mapped[str] = mapped_column(String(40), default="demo", index=True)
+    trading_mode: Mapped[str] = mapped_column(String(40), default="manual_live", index=True)
+    status: Mapped[str] = mapped_column(String(60), default="pending", index=True)
+    requested_by: Mapped[str] = mapped_column(String(120), default="system", index=True)
+    decided_by: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    guard_check_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
