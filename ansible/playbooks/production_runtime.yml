@@ -30,8 +30,8 @@
           RemainAfterExit=true
           WorkingDirectory=/opt/forex-ai-control-tower
           PassEnvironment=POSTGRES_PASSWORD GRAFANA_ADMIN_PASSWORD
-          ExecStart=/usr/bin/docker compose -f /opt/forex-ai-control-tower/control-stack.compose.yml up -d
-          ExecStop=/usr/bin/docker compose -f /opt/forex-ai-control-tower/control-stack.compose.yml down
+          ExecStart=/bin/sh -c 'if [ -n "$POSTGRES_PASSWORD" ] && [ -n "$GRAFANA_ADMIN_PASSWORD" ]; then /usr/bin/docker compose -f /opt/forex-ai-control-tower/control-stack.compose.yml up -d; else /usr/bin/docker start forex-ai-control-tower-postgres-1 forex-ai-control-tower-redis-1 forex-ai-control-tower-qdrant-1 forex-ai-control-tower-prometheus-1 forex-ai-control-tower-grafana-1 forex-ai-control-tower-loki-1; fi'
+          ExecStop=/usr/bin/docker stop forex-ai-control-tower-postgres-1 forex-ai-control-tower-redis-1 forex-ai-control-tower-qdrant-1 forex-ai-control-tower-prometheus-1 forex-ai-control-tower-grafana-1 forex-ai-control-tower-loki-1
           TimeoutStartSec=300
 
           [Install]
