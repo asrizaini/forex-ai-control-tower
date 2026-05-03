@@ -488,3 +488,28 @@ class ReleaseStatusUpdate(BaseModel):
     status: str = Field(pattern="^(planned|approved|deployed|failed|rolled_back)$")
     test_result: str | None = Field(default=None, max_length=120)
     notes: str = Field(default="", max_length=500)
+
+
+class MobilePushRegisterRequest(BaseModel):
+    provider: str = Field(default="fcm", pattern="^(fcm|apns|browser)$")
+    platform: str = Field(default="android", pattern="^(android|ios|web)$")
+    device_id: str = Field(min_length=1, max_length=160)
+    push_token: str = Field(min_length=16, max_length=4096)
+    language: str = Field(default="en", pattern="^(en|ms-MY|auto)$")
+    preferences_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class MobilePushRegistrationOut(BaseModel):
+    id: int
+    registration_id: str
+    user_id: str
+    provider: str
+    device_id: str
+    platform: str
+    language: str
+    enabled: bool
+    preferences_json: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}

@@ -20,6 +20,7 @@ from .models import (
     AgentTask,
     KillSwitch,
     MarketSnapshot,
+    MobilePushRegistration,
     NotificationEvent,
     ReleaseRecord,
     RiskPolicy,
@@ -131,6 +132,7 @@ def collect_database_metrics() -> None:
         CONTROL_PLANE_RECORDS.labels("market_snapshots").set(db.scalar(select(func.count()).select_from(MarketSnapshot)) or 0)
         CONTROL_PLANE_RECORDS.labels("account_snapshots").set(db.scalar(select(func.count()).select_from(AccountSnapshot)) or 0)
         CONTROL_PLANE_RECORDS.labels("release_records").set(db.scalar(select(func.count()).select_from(ReleaseRecord)) or 0)
+        CONTROL_PLANE_RECORDS.labels("mobile_push_registrations").set(db.scalar(select(func.count()).select_from(MobilePushRegistration)) or 0)
 
         for agent, status, count in db.execute(
             select(AgentTask.assigned_agent, AgentTask.status, func.count()).group_by(AgentTask.assigned_agent, AgentTask.status)

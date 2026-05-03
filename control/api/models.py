@@ -337,3 +337,20 @@ class ReleaseRecord(Base):
     created_by: Mapped[str] = mapped_column(String(120), default="system", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class MobilePushRegistration(Base):
+    __tablename__ = "mobile_push_registrations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    registration_id: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    user_id: Mapped[str] = mapped_column(String(80), index=True)
+    provider: Mapped[str] = mapped_column(String(40), default="fcm", index=True)
+    device_id: Mapped[str] = mapped_column(String(160), index=True)
+    token_hash: Mapped[str] = mapped_column(String(128), index=True)
+    platform: Mapped[str] = mapped_column(String(40), default="android", index=True)
+    language: Mapped[str] = mapped_column(String(16), default="en")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    preferences_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)

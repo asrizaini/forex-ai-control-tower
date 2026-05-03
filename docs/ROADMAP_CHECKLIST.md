@@ -304,11 +304,11 @@ This checklist tracks the original full-system prompt. The current deployment is
 
 - `[x]` Mobile API contract docs.
 - `[x]` Kotlin client example.
-- `[~]` Mobile bootstrap route skeleton.
-- `[~]` Push registration route skeleton.
+- `[x]` Mobile bootstrap route with environment, auth, WebSocket, feature, and latest account contract.
+- `[x]` Authenticated push registration route with database-backed token hash records.
 - `[ ]` Real Android/iOS app.
 - `[ ]` FCM credentials and push sender.
-- `[ ]` Mobile 2FA.
+- `[~]` Mobile 2FA; JWT login and TOTP backend are ready, mobile-specific screens/client flow still pending.
 - `[ ]` Mobile approval/rejection live flow.
 
 ## Production Readiness Gates Before Live Trading
