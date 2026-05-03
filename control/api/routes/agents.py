@@ -24,6 +24,7 @@ from ..db import get_db
 from ..dependencies import current_principal
 from ..models import AgentMessage, AgentState, AgentTask, AgentToolPolicy
 from ..permissions import has_permission
+from agents.catalog import catalog_as_dicts
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 
@@ -35,6 +36,11 @@ def list_resource() -> dict:
         "description": "DB-backed agent task queue, message bus, state, and tool policies",
         "mode": "governed-monitor-only",
     }
+
+
+@router.get("/catalog")
+def catalog() -> dict:
+    return {"agents": catalog_as_dicts()}
 
 
 def _task_id() -> str:
@@ -150,4 +156,3 @@ def create_tool_policy(payload: AgentToolPolicyCreate, principal: Principal = De
     db.commit()
     db.refresh(policy)
     return policy
-

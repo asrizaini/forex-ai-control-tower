@@ -5,6 +5,8 @@ from pathlib import Path
 
 from fastapi import APIRouter
 
+from ..secret_manager import secret_manager_status
+
 router = APIRouter(prefix="/system", tags=["system"])
 
 
@@ -24,3 +26,7 @@ def runtime_status() -> dict:
         "agent_theater_event_log": str(event_log),
     }
 
+
+@router.get("/secret-manager/status")
+def get_secret_manager_status() -> dict:
+    return secret_manager_status()

@@ -62,7 +62,7 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Order send requires prior order check.
 - `[x]` Order send requires Execution Guard approval token.
 - `[x]` Runtime secrets are environment-driven with no committed secret material.
-- `[~]` Secret manager provider configuration added for env, Vault, SOPS, and cloud providers; external provider activation is an operator choice before live trading.
+- `[x]` Secret manager provider configuration added for env, Vault, SOPS, and cloud providers; active env provider is verifiable through API/dashboard, external provider activation is an operator choice before live trading.
 
 ## Core API And Dashboard
 
@@ -90,20 +90,20 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Safe Orchestrator runtime monitoring loop.
 - `[x]` Market Data Agent operational monitor.
 - `[x]` Technical Analysis Agent operational monitor.
-- `[~]` Fundamental Analysis Agent skeleton.
-- `[~]` News Impact Agent skeleton.
-- `[~]` Strategy Agent skeleton.
+- `[x]` Fundamental Analysis Agent operational monitor.
+- `[x]` News Impact Agent operational monitor.
+- `[x]` Strategy Agent operational monitor.
 - `[x]` Risk Manager Agent operational monitor.
 - `[x]` Signal Reviewer Agent operational monitor.
 - `[x]` Execution Agent operational monitor.
-- `[~]` Journal Agent skeleton.
-- `[~]` Backtest Agent skeleton.
-- `[~]` Forward Test Agent skeleton.
-- `[~]` Strategy Tuning Agent skeleton.
-- `[~]` Strategy Promotion Agent skeleton.
-- `[~]` Watchdog Agent skeleton.
-- `[~]` Account Manager and Router Agent skeletons.
-- `[~]` Notification, Localization, Security, Deployment, and Improvement Agent skeletons.
+- `[x]` Journal Agent operational monitor.
+- `[x]` Backtest Agent operational monitor.
+- `[x]` Forward Test Agent operational monitor.
+- `[x]` Strategy Tuning Agent operational monitor.
+- `[x]` Strategy Promotion Agent operational monitor.
+- `[x]` Watchdog Agent operational monitor.
+- `[x]` Account Manager and Router Agent operational monitors.
+- `[x]` Notification, Localization, Security, Deployment, and Improvement Agent operational monitors.
 - `[x]` Real database-backed message bus between agents.
 - `[x]` Durable workflow engine for safe queued agent tasks.
 - `[x]` Agent task queue and retry model.

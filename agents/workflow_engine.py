@@ -12,8 +12,9 @@ from pathlib import Path
 from sqlalchemy import select
 
 from agent_theater.loki import push_event
+from agents.catalog import AGENT_CATALOG
 from control.api.db import SessionLocal, init_db
-from control.api.models import AgentMessage, AgentState, AgentTask
+from control.api.models import AgentMessage, AgentState, AgentTask, AgentToolPolicy
 
 
 running = True
@@ -97,6 +98,46 @@ def _upsert_state(db, agent_name: str, status: str, state: dict) -> None:
         db.add(AgentState(agent_name=agent_name, status=status, state_json=state, heartbeat_at=now, updated_at=now))
 
 
+def seed_agent_catalog() -> int:
+    init_db()
+    db = SessionLocal()
+    try:
+        now = datetime.utcnow()
+        count = 0
+        for entry in AGENT_CATALOG:
+            record = db.scalar(select(AgentState).where(AgentState.agent_name == entry.name))
+            state = {"role": entry.role, "tool_policy": entry.tool_policy, "notes": entry.notes}
+            if record:
+                if record.status in {"running"}:
+                    continue
+                record.status = entry.status
+                record.state_json = {**(record.state_json or {}), **state}
+                record.heartbeat_at = now
+                record.updated_at = now
+            else:
+                db.add(AgentState(agent_name=entry.name, status=entry.status, state_json=state, heartbeat_at=now, updated_at=now))
+            existing_policy = db.scalar(
+                select(AgentToolPolicy)
+                .where(AgentToolPolicy.agent_name == entry.name)
+                .where(AgentToolPolicy.tool_name == entry.tool_policy)
+            )
+            if not existing_policy:
+                db.add(
+                    AgentToolPolicy(
+                        agent_name=entry.name,
+                        tool_name=entry.tool_policy,
+                        allowed=entry.tool_policy not in {"restricted", "no_direct_mt5", "adapter_pending"},
+                        environment="demo",
+                        reason=entry.notes,
+                    )
+                )
+            count += 1
+        db.commit()
+        return count
+    finally:
+        db.close()
+
+
 def process_one_task() -> str | None:
     init_db()
     db = SessionLocal()
@@ -168,6 +209,7 @@ def main() -> int:
     signal.signal(signal.SIGINT, _stop)
     while running:
         try:
+            seed_agent_catalog()
             processed = process_one_task()
             if processed:
                 print(json.dumps({"event": "agent_task_processed", "task_id": processed}), flush=True)
@@ -179,4 +221,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

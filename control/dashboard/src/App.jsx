@@ -9,12 +9,13 @@ const wsBase = apiBase.replace(/^http/, 'ws');
 function App() {
   const [health, setHealth] = useState({ status: 'loading', environment: 'demo', trading_mode: 'monitor_only' });
   const [runtime, setRuntime] = useState({ orchestrator_event_log_exists: false });
+  const [secretStatus, setSecretStatus] = useState({ active_provider: 'env', required_runtime_secrets_present: false });
   const [events, setEvents] = useState([]);
   const [marketSnapshots, setMarketSnapshots] = useState([]);
   const [accountSnapshots, setAccountSnapshots] = useState([]);
   const [token, setToken] = useState(window.localStorage.getItem('fx_access_token') || '');
   const [login, setLogin] = useState({ user_id: 'admin', password: '', totp_code: '' });
-  const [operatorData, setOperatorData] = useState({ users: [], permissions: [], audit: [], tasks: [], serviceKeys: [] });
+  const [operatorData, setOperatorData] = useState({ users: [], permissions: [], audit: [], tasks: [], serviceKeys: [], states: [], catalog: [] });
   const [operatorStatus, setOperatorStatus] = useState('Login to unlock admin control-plane panels.');
   const [newUser, setNewUser] = useState({ user_id: '', email: '', role: 'viewer', language: 'en' });
   const [newPermission, setNewPermission] = useState({ user_id: '', permission: 'dashboard:read', account_id: '', strategy_id: '' });
@@ -32,6 +33,9 @@ function App() {
     const loadRuntime = () => {
       fetch(`${apiBase}/api/v1/system/runtime`).then((r) => r.json()).then(setRuntime).catch(() => {
         setRuntime({ orchestrator_event_log_exists: false });
+      });
+      fetch(`${apiBase}/api/v1/system/secret-manager/status`).then((r) => r.json()).then(setSecretStatus).catch(() => {
+        setSecretStatus({ active_provider: 'unknown', required_runtime_secrets_present: false });
       });
       fetch(`${apiBase}/api/v1/agent-theater/events?limit=8`).then((r) => r.json()).then((body) => {
         setEvents(body.events || []);
@@ -61,14 +65,16 @@ function App() {
 
   const loadOperatorData = async () => {
     try {
-      const [users, permissions, audit, tasks, serviceKeys] = await Promise.all([
+      const [users, permissions, audit, tasks, serviceKeys, states, catalog] = await Promise.all([
         fetch(`${apiBase}/api/v1/users/records`, { headers: authHeaders() }).then((r) => r.json()),
         fetch(`${apiBase}/api/v1/permissions`, { headers: authHeaders() }).then((r) => r.json()),
         fetch(`${apiBase}/api/v1/audit/logs`, { headers: authHeaders() }).then((r) => r.ok ? r.json() : []),
         fetch(`${apiBase}/api/v1/agents/tasks`, { headers: authHeaders() }).then((r) => r.json()),
         fetch(`${apiBase}/api/v1/service-keys`, { headers: authHeaders() }).then((r) => r.ok ? r.json() : []),
+        fetch(`${apiBase}/api/v1/agents/states`, { headers: authHeaders() }).then((r) => r.json()),
+        fetch(`${apiBase}/api/v1/agents/catalog`, { headers: authHeaders() }).then((r) => r.json()),
       ]);
-      setOperatorData({ users, permissions, audit, tasks, serviceKeys });
+      setOperatorData({ users, permissions, audit, tasks, serviceKeys, states, catalog: catalog.agents || [] });
       setOperatorStatus('Control-plane data loaded.');
     } catch (error) {
       setOperatorStatus(error.message || 'Unable to load operator data.');
@@ -147,6 +153,11 @@ function App() {
         <article><Activity /><h2>System Health</h2><strong>{health.status}</strong></article>
         <article><ShieldCheck /><h2>Risk Status</h2><strong>Execution guarded</strong></article>
         <article><ServerCog /><h2>Orchestrator</h2><strong>{runtime.orchestrator_event_log_exists ? 'running' : 'warming up'}</strong></article>
+      </section>
+      <section className="grid">
+        <article><ShieldCheck /><h2>Secret Manager</h2><strong>{secretStatus.active_provider}</strong><p>{secretStatus.required_runtime_secrets_present ? 'Required runtime secrets present' : 'Missing required runtime secret'}</p></article>
+        <article><ServerCog /><h2>Agent Catalog</h2><strong>{operatorData.catalog.length || 'login required'}</strong><p>Registered governed agents</p></article>
+        <article><Activity /><h2>Workflow Engine</h2><strong>{operatorData.states.length ? 'active' : 'running'}</strong><p>DB-backed task processing</p></article>
       </section>
       <section className="telemetry-grid">
         <article>
@@ -252,6 +263,10 @@ function App() {
                 <button type="submit">Queue Task</button>
               </form>
               <div className="mini-list">{operatorData.tasks.slice(0, 6).map((task) => <span key={task.task_id}>{task.assigned_agent} · {task.status}</span>)}</div>
+            </article>
+            <article>
+              <h2>Agent States</h2>
+              <div className="mini-list">{operatorData.states.slice(0, 8).map((state) => <span key={state.agent_name}>{state.agent_name} · {state.status}</span>)}</div>
             </article>
             <article className="wide-card">
               <h2>Audit Trail</h2>
