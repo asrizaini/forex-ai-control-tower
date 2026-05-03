@@ -36,6 +36,10 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Orchestrator runtime service enabled on control node.
 - `[x]` Agent Theater live safe event feed enabled.
 - `[x]` Market and strategy/risk workers publish safe Agent Theater events.
+- `[x]` Agent Theater WebSocket live chat stream enabled.
+- `[x]` Agent Theater events pushed to Loki and visible in Grafana.
+- `[x]` Postgres-backed control-plane tables initialized.
+- `[x]` Initial admin user, demo account, monitor-only strategy, and global risk policy seeded.
 
 ## Safety Defaults
 
@@ -62,9 +66,9 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Authenticated WebSocket skeletons.
 - `[x]` Dashboard shows environment, health, risk, localization, orchestrator, and Agent Theater event panels.
 - `[ ]` Real multi-user login UI.
-- `[ ]` User management database.
-- `[ ]` Account management database.
-- `[ ]` Persistent audit event browser.
+- `[x]` User management database foundation.
+- `[x]` Account management database foundation.
+- `[~]` Persistent audit event browser; API exists, dashboard UI still pending.
 - `[ ]` Real RBAC policy storage and admin UI.
 - `[ ]` 2FA flow.
 - `[ ]` Refresh token flow.
@@ -104,7 +108,8 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[~]` Event schema, formatter, redaction, sample events.
 - `[~]` WebSocket route skeleton.
 - `[x]` Dashboard live Agent Theater event feed.
-- `[~]` Live event ingestion from agents; worker-side market, technical, strategy, and risk summaries are live.
+- `[x]` Live event ingestion from agents; worker-side market, technical, strategy, and risk summaries are live.
+- `[x]` Live chat stream over WebSocket.
 - `[~]` Workflow Timeline.
 - `[ ]` Debate Mode.
 - `[~]` Boardroom Mode.
@@ -255,6 +260,7 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Loki running.
 - `[x]` Blackbox exporter running.
 - `[x]` Grafana dashboard provisioned.
+- `[x]` Grafana Agent Theater log dashboard provisioned.
 - `[x]` Reachability monitoring for fixed IP plan.
 - `[x]` Linux node exporter on Linux hosts.
 - `[x]` Windows exporter on MT5 host.

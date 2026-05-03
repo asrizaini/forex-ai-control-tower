@@ -15,6 +15,7 @@ dist/
 build/
 .DS_Store
 *.log
+*.db
 ansible/inventory.ini
 deployment/reports/*.json
 deployment/reports/*.md

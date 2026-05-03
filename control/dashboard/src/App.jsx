@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import './styles.css';
 
 const apiBase = import.meta.env.VITE_API_BASE || `${window.location.protocol}//${window.location.hostname}:8000`;
+const wsBase = apiBase.replace(/^http/, 'ws');
 
 function App() {
   const [health, setHealth] = useState({ status: 'loading', environment: 'demo', trading_mode: 'monitor_only' });
@@ -26,7 +27,15 @@ function App() {
     };
     loadRuntime();
     const timer = window.setInterval(loadRuntime, 15000);
-    return () => window.clearInterval(timer);
+    const ws = new WebSocket(`${wsBase}/ws/v1/agent-theater`);
+    ws.onmessage = (message) => {
+      const event = JSON.parse(message.data);
+      setEvents((current) => [...current.slice(-40), event]);
+    };
+    return () => {
+      window.clearInterval(timer);
+      ws.close();
+    };
   }, []);
 
   return (
@@ -51,19 +60,19 @@ function App() {
         {events.length === 0 ? (
           <p>Waiting for safe orchestrator summaries.</p>
         ) : (
-          <div className="events">
+          <div className="chat-room">
             {events.slice().reverse().map((event, index) => (
-              <article className="event" key={`${event.timestamp}-${index}`}>
-                <div className="event-topline">
+              <article className="message" key={`${event.timestamp}-${index}`}>
+                <div className="message-topline">
                   <strong>{event.agent}</strong>
-                  <span>{event.timestamp}</span>
+                  <span>{event.stream} · {event.timestamp}</span>
                 </div>
                 <p>{event.summary}</p>
-                <dl>
-                  <div><dt>Result</dt><dd>{event.result}</dd></div>
-                  <div><dt>Risk</dt><dd>{event.risk_status}</dd></div>
-                  <div><dt>Next</dt><dd>{event.next_action}</dd></div>
-                </dl>
+                <div className="message-meta">
+                  <span>{event.result}</span>
+                  <span>{event.risk_status}</span>
+                  <span>{event.next_action}</span>
+                </div>
               </article>
             ))}
           </div>

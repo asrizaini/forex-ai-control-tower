@@ -10,6 +10,7 @@ from typing import Any
 from fastapi import APIRouter, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
+from agent_theater.loki import push_event
 from agent_theater.redaction import redact
 
 router = APIRouter(prefix="/agent-theater", tags=["agent-theater"])
@@ -62,6 +63,7 @@ def _append_event(event: dict[str, Any]) -> Path:
     event_log.parent.mkdir(parents=True, exist_ok=True)
     with event_log.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(event, separators=(",", ":")) + "\n")
+    push_event(event)
     return event_log
 
 

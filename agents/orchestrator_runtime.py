@@ -11,6 +11,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from agent_theater.loki import push_event
+
 
 ENDPOINTS = (
     ("Control API", "http://10.10.1.81:8000/health"),
@@ -93,8 +95,10 @@ def _event_from_checks(checks: list[dict[str, Any]]) -> SafeEvent:
 
 def _write_jsonl(path: Path, event: SafeEvent, max_events: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    payload = asdict(event)
     with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(asdict(event), separators=(",", ":")) + "\n")
+        handle.write(json.dumps(payload, separators=(",", ":")) + "\n")
+    push_event(payload)
 
 
 def _recent_events(path: Path, limit: int = 20) -> list[dict[str, Any]]:
