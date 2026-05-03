@@ -54,6 +54,9 @@
           WorkingDirectory=/opt/forex-ai-control-tower
           Environment=PYTHONPATH=/opt/forex-ai-control-tower
           Environment=FOREX_WORKER_NAME=market
+          Environment=MT5_BRIDGE_URL=http://10.10.1.86:8501
+          Environment=MARKET_WATCH_SYMBOLS=EURUSD,XAUUSD,GBPUSD,USDJPY
+          PassEnvironment=BRIDGE_API_TOKEN
           ExecStart=/usr/bin/python3 -m workers.runner
           Restart=always
           RestartSec=5
@@ -82,6 +85,8 @@
           WorkingDirectory=/opt/forex-ai-control-tower
           Environment=PYTHONPATH=/opt/forex-ai-control-tower
           Environment=FOREX_WORKER_NAME=strategy_risk
+          Environment=MT5_BRIDGE_URL=http://10.10.1.86:8501
+          PassEnvironment=BRIDGE_API_TOKEN
           ExecStart=/usr/bin/python3 -m workers.runner
           Restart=always
           RestartSec=5

@@ -36,6 +36,9 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Orchestrator runtime service enabled on control node.
 - `[x]` Agent Theater live safe event feed enabled.
 - `[x]` Market and strategy/risk workers publish safe Agent Theater events.
+- `[x]` Market worker reads MT5 bridge symbols, ticks, and M1 candle snapshots in monitor-only mode.
+- `[x]` Strategy/risk worker reads MT5 bridge account and open-position state in monitor-only mode.
+- `[x]` Agent Theater reports stale/limited MT5 market data as blocked for signal commentary.
 - `[x]` Agent Theater WebSocket live chat stream enabled.
 - `[x]` Agent Theater events pushed to Loki and visible in Grafana.
 - `[x]` Human-style Agent Theater dialogue templates for market, technical, news, strategy, risk, signal review, notification, and execution status.
@@ -201,8 +204,8 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[~]` Market worker service wrapper.
 - `[~]` Market data quality checker scaffold.
 - `[~]` Broker compatibility checker scaffold.
-- `[ ]` Real candle/tick collector.
-- `[ ]` Technical indicator engine.
+- `[~]` Real candle/tick collector; MT5 bridge snapshots are wired, durable storage still pending.
+- `[~]` Technical indicator engine; short-term trend from M1 candles is wired, full indicator suite still pending.
 - `[ ]` Multi-timeframe analyzer.
 - `[ ]` Price action detector.
 - `[ ]` Spread/slippage monitor.

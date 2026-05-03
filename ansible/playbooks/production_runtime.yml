@@ -53,6 +53,32 @@
         state: restarted
         enabled: true
 
+- name: Configure production runtime on Linux worker nodes
+  hosts: worker_nodes
+  become: true
+  tasks:
+    - name: Set volatile systemd runtime secrets for workers
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - set-environment
+          - "BRIDGE_API_TOKEN={{ lookup('env', 'BRIDGE_API_TOKEN') }}"
+      no_log: true
+
+    - name: Restart market worker with bridge token
+      ansible.builtin.systemd_service:
+        name: forex-market-worker
+        state: restarted
+        enabled: true
+      when: "'market_worker' in group_names"
+
+    - name: Restart strategy/risk worker with bridge token
+      ansible.builtin.systemd_service:
+        name: forex-strategy-risk-worker
+        state: restarted
+        enabled: true
+      when: "'strategy_risk_worker' in group_names"
+
 - name: Configure production runtime on Windows MT5 bridge
   hosts: mt5_bridge_windows
   gather_facts: false
