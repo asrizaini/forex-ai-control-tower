@@ -91,6 +91,14 @@
         group: aiops
         mode: preserve
 
+    - name: Copy notifications package
+      ansible.builtin.copy:
+        src: ../../notifications/
+        dest: /opt/forex-ai-control-tower/app/notifications/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
     - name: Copy localization package
       ansible.builtin.copy:
         src: ../../localization/

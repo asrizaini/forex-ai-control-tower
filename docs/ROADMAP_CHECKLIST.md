@@ -232,16 +232,16 @@ This checklist tracks the original full-system prompt. The current deployment is
 
 ## Notifications
 
-- `[~]` Notification hub scaffold.
-- `[~]` Escalation matrix documented.
-- `[ ]` Telegram integration.
-- `[ ]` WhatsApp Business Cloud API integration.
-- `[ ]` Mobile push integration.
-- `[ ]` Email SMTP integration.
-- `[ ]` Browser push integration.
-- `[ ]` Discord/SMS optional integrations.
-- `[ ]` Quiet hours.
-- `[ ]` Approval/rejection workflows through notification channels.
+- `[x]` Notification hub scaffold.
+- `[x]` Escalation matrix documented and exposed through API.
+- `[~]` Telegram integration readiness checks; delivery adapter pending token and live test.
+- `[~]` WhatsApp Business Cloud API readiness checks; delivery adapter pending token and live test.
+- `[~]` Mobile push readiness checks; delivery adapter pending FCM credentials and live test.
+- `[~]` Email SMTP readiness checks; delivery adapter pending SMTP credentials and live test.
+- `[~]` Browser push readiness checks; delivery adapter pending VAPID configuration.
+- `[~]` Discord/SMS optional readiness checks; adapters pending credentials.
+- `[x]` Quiet hours.
+- `[~]` Approval/rejection workflows through notification event records; real channel callbacks still pending.
 
 ## Paid And Local LLM Routing
 

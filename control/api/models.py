@@ -81,6 +81,25 @@ class StrategyLabJob(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
 
+class NotificationEvent(Base):
+    __tablename__ = "notification_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    level: Mapped[str] = mapped_column(String(40), index=True)
+    notification_type: Mapped[str] = mapped_column(String(80), index=True)
+    user_id: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
+    account_id: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    message: Mapped[str] = mapped_column(Text, default="")
+    language: Mapped[str] = mapped_column(String(16), default="en", index=True)
+    routed_channels: Mapped[list] = mapped_column(JSON, default=list)
+    pending_channels: Mapped[list] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String(60), default="queued", index=True)
+    metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
 class PermissionAssignment(Base):
     __tablename__ = "permission_assignments"
 

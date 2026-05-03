@@ -102,6 +102,37 @@ class StrategyLabJobOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class NotificationCreate(BaseModel):
+    level: str = Field(default="normal", max_length=40)
+    notification_type: str = Field(default="system_alert", max_length=80)
+    user_id: str | None = Field(default=None, max_length=80)
+    account_id: str | None = Field(default=None, max_length=80)
+    title: str = Field(max_length=200)
+    message: str = Field(default="", max_length=1000)
+    language: str = "en"
+    quiet_hours_enabled: bool = False
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class NotificationOut(BaseModel):
+    id: int
+    event_id: str
+    level: str
+    notification_type: str
+    user_id: str | None
+    account_id: str | None
+    title: str
+    message: str
+    language: str
+    routed_channels: list
+    pending_channels: list
+    status: str
+    metadata_json: dict[str, Any]
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class PermissionCreate(BaseModel):
     user_id: str
     permission: str
