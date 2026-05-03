@@ -48,6 +48,7 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in environment}"
       GF_METRICS_ENABLED: "true"
     volumes:
+      - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards/forex-ai-control-tower:ro
 
@@ -59,3 +60,4 @@ services:
 
 volumes:
   postgres_data:
+  grafana_data:

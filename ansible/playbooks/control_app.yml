@@ -35,6 +35,30 @@
         group: aiops
         mode: "0644"
 
+    - name: Copy agents package
+      ansible.builtin.copy:
+        src: ../../agents/
+        dest: /opt/forex-ai-control-tower/app/agents/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
+    - name: Copy Agent Theater package
+      ansible.builtin.copy:
+        src: ../../agent_theater/
+        dest: /opt/forex-ai-control-tower/app/agent_theater/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
+    - name: Create runtime state directory
+      ansible.builtin.file:
+        path: /opt/forex-ai-control-tower/runtime
+        state: directory
+        owner: aiops
+        group: aiops
+        mode: "0750"
+
     - name: Create dashboard web directory
       ansible.builtin.file:
         path: /opt/forex-ai-control-tower/dashboard
@@ -79,8 +103,37 @@
           Group=aiops
           WorkingDirectory=/opt/forex-ai-control-tower/app
           Environment=PYTHONPATH=/opt/forex-ai-control-tower/app
+          Environment=AGENT_THEATER_EVENT_LOG=/opt/forex-ai-control-tower/runtime/agent_theater_events.jsonl
           PassEnvironment=JWT_SECRET_KEY
           ExecStart=/opt/forex-ai-control-tower/.venv/bin/python -m uvicorn control.api.main:app --host 0.0.0.0 --port 8000
+          Restart=always
+          RestartSec=5
+          NoNewPrivileges=true
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Install orchestrator runtime systemd unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/forex-orchestrator.service
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Forex AI Control Tower Orchestrator Runtime
+          After=network-online.target forex-control-stack.service forex-control-api.service
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=aiops
+          Group=aiops
+          WorkingDirectory=/opt/forex-ai-control-tower/app
+          Environment=PYTHONPATH=/opt/forex-ai-control-tower/app
+          Environment=AGENT_THEATER_EVENT_LOG=/opt/forex-ai-control-tower/runtime/agent_theater_events.jsonl
+          Environment=ORCHESTRATOR_INTERVAL_SECONDS=30
+          ExecStart=/opt/forex-ai-control-tower/.venv/bin/python -m agents.orchestrator_runtime
           Restart=always
           RestartSec=5
           NoNewPrivileges=true
@@ -126,5 +179,11 @@
     - name: Start and enable dashboard
       ansible.builtin.systemd_service:
         name: forex-dashboard
+        state: restarted
+        enabled: true
+
+    - name: Start and enable orchestrator runtime
+      ansible.builtin.systemd_service:
+        name: forex-orchestrator
         state: restarted
         enabled: true

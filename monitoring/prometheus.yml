@@ -24,6 +24,20 @@ scrape_configs:
     static_configs:
       - targets: ["10.10.1.81:3100"]
 
+  - job_name: linux-node
+    static_configs:
+      - targets:
+          - 10.10.1.81:9100
+          - 10.10.1.82:9100
+          - 10.10.1.83:9100
+          - 10.10.1.84:9100
+          - 10.10.1.85:9100
+
+  - job_name: windows-node
+    static_configs:
+      - targets:
+          - 10.10.1.86:9182
+
   - job_name: blackbox-http
     metrics_path: /probe
     params:
@@ -60,6 +74,12 @@ scrape_configs:
           - 10.10.1.85:22
           - 10.10.1.86:22
           - 10.10.1.86:5985
+          - 10.10.1.81:9100
+          - 10.10.1.82:9100
+          - 10.10.1.83:9100
+          - 10.10.1.84:9100
+          - 10.10.1.85:9100
+          - 10.10.1.86:9182
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

@@ -31,6 +31,10 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` MT5 bridge connected to installed demo MT5 terminal.
 - `[x]` Runtime secrets rotated without printing values.
 - `[x]` Services enabled for restart after reboot where safe.
+- `[x]` Linux node exporters deployed on machines 1-5.
+- `[x]` Windows exporter deployed on machine 6.
+- `[x]` Orchestrator runtime service enabled on control node.
+- `[x]` Agent Theater live safe event feed enabled.
 
 ## Safety Defaults
 
@@ -55,7 +59,7 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` JWT signing/verification helper.
 - `[x]` Deny-by-default permission helper tests.
 - `[x]` Authenticated WebSocket skeletons.
-- `[~]` Dashboard skeleton with environment, health, risk, localization, and Agent Theater panels.
+- `[x]` Dashboard shows environment, health, risk, localization, orchestrator, and Agent Theater event panels.
 - `[ ]` Real multi-user login UI.
 - `[ ]` User management database.
 - `[ ]` Account management database.
@@ -69,7 +73,7 @@ This checklist tracks the original full-system prompt. The current deployment is
 
 - `[~]` Agent modules scaffolded.
 - `[~]` Structured message concept scaffolded.
-- `[~]` Orchestrator agent skeleton.
+- `[x]` Safe Orchestrator runtime monitoring loop.
 - `[~]` Market Data Agent skeleton.
 - `[~]` Technical Analysis Agent skeleton.
 - `[~]` Fundamental Analysis Agent skeleton.
@@ -91,14 +95,14 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[ ]` Agent task queue and retry model.
 - `[ ]` Agent state persistence.
 - `[ ]` Agent permissions and tool policy enforcement.
-- `[ ]` Production orchestrator decision loop.
+- `[~]` Production orchestrator decision loop; health monitoring is live, trading workflow orchestration remains pending.
 
 ## Agent Theater / AI Trading Room
 
 - `[~]` Agent Theater module scaffold.
 - `[~]` Event schema, formatter, redaction, sample events.
 - `[~]` WebSocket route skeleton.
-- `[~]` Dashboard placeholder.
+- `[x]` Dashboard live Agent Theater event feed.
 - `[ ]` Live event ingestion from all agents.
 - `[ ]` Workflow Timeline.
 - `[ ]` Debate Mode.
@@ -251,9 +255,10 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Blackbox exporter running.
 - `[x]` Grafana dashboard provisioned.
 - `[x]` Reachability monitoring for fixed IP plan.
+- `[x]` Linux node exporter on Linux hosts.
+- `[x]` Windows exporter on MT5 host.
+- `[x]` Host metrics dashboard provisioned.
 - `[~]` Structured JSON logs in selected services.
-- `[ ]` Node exporter on Linux hosts.
-- `[ ]` Windows exporter on MT5 host.
 - `[ ]` Docker/container dashboards.
 - `[ ]` API request dashboards.
 - `[ ]` Worker queue dashboards.
