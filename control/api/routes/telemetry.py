@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from ..control_schemas import AccountSnapshotOut, MarketSnapshotOut, WorkerTelemetryIn
 from ..db import get_db
 from ..models import AccountSnapshot, MarketSnapshot
+from market_data_quality.analysis import multi_timeframe_summary, price_action_summary, spread_slippage_summary
 
 router = APIRouter(prefix="/telemetry", tags=["telemetry"])
 
@@ -142,3 +143,37 @@ def latest_market_snapshots(symbol: str | None = None, limit: int = 50, db: Sess
 def latest_account_snapshots(limit: int = 50, db: Session = Depends(get_db)) -> list[AccountSnapshot]:
     query = select(AccountSnapshot).order_by(AccountSnapshot.created_at.desc()).limit(max(1, min(limit, 200)))
     return list(db.scalars(query))
+
+
+@router.get("/market/{symbol}/analysis")
+def market_analysis(symbol: str, limit: int = 20, db: Session = Depends(get_db)) -> dict:
+    snapshots = list(
+        db.scalars(
+            select(MarketSnapshot)
+            .where(MarketSnapshot.symbol == symbol.upper())
+            .order_by(MarketSnapshot.created_at.desc())
+            .limit(max(1, min(limit, 100)))
+        )
+    )
+    payloads = [
+        {
+            **(snapshot.payload_json or {}),
+            "trend": snapshot.trend,
+            "spread": snapshot.spread,
+            "feed_fresh": snapshot.feed_fresh,
+            "rates_count": snapshot.rates_count,
+        }
+        for snapshot in snapshots
+    ]
+    latest = payloads[0] if payloads else None
+    quality = multi_timeframe_summary(payloads)
+    price_action = price_action_summary(latest)
+    execution_cost = spread_slippage_summary(latest)
+    execution_allowed = quality["status"] == "ok" and price_action["status"] == "ok" and execution_cost["status"] == "ok"
+    return {
+        "symbol": symbol.upper(),
+        "execution_allowed_by_market_data": execution_allowed,
+        "multi_timeframe": quality,
+        "price_action": price_action,
+        "spread_slippage": execution_cost,
+    }

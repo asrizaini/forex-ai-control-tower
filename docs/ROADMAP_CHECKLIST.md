@@ -210,12 +210,12 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[~]` Broker compatibility checker scaffold.
 - `[~]` Real candle/tick collector; MT5 bridge snapshots are wired, durable storage still pending.
 - `[~]` Technical indicator engine; short-term trend from M1 candles is wired, full indicator suite still pending.
-- `[ ]` Multi-timeframe analyzer.
-- `[ ]` Price action detector.
-- `[ ]` Spread/slippage monitor.
-- `[ ]` News/fundamental feed integration.
-- `[ ]` High-impact news halt logic.
-- `[ ]` Stale feed detection wired to execution guard.
+- `[x]` Multi-timeframe analyzer over persisted market snapshots.
+- `[x]` Price action detector scaffold over latest market snapshot.
+- `[x]` Spread/slippage monitor over persisted telemetry.
+- `[~]` News/fundamental feed integration; conservative provider status API exists, external provider adapter still pending.
+- `[x]` High-impact news halt logic defaults to safe halt unless provider is enabled and clear.
+- `[~]` Stale feed detection available in market analysis and Execution Guard inputs; automatic binding into guard request still pending.
 
 ## Localization
 

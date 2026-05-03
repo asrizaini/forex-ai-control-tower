@@ -83,6 +83,14 @@
         group: aiops
         mode: preserve
 
+    - name: Copy market data quality package
+      ansible.builtin.copy:
+        src: ../../market_data_quality/
+        dest: /opt/forex-ai-control-tower/app/market_data_quality/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
     - name: Copy localization package
       ansible.builtin.copy:
         src: ../../localization/
