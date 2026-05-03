@@ -166,13 +166,13 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Demo MT5 terminal detected.
 - `[x]` Bridge token protection.
 - `[x]` Windows scheduled task startup.
-- `[~]` Multi-account terminal manager scaffold.
-- `[ ]` One MT5 terminal instance per account.
-- `[ ]` Per-account bridge ports `8501+`.
-- `[ ]` Account profile persistence.
-- `[ ]` Broker credential onboarding without secret leakage.
+- `[x]` Multi-account terminal manager scaffold.
+- `[~]` One MT5 terminal instance per account; software profile routing is ready, terminal launch orchestration still pending.
+- `[~]` Per-account bridge ports `8501+`; account route metadata and profile API are wired, multi-process launcher still pending.
+- `[x]` Account profile persistence without broker credentials.
+- `[~]` Broker credential onboarding without secret leakage; profiles intentionally exclude credentials, onboarding workflow still pending.
 - `[ ]` Windows service mode alternative.
-- `[ ]` Production MT5 bridge observability beyond basic health.
+- `[~]` Production MT5 bridge observability beyond basic health; health now includes profile count/routes, detailed per-terminal metrics still pending.
 
 ## Strategy Registry And Governance
 

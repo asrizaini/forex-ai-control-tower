@@ -11,8 +11,12 @@ from starlette.responses import Response
 
 from execution_guard.approval_token import validate_approval_token
 try:
+    from .account_profile import AccountProfile, load_account_profiles, profile_for_account, save_account_profiles
+    from .multi_terminal_manager import account_route_map
     from .mt5_client import MT5Client, MT5Unavailable
 except ImportError:
+    from account_profile import AccountProfile, load_account_profiles, profile_for_account, save_account_profiles
+    from multi_terminal_manager import account_route_map
     from mt5_client import MT5Client, MT5Unavailable
 
 BRIDGE_MODE = os.getenv("BRIDGE_MODE", "demo")
@@ -34,6 +38,15 @@ class OrderRequest(BaseModel):
     sl: float | None = None
     tp: float | None = None
     deviation: int = 20
+
+
+class AccountProfileIn(BaseModel):
+    account_id: str = Field(min_length=1, max_length=80)
+    terminal_port: int = Field(ge=8501, le=8599)
+    environment: str = Field(default="demo", pattern="^(dev|staging|demo|production-live)$")
+    trading_mode: str = "monitor_only"
+    terminal_path: str | None = None
+    enabled: bool = True
 
 
 def require_bridge_token(x_bridge_token: str | None = Header(default=None)) -> None:
@@ -74,6 +87,15 @@ def mt5_request(order: OrderRequest) -> dict[str, Any]:
     return request
 
 
+def require_known_account(account_id: str) -> AccountProfile:
+    profile = profile_for_account(account_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Unknown MT5 bridge account profile")
+    if not profile.enabled:
+        raise HTTPException(status_code=403, detail="MT5 bridge account profile is disabled")
+    return profile
+
+
 @app.get("/health")
 def health() -> dict[str, Any]:
     connected = False
@@ -89,6 +111,8 @@ def health() -> dict[str, Any]:
         "require_order_check": REQUIRE_ORDER_CHECK,
         "mt5_connected": connected,
         "mt5_terminal_path_configured": bool(os.getenv("MT5_TERMINAL_PATH")),
+        "multi_account_profiles": len(load_account_profiles()),
+        "account_routes": account_route_map(),
         "error": error,
     }
 
@@ -104,6 +128,34 @@ def account() -> dict[str, Any]:
         return client().account_info()
     except MT5Unavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/accounts/profiles", dependencies=[Depends(require_bridge_token)])
+def account_profiles() -> dict[str, Any]:
+    return {"accounts": [profile.__dict__ for profile in load_account_profiles()]}
+
+
+@app.post("/accounts/profiles", dependencies=[Depends(require_bridge_token)])
+def upsert_account_profile(profile: AccountProfileIn) -> dict[str, Any]:
+    if profile.environment == "production-live":
+        raise HTTPException(status_code=403, detail="production-live profile requires governance workflow")
+    profiles = [item for item in load_account_profiles() if item.account_id != profile.account_id]
+    profiles.append(AccountProfile(**profile.model_dump()))
+    save_account_profiles(profiles)
+    return {"saved": True, "account_id": profile.account_id, "terminal_port": profile.terminal_port}
+
+
+@app.get("/accounts/{account_id}/route", dependencies=[Depends(require_bridge_token)])
+def account_route(account_id: str) -> dict[str, Any]:
+    profile = require_known_account(account_id)
+    return {
+        "account_id": profile.account_id,
+        "terminal_port": profile.terminal_port,
+        "environment": profile.environment,
+        "trading_mode": profile.trading_mode,
+        "terminal_path_configured": bool(profile.terminal_path),
+        "enabled": profile.enabled,
+    }
 
 
 @app.get("/symbols", dependencies=[Depends(require_bridge_token)])
@@ -132,6 +184,7 @@ def ticks(symbol: str) -> dict[str, Any]:
 
 @app.post("/order/check", dependencies=[Depends(require_bridge_token)])
 def order_check(order: OrderRequest) -> dict[str, Any]:
+    require_known_account(order.account_id)
     if order.live_order and not ALLOW_LIVE_TRADING:
         raise HTTPException(status_code=403, detail="Live trading is disabled")
     try:
@@ -144,6 +197,7 @@ def order_check(order: OrderRequest) -> dict[str, Any]:
 
 @app.post("/order/send", dependencies=[Depends(require_bridge_token)])
 def order_send(order: OrderRequest, x_execution_guard_token: str | None = Header(default=None)) -> dict[str, Any]:
+    require_known_account(order.account_id)
     if order.live_order and not ALLOW_LIVE_TRADING:
         raise HTTPException(status_code=403, detail="Live trading is disabled")
     if REQUIRE_ORDER_CHECK and order.client_order_id not in checked_orders:
