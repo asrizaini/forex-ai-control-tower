@@ -119,3 +119,24 @@ def test_orchestrator_chat_supports_debate_and_improvement_rooms(monkeypatch, tm
     streams = {event["stream"] for event in client.get("/api/v1/agent-theater/events").json()["events"]}
     assert "Debate Mode" in streams
     assert "System Improvement Room" in streams
+
+
+def test_room_seed_creates_multi_agent_transcripts(monkeypatch, tmp_path):
+    event_log = tmp_path / "events.jsonl"
+    monkeypatch.setenv("AGENT_THEATER_EVENT_LOG", str(event_log))
+    app = create_app()
+    client = TestClient(app, client=("10.10.1.50", 12345))
+
+    for room in ("Workflow Timeline", "Boardroom Mode", "Strategy War Room", "Account Routing Room"):
+        response = client.post(f"/api/v1/agent-theater/rooms/{room}/seed")
+        assert response.status_code == 202
+        body = response.json()
+        assert len(body["events"]) >= 3
+        assert {event["stream"] for event in body["events"]} == {room}
+
+    events = client.get("/api/v1/agent-theater/events?limit=30").json()["events"]
+    agents = {event["agent"] for event in events}
+    assert "Journal Agent" in agents
+    assert "Security Review Agent" in agents
+    assert "Backtest Agent" in agents
+    assert "Account Router Agent" in agents

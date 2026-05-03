@@ -126,11 +126,11 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Debate Mode safe challenge summaries between Strategy Agent and Risk Manager.
 - `[x]` System Improvement Room for roadmap, deployment, rollback, test, and audit coordination.
 - `[x]` Bilingual rendered event stream labels and selected safe summaries for English and Bahasa Melayu Malaysia.
-- `[~]` Real market/news/strategy content in dialogue; current messages honestly show standby or pending-adapter status until integrations are complete.
-- `[~]` Workflow Timeline.
-- `[~]` Boardroom Mode.
-- `[~]` Strategy War Room.
-- `[~]` Account Routing Room.
+- `[~]` Real market/news/strategy content in dialogue; live market/account telemetry is present, but news feed, full strategy scoring, and live strategy governance adapters are still pending.
+- `[x]` Workflow Timeline room with multi-agent safe transcript seed and live event filtering.
+- `[x]` Boardroom Mode with executive status, risk posture, and security review summaries.
+- `[x]` Strategy War Room with strategy, backtest, and promotion gate summaries.
+- `[x]` Account Routing Room with account router, risk manager, and execution guard summaries.
 
 ## Execution Guard And Risk
 

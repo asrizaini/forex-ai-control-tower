@@ -24,6 +24,7 @@ from agent_theater.loki import push_event
 from agent_theater.modes import mode_names, modes_as_dicts
 from agent_theater.redaction import redact
 from agent_theater.renderer import render_event, render_events
+from agent_theater.room_templates import room_seed_events
 
 router = APIRouter(prefix="/agent-theater", tags=["agent-theater"])
 
@@ -593,19 +594,8 @@ def seed_room_status(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown Agent Theater room")
     if not _chat_allowed(request, authorization):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
-    event = {
-        "agent": "Orchestrator Agent",
-        "stream": room_name,
-        "summary": f"{room_name} is active. I will show only safe summaries, visible conclusions, confidence, risk status, and next action.",
-        "input_sources": ["Agent Theater mode catalog"],
-        "result": "room_active",
-        "confidence": 0.9,
-        "risk_status": "safe_display_only",
-        "next_action": "Use this room for visibility and governed coordination; it cannot bypass approvals.",
-        "metadata": {"message_type": "room_seed"},
-        "timestamp": _timestamp(),
-        "contains_hidden_chain_of_thought": False,
-    }
-    _append_event(redact(event))
-    return {"accepted": True, "event": render_event(event)}
+    events = room_seed_events(room_name)
+    for event in events:
+        _append_event(redact(event))
+    return {"accepted": True, "events": [render_event(event) for event in events]}
 
