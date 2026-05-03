@@ -45,6 +45,8 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Grafana-embedded Orchestrator Console for operator chat and safe agent task routing.
 - `[x]` Local Ollama-backed general Orchestrator chat enabled with safety fallback.
 - `[x]` Postgres-backed control-plane tables initialized.
+- `[x]` Worker telemetry snapshots persisted to PostgreSQL through the control API.
+- `[x]` Dashboard displays latest MT5 account and market telemetry.
 - `[x]` Initial admin user, demo account, monitor-only strategy, and global risk policy seeded.
 
 ## Safety Defaults
@@ -71,6 +73,7 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Deny-by-default permission helper tests.
 - `[x]` Authenticated WebSocket skeletons.
 - `[x]` Dashboard shows environment, health, risk, localization, orchestrator, and Agent Theater event panels.
+- `[x]` Dashboard shows latest persisted MT5 account/market snapshots.
 - `[ ]` Real multi-user login UI.
 - `[x]` User management database foundation.
 - `[x]` Account management database foundation.

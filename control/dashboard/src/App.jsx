@@ -10,6 +10,8 @@ function App() {
   const [health, setHealth] = useState({ status: 'loading', environment: 'demo', trading_mode: 'monitor_only' });
   const [runtime, setRuntime] = useState({ orchestrator_event_log_exists: false });
   const [events, setEvents] = useState([]);
+  const [marketSnapshots, setMarketSnapshots] = useState([]);
+  const [accountSnapshots, setAccountSnapshots] = useState([]);
   const [language, setLanguage] = useState('en');
   const [chatMessage, setChatMessage] = useState('');
   const [chatStatus, setChatStatus] = useState('Ready for safe status questions.');
@@ -26,6 +28,8 @@ function App() {
       fetch(`${apiBase}/api/v1/agent-theater/events?limit=8`).then((r) => r.json()).then((body) => {
         setEvents(body.events || []);
       }).catch(() => setEvents([]));
+      fetch(`${apiBase}/api/v1/telemetry/market/latest?limit=4`).then((r) => r.json()).then(setMarketSnapshots).catch(() => setMarketSnapshots([]));
+      fetch(`${apiBase}/api/v1/telemetry/accounts/latest?limit=1`).then((r) => r.json()).then(setAccountSnapshots).catch(() => setAccountSnapshots([]));
     };
     loadRuntime();
     const timer = window.setInterval(loadRuntime, 15000);
@@ -73,6 +77,36 @@ function App() {
         <article><Activity /><h2>System Health</h2><strong>{health.status}</strong></article>
         <article><ShieldCheck /><h2>Risk Status</h2><strong>Execution guarded</strong></article>
         <article><ServerCog /><h2>Orchestrator</h2><strong>{runtime.orchestrator_event_log_exists ? 'running' : 'warming up'}</strong></article>
+      </section>
+      <section className="telemetry-grid">
+        <article>
+          <h2>MT5 Demo Account</h2>
+          {accountSnapshots[0] ? (
+            <div className="telemetry-list">
+              <span>Account <strong>{accountSnapshots[0].login_masked}</strong></span>
+              <span>Server <strong>{accountSnapshots[0].server}</strong></span>
+              <span>Equity <strong>{accountSnapshots[0].equity} {accountSnapshots[0].currency}</strong></span>
+              <span>Drawdown <strong>{accountSnapshots[0].drawdown_pct}%</strong></span>
+              <span>Positions <strong>{accountSnapshots[0].positions_count}</strong></span>
+              <span>Mode <strong>{accountSnapshots[0].risk_mode}</strong></span>
+            </div>
+          ) : <p>Waiting for account telemetry.</p>}
+        </article>
+        <article>
+          <h2>Market Snapshot</h2>
+          {marketSnapshots.length ? (
+            <div className="market-table">
+              {marketSnapshots.map((snapshot) => (
+                <div className="market-row" key={`${snapshot.symbol}-${snapshot.id}`}>
+                  <strong>{snapshot.symbol}</strong>
+                  <span>{snapshot.trend}</span>
+                  <span>{snapshot.feed_fresh ? 'fresh' : 'stale'}</span>
+                  <span>{snapshot.rates_count} candles</span>
+                </div>
+              ))}
+            </div>
+          ) : <p>Waiting for market telemetry.</p>}
+        </article>
       </section>
       <section className="theater">
         <div className="section-title">

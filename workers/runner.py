@@ -52,6 +52,20 @@ def publish_theater_event(event: dict) -> None:
         emit({"level": "warning", "event": "agent_theater_publish_failed", "agent": event["agent"], "error": type(exc).__name__})
 
 
+def publish_telemetry(worker_name: str, result: dict) -> None:
+    url = os.getenv("TELEMETRY_INGEST_URL", "http://10.10.1.81:8000/api/v1/telemetry/worker-snapshot")
+    token = os.getenv("TELEMETRY_INGEST_TOKEN")
+    data = json.dumps({"worker": worker_name, "result": result}, separators=(",", ":")).encode("utf-8")
+    request = urllib.request.Request(url, data=data, method="POST", headers={"Content-Type": "application/json"})
+    if token:
+        request.add_header("X-Telemetry-Token", token)
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            emit({"level": "info", "event": "telemetry_publish", "status": response.status, "worker": worker_name})
+    except (urllib.error.URLError, TimeoutError) as exc:
+        emit({"level": "warning", "event": "telemetry_publish_failed", "worker": worker_name, "error": type(exc).__name__})
+
+
 def main() -> int:
     worker_name = os.getenv("FOREX_WORKER_NAME", "market")
     interval_seconds = int(os.getenv("FOREX_WORKER_INTERVAL_SECONDS", "30"))
@@ -69,6 +83,7 @@ def main() -> int:
         try:
             result = worker()
             emit({"level": "info", "event": "worker_heartbeat", "result": result})
+            publish_telemetry(worker_name, result)
             for theater_event in theater_events(worker_name, result):
                 publish_theater_event(theater_event)
         except Exception as exc:  # pragma: no cover - defensive service boundary

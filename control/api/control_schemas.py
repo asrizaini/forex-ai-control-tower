@@ -102,3 +102,44 @@ class AuditLogOut(BaseModel):
     note: str
 
     model_config = {"from_attributes": True}
+
+
+class WorkerTelemetryIn(BaseModel):
+    worker: str = Field(min_length=1, max_length=80)
+    result: dict[str, Any] = Field(default_factory=dict)
+
+
+class MarketSnapshotOut(BaseModel):
+    id: int
+    worker: str
+    symbol: str
+    trend: str
+    spread: float | None
+    freshness_seconds: int | None
+    rates_count: int
+    feed_fresh: bool
+    data_quality: str
+    payload_json: dict[str, Any]
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AccountSnapshotOut(BaseModel):
+    id: int
+    worker: str
+    login_masked: str
+    server: str
+    currency: str
+    balance: float | None
+    equity: float | None
+    margin_free: float | None
+    drawdown_pct: float | None
+    positions_count: int
+    trade_allowed: bool | None
+    risk_mode: str
+    auto_execution_enabled: bool
+    payload_json: dict[str, Any]
+    created_at: datetime
+
+    model_config = {"from_attributes": True}

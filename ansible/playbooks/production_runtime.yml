@@ -63,6 +63,7 @@
           - systemctl
           - set-environment
           - "BRIDGE_API_TOKEN={{ lookup('env', 'BRIDGE_API_TOKEN') }}"
+          - "TELEMETRY_INGEST_TOKEN={{ lookup('env', 'TELEMETRY_INGEST_TOKEN') }}"
       no_log: true
 
     - name: Restart market worker with bridge token

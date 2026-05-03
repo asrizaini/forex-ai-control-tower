@@ -89,3 +89,39 @@ class AuditLog(Base):
     details: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     note: Mapped[str] = mapped_column(Text, default="")
+
+
+class MarketSnapshot(Base):
+    __tablename__ = "market_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    worker: Mapped[str] = mapped_column(String(80), default="market", index=True)
+    symbol: Mapped[str] = mapped_column(String(40), index=True)
+    trend: Mapped[str] = mapped_column(String(80), default="unknown")
+    spread: Mapped[float | None] = mapped_column(Float, nullable=True)
+    freshness_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rates_count: Mapped[int] = mapped_column(Integer, default=0)
+    feed_fresh: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    data_quality: Mapped[str] = mapped_column(String(40), default="limited", index=True)
+    payload_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class AccountSnapshot(Base):
+    __tablename__ = "account_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    worker: Mapped[str] = mapped_column(String(80), default="strategy_risk", index=True)
+    login_masked: Mapped[str] = mapped_column(String(80), default="***", index=True)
+    server: Mapped[str] = mapped_column(String(120), default="unknown")
+    currency: Mapped[str] = mapped_column(String(16), default="unknown")
+    balance: Mapped[float | None] = mapped_column(Float, nullable=True)
+    equity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    margin_free: Mapped[float | None] = mapped_column(Float, nullable=True)
+    drawdown_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    positions_count: Mapped[int] = mapped_column(Integer, default=0)
+    trade_allowed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    risk_mode: Mapped[str] = mapped_column(String(40), default="monitor_only", index=True)
+    auto_execution_enabled: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    payload_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
