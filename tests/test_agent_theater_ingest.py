@@ -61,3 +61,14 @@ def test_orchestrator_chat_redacts_secret_like_text(monkeypatch, tmp_path):
     assert response.status_code == 202
     body = client.get("/api/v1/agent-theater/events").json()
     assert body["events"][0]["summary"] == "[REDACTED: operator message may contain sensitive text]"
+
+
+def test_orchestrator_console_serves_embeddable_ui():
+    app = create_app()
+    client = TestClient(app)
+
+    response = client.get("/api/v1/agent-theater/console")
+
+    assert response.status_code == 200
+    assert "Orchestrator Console" in response.text
+    assert "/api/v1/agent-theater/chat" in response.text

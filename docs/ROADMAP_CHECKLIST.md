@@ -39,6 +39,8 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Agent Theater WebSocket live chat stream enabled.
 - `[x]` Agent Theater events pushed to Loki and visible in Grafana.
 - `[x]` Human-style Agent Theater dialogue templates for market, technical, news, strategy, risk, signal review, notification, and execution status.
+- `[x]` Grafana-embedded Orchestrator Console for operator chat and safe agent task routing.
+- `[x]` Local Ollama-backed general Orchestrator chat enabled with safety fallback.
 - `[x]` Postgres-backed control-plane tables initialized.
 - `[x]` Initial admin user, demo account, monitor-only strategy, and global risk policy seeded.
 
@@ -111,6 +113,8 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Dashboard live Agent Theater event feed.
 - `[x]` Live event ingestion from agents; worker-side market, technical, strategy, and risk summaries are live.
 - `[x]` Live chat stream over WebSocket.
+- `[x]` Operator-to-Orchestrator chat UI embedded in Grafana.
+- `[x]` Orchestrator chat publishes operator messages, agent task acknowledgements, and safe replies into the Theater transcript.
 - `[x]` Human-readable trading-room style status messages.
 - `[~]` Real market/news/strategy content in dialogue; current messages honestly show standby or pending-adapter status until integrations are complete.
 - `[~]` Workflow Timeline.
