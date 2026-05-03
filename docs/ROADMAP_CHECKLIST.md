@@ -35,6 +35,7 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Windows exporter deployed on machine 6.
 - `[x]` Orchestrator runtime service enabled on control node.
 - `[x]` Agent Theater live safe event feed enabled.
+- `[x]` Market and strategy/risk workers publish safe Agent Theater events.
 
 ## Safety Defaults
 
@@ -103,12 +104,12 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[~]` Event schema, formatter, redaction, sample events.
 - `[~]` WebSocket route skeleton.
 - `[x]` Dashboard live Agent Theater event feed.
-- `[ ]` Live event ingestion from all agents.
-- `[ ]` Workflow Timeline.
+- `[~]` Live event ingestion from agents; worker-side market, technical, strategy, and risk summaries are live.
+- `[~]` Workflow Timeline.
 - `[ ]` Debate Mode.
-- `[ ]` Boardroom Mode.
-- `[ ]` Strategy War Room.
-- `[ ]` Account Routing Room.
+- `[~]` Boardroom Mode.
+- `[~]` Strategy War Room.
+- `[~]` Account Routing Room.
 - `[ ]` System Improvement Room.
 - `[ ]` Bilingual rendered event stream.
 

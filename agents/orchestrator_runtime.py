@@ -93,11 +93,39 @@ def _event_from_checks(checks: list[dict[str, Any]]) -> SafeEvent:
 
 def _write_jsonl(path: Path, event: SafeEvent, max_events: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    existing: list[str] = []
-    if path.exists():
-        existing = path.read_text(encoding="utf-8").splitlines()[-max_events + 1 :]
-    existing.append(json.dumps(asdict(event), separators=(",", ":")))
-    path.write_text("\n".join(existing) + "\n", encoding="utf-8")
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(asdict(event), separators=(",", ":")) + "\n")
+
+
+def _recent_events(path: Path, limit: int = 20) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    events: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8").splitlines()[-limit:]:
+        try:
+            events.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return events
+
+
+def _boardroom_event(path: Path) -> SafeEvent | None:
+    recent = _recent_events(path)
+    agents = sorted({str(event.get("agent", "Unknown Agent")) for event in recent if event.get("agent")})
+    worker_agents = [agent for agent in agents if agent in {"Market Data Agent", "Technical Analysis Agent", "Strategy Agent", "Risk Manager Agent"}]
+    if not worker_agents:
+        return None
+    return SafeEvent(
+        timestamp=_utc_timestamp(),
+        agent="Orchestrator Agent",
+        stream="Boardroom Mode",
+        summary=f"Agent Theater received live summaries from {len(worker_agents)} worker-side agents: {', '.join(worker_agents)}.",
+        input_sources=worker_agents,
+        result="coordination_visible",
+        confidence=0.88,
+        risk_status="execution_guarded_monitor_only",
+        next_action="Continue routing safe summaries into Agent Theater; executable trade flow remains disabled until governance gates pass.",
+    )
 
 
 def main() -> int:
@@ -112,6 +140,10 @@ def main() -> int:
         event = _event_from_checks(checks)
         _write_jsonl(event_log, event, max_events)
         print(json.dumps(asdict(event), separators=(",", ":")), flush=True)
+        boardroom_event = _boardroom_event(event_log)
+        if boardroom_event:
+            _write_jsonl(event_log, boardroom_event, max_events)
+            print(json.dumps(asdict(boardroom_event), separators=(",", ":")), flush=True)
         time.sleep(interval_seconds)
 
     return 0
