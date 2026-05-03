@@ -9,6 +9,8 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable
 
+from agent_theater.dialogue_templates import market_dialogue, strategy_risk_dialogue
+
 from .market_worker import run_market_worker_once
 from .strategy_risk_worker import run_strategy_risk_worker_once
 
@@ -32,54 +34,8 @@ def emit(event: dict) -> None:
 
 def theater_events(worker_name: str, result: dict) -> list[dict]:
     if worker_name == "market":
-        return [
-            {
-                "agent": "Market Data Agent",
-                "stream": "Live Chat View",
-                "summary": "Market worker heartbeat received; candle, tick, spread, and feed-quality loops are alive.",
-                "input_sources": ["fx-market-worker", "market_worker.py"],
-                "result": result.get("status", "observed"),
-                "confidence": 0.86,
-                "risk_status": "market_data_monitoring_only",
-                "next_action": "Keep collecting market health signals; block execution if feed quality degrades.",
-                "metadata": {"worker": worker_name, "safe_mode": True},
-            },
-            {
-                "agent": "Technical Analysis Agent",
-                "stream": "Strategy War Room",
-                "summary": "Technical analysis loop is standing by for validated candle data; no trade signal is authorized from this heartbeat.",
-                "input_sources": ["Market Data Agent"],
-                "result": "standby",
-                "confidence": 0.72,
-                "risk_status": "no_execution_requested",
-                "next_action": "Wait for strategy registry and risk gates before producing executable signals.",
-                "metadata": {"worker": worker_name, "signal_authorized": False},
-            },
-        ]
-    return [
-        {
-            "agent": "Strategy Agent",
-            "stream": "Boardroom Mode",
-            "summary": "Strategy/risk worker heartbeat received; strategy registry, backtest, tuning, and risk loops are alive.",
-            "input_sources": ["fx-strategy-risk-worker", "strategy_risk_worker.py"],
-            "result": result.get("status", "observed"),
-            "confidence": 0.84,
-            "risk_status": "execution_guarded_monitor_only",
-            "next_action": "Keep strategy lifecycle in monitor mode until governance and validation gates are complete.",
-            "metadata": {"worker": worker_name, "safe_mode": True},
-        },
-        {
-            "agent": "Risk Manager Agent",
-            "stream": "Account Routing Room",
-            "summary": "Risk manager confirms execution remains blocked unless Execution Guard issues a short-lived approval token.",
-            "input_sources": ["Strategy Agent", "Execution Guard"],
-            "result": "guarded",
-            "confidence": 0.9,
-            "risk_status": "order_send_blocked_without_guard_token",
-            "next_action": "Maintain monitor_only mode while user, account, and strategy permissions are built.",
-            "metadata": {"worker": worker_name, "live_auto_trading": False},
-        },
-    ]
+        return market_dialogue(worker_name, result)
+    return strategy_risk_dialogue(worker_name, result)
 
 
 def publish_theater_event(event: dict) -> None:

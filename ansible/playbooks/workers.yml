@@ -19,6 +19,14 @@
         group: aiops
         mode: preserve
 
+    - name: Copy Agent Theater package for worker dialogue templates
+      ansible.builtin.copy:
+        src: ../../agent_theater/
+        dest: /opt/forex-ai-control-tower/agent_theater/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
     - name: Write worker role marker
       ansible.builtin.copy:
         dest: /opt/forex-ai-control-tower/workers/role.txt

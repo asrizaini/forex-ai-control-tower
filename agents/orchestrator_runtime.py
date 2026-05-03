@@ -116,14 +116,29 @@ def _recent_events(path: Path, limit: int = 20) -> list[dict[str, Any]]:
 def _boardroom_event(path: Path) -> SafeEvent | None:
     recent = _recent_events(path)
     agents = sorted({str(event.get("agent", "Unknown Agent")) for event in recent if event.get("agent")})
-    worker_agents = [agent for agent in agents if agent in {"Market Data Agent", "Technical Analysis Agent", "Strategy Agent", "Risk Manager Agent"}]
+    worker_agents = [
+        agent
+        for agent in agents
+        if agent
+        in {
+            "Market Data Agent",
+            "Technical Analysis Agent",
+            "News Agent",
+            "Strategy Agent",
+            "Risk Manager",
+            "Risk Manager Agent",
+            "Signal Reviewer",
+            "Notification Agent",
+            "Execution Agent",
+        }
+    ]
     if not worker_agents:
         return None
     return SafeEvent(
         timestamp=_utc_timestamp(),
         agent="Orchestrator Agent",
         stream="Boardroom Mode",
-        summary=f"Agent Theater received live summaries from {len(worker_agents)} worker-side agents: {', '.join(worker_agents)}.",
+        summary=f"Team check-in received from {len(worker_agents)} agents: {', '.join(worker_agents)}. Everyone is communicating in safe monitor-only mode.",
         input_sources=worker_agents,
         result="coordination_visible",
         confidence=0.88,
