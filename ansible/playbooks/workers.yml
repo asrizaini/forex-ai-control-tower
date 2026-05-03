@@ -11,6 +11,14 @@
         group: aiops
         mode: "0750"
 
+    - name: Copy worker package
+      ansible.builtin.copy:
+        src: ../../workers/
+        dest: /opt/forex-ai-control-tower/workers/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
     - name: Write worker role marker
       ansible.builtin.copy:
         dest: /opt/forex-ai-control-tower/workers/role.txt
@@ -18,3 +26,77 @@
         owner: aiops
         group: aiops
         mode: "0640"
+
+    - name: Install market worker systemd unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/forex-market-worker.service
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Forex AI Market Worker
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=aiops
+          Group=aiops
+          WorkingDirectory=/opt/forex-ai-control-tower
+          Environment=PYTHONPATH=/opt/forex-ai-control-tower
+          Environment=FOREX_WORKER_NAME=market
+          ExecStart=/usr/bin/python3 -m workers.runner
+          Restart=always
+          RestartSec=5
+          NoNewPrivileges=true
+
+          [Install]
+          WantedBy=multi-user.target
+      when: "'market_worker' in group_names"
+
+    - name: Install strategy/risk worker systemd unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/forex-strategy-risk-worker.service
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Forex AI Strategy and Risk Worker
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=aiops
+          Group=aiops
+          WorkingDirectory=/opt/forex-ai-control-tower
+          Environment=PYTHONPATH=/opt/forex-ai-control-tower
+          Environment=FOREX_WORKER_NAME=strategy_risk
+          ExecStart=/usr/bin/python3 -m workers.runner
+          Restart=always
+          RestartSec=5
+          NoNewPrivileges=true
+
+          [Install]
+          WantedBy=multi-user.target
+      when: "'strategy_risk_worker' in group_names"
+
+    - name: Reload systemd for worker services
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+
+    - name: Start and enable market worker
+      ansible.builtin.systemd_service:
+        name: forex-market-worker
+        state: restarted
+        enabled: true
+      when: "'market_worker' in group_names"
+
+    - name: Start and enable strategy/risk worker
+      ansible.builtin.systemd_service:
+        name: forex-strategy-risk-worker
+        state: restarted
+        enabled: true
+      when: "'strategy_risk_worker' in group_names"
