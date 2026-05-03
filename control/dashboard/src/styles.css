@@ -12,10 +12,22 @@ strong { color: #0b6b5d; }
 .theater { margin-top: 28px; }
 .section-title { display: flex; align-items: center; gap: 10px; }
 .section-title h2 { margin: 0; }
-.chat-room { display: grid; gap: 10px; margin-top: 14px; max-height: 620px; overflow: auto; border: 1px solid #dfe4ea; background: #ffffff; border-radius: 8px; padding: 12px; }
+.theater-layout { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 14px; margin-top: 14px; align-items: start; }
+.operator-chat { background: white; border: 1px solid #dfe4ea; border-radius: 8px; padding: 16px; }
+.operator-heading { display: flex; align-items: center; gap: 10px; }
+.operator-heading h3 { font-size: 15px; margin: 0; }
+.operator-presets { display: grid; gap: 8px; margin-top: 14px; }
+.operator-presets button { border: 1px solid #d7dee7; border-radius: 6px; background: #f8fafc; color: #253444; cursor: pointer; padding: 9px 10px; text-align: left; }
+.chat-form { display: grid; gap: 10px; margin-top: 14px; }
+.chat-form textarea { border: 1px solid #cbd2da; border-radius: 6px; color: #17202a; font: inherit; line-height: 1.4; min-height: 126px; padding: 10px; resize: vertical; }
+.chat-form button { align-items: center; background: #0b6b5d; border: 0; border-radius: 6px; color: white; cursor: pointer; display: inline-flex; gap: 8px; justify-content: center; padding: 10px 12px; }
+.chat-status { color: #425466; font-size: 13px; line-height: 1.4; margin-top: 12px; }
+.chat-room { display: grid; gap: 10px; max-height: 620px; overflow: auto; border: 1px solid #dfe4ea; background: #ffffff; border-radius: 8px; padding: 12px; }
 .message { min-height: 0; border-radius: 8px; background: #f8fafc; }
+.operator-message { background: #eef8f5; border-color: #b9ddd5; }
 .message-topline { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .message-topline span { color: #6b7785; font-size: 12px; white-space: nowrap; }
 .message-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .message-meta span { border: 1px solid #d7dee7; border-radius: 999px; color: #425466; font-size: 12px; padding: 5px 8px; }
+@media (max-width: 900px) { .theater-layout { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .topbar { align-items: flex-start; flex-direction: column; } .grid { grid-template-columns: 1fr; } }

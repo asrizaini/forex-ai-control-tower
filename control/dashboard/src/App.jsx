@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, ShieldCheck, Globe2, RadioTower, ServerCog } from 'lucide-react';
+import { Activity, MessageCircle, Send, ShieldCheck, Globe2, RadioTower, ServerCog } from 'lucide-react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 
@@ -11,6 +11,8 @@ function App() {
   const [runtime, setRuntime] = useState({ orchestrator_event_log_exists: false });
   const [events, setEvents] = useState([]);
   const [language, setLanguage] = useState('en');
+  const [chatMessage, setChatMessage] = useState('');
+  const [chatStatus, setChatStatus] = useState('Ready for safe status questions.');
 
   useEffect(() => {
     fetch(`${apiBase}/health`).then((r) => r.json()).then(setHealth).catch(() => {
@@ -38,6 +40,26 @@ function App() {
     };
   }, []);
 
+  const sendChat = async (event) => {
+    event.preventDefault();
+    const message = chatMessage.trim();
+    if (!message) return;
+    setChatStatus('Sending to Orchestrator...');
+    setChatMessage('');
+    try {
+      const response = await fetch(`${apiBase}/api/v1/agent-theater/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, language, session_id: 'dashboard-operator' }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.detail || 'Chat request failed');
+      setChatStatus(body.next_action || 'Orchestrator replied in Agent Theater.');
+    } catch (error) {
+      setChatStatus(error.message || 'Unable to reach Orchestrator chat.');
+    }
+  };
+
   return (
     <main className="shell">
       <header className="topbar">
@@ -57,26 +79,49 @@ function App() {
           <RadioTower size={20} />
           <h2>Agent Theater</h2>
         </div>
-        {events.length === 0 ? (
-          <p>Waiting for safe orchestrator summaries.</p>
-        ) : (
-          <div className="chat-room">
-            {events.slice().reverse().map((event, index) => (
-              <article className="message" key={`${event.timestamp}-${index}`}>
-                <div className="message-topline">
-                  <strong>{event.agent}</strong>
-                  <span>{event.stream} · {event.timestamp}</span>
-                </div>
-                <p>{event.summary}</p>
-                <div className="message-meta">
-                  <span>{event.result}</span>
-                  <span>{event.risk_status}</span>
-                  <span>{event.next_action}</span>
-                </div>
-              </article>
-            ))}
+        <div className="theater-layout">
+          <div className="operator-chat">
+            <div className="operator-heading">
+              <MessageCircle size={20} />
+              <h3>Talk To Orchestrator</h3>
+            </div>
+            <div className="operator-presets">
+              {['System status?', 'What is blocking demo trading?', 'What should we wire next?'].map((prompt) => (
+                <button type="button" key={prompt} onClick={() => setChatMessage(prompt)}>{prompt}</button>
+              ))}
+            </div>
+            <form onSubmit={sendChat} className="chat-form">
+              <textarea
+                value={chatMessage}
+                onChange={(event) => setChatMessage(event.target.value)}
+                placeholder="Ask the Orchestrator about status, risk, MT5 bridge, strategies, notifications, or agents."
+                rows={5}
+              />
+              <button type="submit" aria-label="Send message to Orchestrator"><Send size={18} /> Send</button>
+            </form>
+            <p className="chat-status">{chatStatus}</p>
           </div>
-        )}
+          {events.length === 0 ? (
+            <p>Waiting for safe orchestrator summaries.</p>
+          ) : (
+            <div className="chat-room">
+              {events.slice().reverse().map((event, index) => (
+                <article className={`message ${event.agent === 'Operator' ? 'operator-message' : ''}`} key={`${event.timestamp}-${index}`}>
+                  <div className="message-topline">
+                    <strong>{event.agent}</strong>
+                    <span>{event.stream} · {event.timestamp}</span>
+                  </div>
+                  <p>{event.summary}</p>
+                  <div className="message-meta">
+                    <span>{event.result}</span>
+                    <span>{event.risk_status}</span>
+                    <span>{event.next_action}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
     </main>
   );
