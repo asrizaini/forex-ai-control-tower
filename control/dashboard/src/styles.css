@@ -15,6 +15,16 @@ strong { color: #0b6b5d; }
 .market-table { display: grid; gap: 8px; }
 .market-row { align-items: center; border-bottom: 1px solid #edf1f5; display: grid; grid-template-columns: 0.8fr 1fr 0.7fr 0.9fr; gap: 10px; padding: 7px 0; }
 .market-row span { color: #5d6978; }
+.admin-panel { margin-top: 28px; }
+.admin-login, .admin-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.admin-login input, .compact-form input, .compact-form select { border: 1px solid #cbd2da; border-radius: 6px; color: #17202a; font: inherit; padding: 9px 10px; }
+.admin-login button, .admin-actions button, .compact-form button { background: #0b6b5d; border: 0; border-radius: 6px; color: white; cursor: pointer; padding: 10px 12px; }
+.admin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+.compact-form { display: grid; gap: 8px; }
+.mini-list { display: grid; gap: 6px; margin-top: 12px; max-height: 150px; overflow: auto; }
+.mini-list span { border-bottom: 1px solid #edf1f5; color: #5d6978; font-size: 13px; padding-bottom: 5px; }
+.wide-card { grid-column: 1 / -1; }
+.audit-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .theater { margin-top: 28px; }
 .section-title { display: flex; align-items: center; gap: 10px; }
 .section-title h2 { margin: 0; }
@@ -36,4 +46,4 @@ strong { color: #0b6b5d; }
 .message-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .message-meta span { border: 1px solid #d7dee7; border-radius: 999px; color: #425466; font-size: 12px; padding: 5px 8px; }
 @media (max-width: 900px) { .theater-layout { grid-template-columns: 1fr; } }
-@media (max-width: 760px) { .topbar { align-items: flex-start; flex-direction: column; } .grid, .telemetry-grid { grid-template-columns: 1fr; } .telemetry-list { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .topbar { align-items: flex-start; flex-direction: column; } .grid, .telemetry-grid, .admin-grid, .audit-list { grid-template-columns: 1fr; } .telemetry-list { grid-template-columns: 1fr; } }

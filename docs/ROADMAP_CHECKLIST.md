@@ -61,8 +61,8 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` `REQUIRE_ORDER_CHECK=true` default.
 - `[x]` Order send requires prior order check.
 - `[x]` Order send requires Execution Guard approval token.
-- `[~]` Runtime secrets are environment-driven; full reboot persistence still needs a production secret manager.
-- `[ ]` Vault, SOPS, or cloud secret manager integration.
+- `[x]` Runtime secrets are environment-driven with no committed secret material.
+- `[~]` Secret manager provider configuration added for env, Vault, SOPS, and cloud providers; external provider activation is an operator choice before live trading.
 
 ## Core API And Dashboard
 
@@ -74,28 +74,28 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Authenticated WebSocket skeletons.
 - `[x]` Dashboard shows environment, health, risk, localization, orchestrator, and Agent Theater event panels.
 - `[x]` Dashboard shows latest persisted MT5 account/market snapshots.
-- `[ ]` Real multi-user login UI.
+- `[x]` Real multi-user login UI.
 - `[x]` User management database foundation.
 - `[x]` Account management database foundation.
-- `[~]` Persistent audit event browser; API exists, dashboard UI still pending.
-- `[ ]` Real RBAC policy storage and admin UI.
-- `[ ]` 2FA flow.
-- `[ ]` Refresh token flow.
-- `[ ]` Service API key management.
+- `[x]` Persistent audit event browser.
+- `[x]` Real RBAC policy storage and admin UI.
+- `[x]` 2FA setup/enable flow.
+- `[x]` Refresh token flow.
+- `[x]` Service API key management.
 
 ## Main Orchestrator And Agents
 
-- `[~]` Agent modules scaffolded.
-- `[~]` Structured message concept scaffolded.
+- `[x]` Agent modules scaffolded.
+- `[x]` Structured message concept scaffolded.
 - `[x]` Safe Orchestrator runtime monitoring loop.
-- `[~]` Market Data Agent skeleton.
-- `[~]` Technical Analysis Agent skeleton.
+- `[x]` Market Data Agent operational monitor.
+- `[x]` Technical Analysis Agent operational monitor.
 - `[~]` Fundamental Analysis Agent skeleton.
 - `[~]` News Impact Agent skeleton.
 - `[~]` Strategy Agent skeleton.
-- `[~]` Risk Manager Agent skeleton.
-- `[~]` Signal Reviewer Agent skeleton.
-- `[~]` Execution Agent skeleton.
+- `[x]` Risk Manager Agent operational monitor.
+- `[x]` Signal Reviewer Agent operational monitor.
+- `[x]` Execution Agent operational monitor.
 - `[~]` Journal Agent skeleton.
 - `[~]` Backtest Agent skeleton.
 - `[~]` Forward Test Agent skeleton.
@@ -104,12 +104,12 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[~]` Watchdog Agent skeleton.
 - `[~]` Account Manager and Router Agent skeletons.
 - `[~]` Notification, Localization, Security, Deployment, and Improvement Agent skeletons.
-- `[ ]` Real message bus between agents.
-- `[ ]` Durable workflow engine.
-- `[ ]` Agent task queue and retry model.
-- `[ ]` Agent state persistence.
-- `[ ]` Agent permissions and tool policy enforcement.
-- `[~]` Production orchestrator decision loop; health monitoring is live, trading workflow orchestration remains pending.
+- `[x]` Real database-backed message bus between agents.
+- `[~]` Durable workflow engine; DB-backed tasks and statuses are live, complex multi-step workflows still pending.
+- `[x]` Agent task queue and retry model.
+- `[x]` Agent state persistence.
+- `[x]` Agent permissions and tool policy enforcement.
+- `[~]` Production orchestrator decision loop; health, task routing, and safe agent workflow orchestration are live, executable trading workflow remains approval-gated.
 
 ## Agent Theater / AI Trading Room
 

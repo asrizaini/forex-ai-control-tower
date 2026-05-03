@@ -20,6 +20,30 @@ def list_permissions(db: Session = Depends(get_db)) -> list[PermissionAssignment
     return list(db.scalars(select(PermissionAssignment).order_by(PermissionAssignment.created_at.desc()).limit(200)))
 
 
+@router.get("/effective/{user_id}")
+def effective_permissions(user_id: str, db: Session = Depends(get_db)) -> dict:
+    assignments = list(
+        db.scalars(
+            select(PermissionAssignment)
+            .where(PermissionAssignment.user_id == user_id)
+            .where(PermissionAssignment.enabled == True)  # noqa: E712
+            .order_by(PermissionAssignment.created_at.desc())
+        )
+    )
+    return {
+        "user_id": user_id,
+        "permissions": [
+            {
+                "permission": item.permission,
+                "account_id": item.account_id,
+                "strategy_id": item.strategy_id,
+                "enabled": item.enabled,
+            }
+            for item in assignments
+        ],
+    }
+
+
 @router.post("", response_model=PermissionOut)
 def create_permission(payload: PermissionCreate, principal: Principal = Depends(current_principal), db: Session = Depends(get_db)) -> PermissionAssignment:
     if not has_permission(principal.role, "users:write"):

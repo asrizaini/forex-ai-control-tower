@@ -143,3 +143,133 @@ class AccountSnapshotOut(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class LoginRequest(BaseModel):
+    user_id: str = Field(min_length=1, max_length=80)
+    password: str = Field(min_length=8, max_length=256)
+    totp_code: str | None = Field(default=None, max_length=12)
+
+
+class BootstrapAdminRequest(BaseModel):
+    user_id: str = Field(default="admin", max_length=80)
+    email: EmailStr
+    password: str = Field(min_length=12, max_length=256)
+
+
+class SetPasswordRequest(BaseModel):
+    user_id: str = Field(min_length=1, max_length=80)
+    password: str = Field(min_length=12, max_length=256)
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str = Field(min_length=32, max_length=512)
+
+
+class TotpVerifyRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=12)
+
+
+class ServiceApiKeyCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    permissions: list[str] = Field(default_factory=list)
+
+
+class ServiceApiKeyOut(BaseModel):
+    id: int
+    key_id: str
+    name: str
+    permissions: list[str]
+    enabled: bool
+    created_by: str
+    last_used_at: datetime | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ServiceApiKeyCreated(ServiceApiKeyOut):
+    api_key: str
+
+
+class AgentTaskCreate(BaseModel):
+    assigned_agent: str = Field(min_length=1, max_length=120)
+    task_type: str = Field(min_length=1, max_length=120)
+    priority: int = Field(default=5, ge=1, le=10)
+    request_json: dict[str, Any] = Field(default_factory=dict)
+    max_attempts: int = Field(default=3, ge=1, le=10)
+
+
+class AgentTaskUpdate(BaseModel):
+    status: str = Field(min_length=1, max_length=60)
+    result_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class AgentTaskOut(BaseModel):
+    id: int
+    task_id: str
+    requested_by: str
+    assigned_agent: str
+    task_type: str
+    status: str
+    priority: int
+    request_json: dict[str, Any]
+    result_json: dict[str, Any]
+    attempts: int
+    max_attempts: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AgentMessageCreate(BaseModel):
+    task_id: str | None = None
+    sender_agent: str = Field(min_length=1, max_length=120)
+    recipient_agent: str = Field(min_length=1, max_length=120)
+    message_type: str = Field(default="status", max_length=80)
+    payload_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class AgentMessageOut(BaseModel):
+    id: int
+    message_id: str
+    task_id: str | None
+    sender_agent: str
+    recipient_agent: str
+    message_type: str
+    payload_json: dict[str, Any]
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AgentStateUpdate(BaseModel):
+    status: str = Field(default="standby", max_length=60)
+    state_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class AgentStateOut(BaseModel):
+    id: int
+    agent_name: str
+    status: str
+    heartbeat_at: datetime | None
+    state_json: dict[str, Any]
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AgentToolPolicyCreate(BaseModel):
+    agent_name: str = Field(min_length=1, max_length=120)
+    tool_name: str = Field(min_length=1, max_length=120)
+    allowed: bool = False
+    environment: str = "demo"
+    reason: str = ""
+
+
+class AgentToolPolicyOut(AgentToolPolicyCreate):
+    id: int
+    created_at: datetime
+
+    model_config = {"from_attributes": True}

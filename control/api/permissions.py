@@ -9,6 +9,7 @@ ROLE_PERMISSIONS = {
         "risk:write",
         "system:halt",
         "audit:read",
+        "agents:write",
     },
     "strategy_admin": {"strategies:approve", "audit:read"},
     "account_manager": {"accounts:write", "trades:approve"},

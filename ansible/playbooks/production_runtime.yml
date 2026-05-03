@@ -11,6 +11,9 @@
           - "POSTGRES_PASSWORD={{ lookup('env', 'POSTGRES_PASSWORD') }}"
           - "GRAFANA_ADMIN_PASSWORD={{ lookup('env', 'GRAFANA_ADMIN_PASSWORD') }}"
           - "JWT_SECRET_KEY={{ lookup('env', 'JWT_SECRET_KEY') }}"
+          - "LOCAL_AUTH_BOOTSTRAP_ENABLED={{ lookup('env', 'LOCAL_AUTH_BOOTSTRAP_ENABLED') | default('false', true) }}"
+          - "LOCAL_ADMIN_BOOTSTRAP_PASSWORD={{ lookup('env', 'LOCAL_ADMIN_BOOTSTRAP_PASSWORD') }}"
+          - "TOTP_ISSUER={{ lookup('env', 'TOTP_ISSUER') | default('Forex AI Control Tower', true) }}"
       no_log: true
 
     - name: Install control stack systemd unit

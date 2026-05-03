@@ -12,6 +12,14 @@ function App() {
   const [events, setEvents] = useState([]);
   const [marketSnapshots, setMarketSnapshots] = useState([]);
   const [accountSnapshots, setAccountSnapshots] = useState([]);
+  const [token, setToken] = useState(window.localStorage.getItem('fx_access_token') || '');
+  const [login, setLogin] = useState({ user_id: 'admin', password: '', totp_code: '' });
+  const [operatorData, setOperatorData] = useState({ users: [], permissions: [], audit: [], tasks: [], serviceKeys: [] });
+  const [operatorStatus, setOperatorStatus] = useState('Login to unlock admin control-plane panels.');
+  const [newUser, setNewUser] = useState({ user_id: '', email: '', role: 'viewer', language: 'en' });
+  const [newPermission, setNewPermission] = useState({ user_id: '', permission: 'dashboard:read', account_id: '', strategy_id: '' });
+  const [newServiceKey, setNewServiceKey] = useState({ name: '', permissions: 'telemetry:write' });
+  const [newTask, setNewTask] = useState({ assigned_agent: 'Orchestrator Agent', task_type: 'operator_request', request: '' });
   const [language, setLanguage] = useState('en');
   const [chatMessage, setChatMessage] = useState('');
   const [chatStatus, setChatStatus] = useState('Ready for safe status questions.');
@@ -43,6 +51,68 @@ function App() {
       ws.close();
     };
   }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    loadOperatorData();
+  }, [token]);
+
+  const authHeaders = () => token ? { Authorization: `Bearer ${token}` } : {};
+
+  const loadOperatorData = async () => {
+    try {
+      const [users, permissions, audit, tasks, serviceKeys] = await Promise.all([
+        fetch(`${apiBase}/api/v1/users/records`, { headers: authHeaders() }).then((r) => r.json()),
+        fetch(`${apiBase}/api/v1/permissions`, { headers: authHeaders() }).then((r) => r.json()),
+        fetch(`${apiBase}/api/v1/audit/logs`, { headers: authHeaders() }).then((r) => r.ok ? r.json() : []),
+        fetch(`${apiBase}/api/v1/agents/tasks`, { headers: authHeaders() }).then((r) => r.json()),
+        fetch(`${apiBase}/api/v1/service-keys`, { headers: authHeaders() }).then((r) => r.ok ? r.json() : []),
+      ]);
+      setOperatorData({ users, permissions, audit, tasks, serviceKeys });
+      setOperatorStatus('Control-plane data loaded.');
+    } catch (error) {
+      setOperatorStatus(error.message || 'Unable to load operator data.');
+    }
+  };
+
+  const doLogin = async (event) => {
+    event.preventDefault();
+    setOperatorStatus('Logging in...');
+    try {
+      const response = await fetch(`${apiBase}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: login.user_id, password: login.password, totp_code: login.totp_code || null }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.detail || 'Login failed');
+      window.localStorage.setItem('fx_access_token', body.access_token);
+      if (body.refresh_token) window.localStorage.setItem('fx_refresh_token', body.refresh_token);
+      setToken(body.access_token);
+      setLogin((current) => ({ ...current, password: '', totp_code: '' }));
+      setOperatorStatus('Logged in.');
+    } catch (error) {
+      setOperatorStatus(error.message || 'Login failed.');
+    }
+  };
+
+  const postAdmin = async (path, body, success) => {
+    try {
+      const response = await fetch(`${apiBase}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify(body),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail || 'Request failed');
+      setOperatorStatus(success || 'Saved.');
+      await loadOperatorData();
+      return payload;
+    } catch (error) {
+      setOperatorStatus(error.message || 'Request failed.');
+      return null;
+    }
+  };
 
   const sendChat = async (event) => {
     event.preventDefault();
@@ -107,6 +177,88 @@ function App() {
             </div>
           ) : <p>Waiting for market telemetry.</p>}
         </article>
+      </section>
+      <section className="admin-panel">
+        <div className="section-title">
+          <ShieldCheck size={20} />
+          <h2>Control Plane</h2>
+        </div>
+        {!token ? (
+          <form className="admin-login" onSubmit={doLogin}>
+            <input value={login.user_id} onChange={(event) => setLogin({ ...login, user_id: event.target.value })} placeholder="User ID" />
+            <input type="password" value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} placeholder="Password" />
+            <input value={login.totp_code} onChange={(event) => setLogin({ ...login, totp_code: event.target.value })} placeholder="2FA code if enabled" />
+            <button type="submit">Login</button>
+          </form>
+        ) : (
+          <div className="admin-actions">
+            <button type="button" onClick={loadOperatorData}>Refresh Control Plane</button>
+            <button type="button" onClick={() => { window.localStorage.removeItem('fx_access_token'); setToken(''); }}>Logout</button>
+          </div>
+        )}
+        <p className="chat-status">{operatorStatus}</p>
+        {token && (
+          <div className="admin-grid">
+            <article>
+              <h2>Users</h2>
+              <form className="compact-form" onSubmit={(event) => {
+                event.preventDefault();
+                postAdmin('/api/v1/users/records', newUser, 'User created.');
+              }}>
+                <input placeholder="user_id" value={newUser.user_id} onChange={(event) => setNewUser({ ...newUser, user_id: event.target.value })} />
+                <input placeholder="email" value={newUser.email} onChange={(event) => setNewUser({ ...newUser, email: event.target.value })} />
+                <select value={newUser.role} onChange={(event) => setNewUser({ ...newUser, role: event.target.value })}>
+                  <option>viewer</option><option>extended_user</option><option>account_manager</option><option>strategy_admin</option><option>super_admin</option>
+                </select>
+                <button type="submit">Create User</button>
+              </form>
+              <div className="mini-list">{operatorData.users.slice(0, 6).map((user) => <span key={user.user_id}>{user.user_id} · {user.role}</span>)}</div>
+            </article>
+            <article>
+              <h2>RBAC</h2>
+              <form className="compact-form" onSubmit={(event) => {
+                event.preventDefault();
+                postAdmin('/api/v1/permissions', { ...newPermission, account_id: newPermission.account_id || null, strategy_id: newPermission.strategy_id || null }, 'Permission assigned.');
+              }}>
+                <input placeholder="user_id" value={newPermission.user_id} onChange={(event) => setNewPermission({ ...newPermission, user_id: event.target.value })} />
+                <input placeholder="permission" value={newPermission.permission} onChange={(event) => setNewPermission({ ...newPermission, permission: event.target.value })} />
+                <input placeholder="account_id optional" value={newPermission.account_id} onChange={(event) => setNewPermission({ ...newPermission, account_id: event.target.value })} />
+                <button type="submit">Assign Permission</button>
+              </form>
+              <div className="mini-list">{operatorData.permissions.slice(0, 6).map((item) => <span key={item.id}>{item.user_id} · {item.permission}</span>)}</div>
+            </article>
+            <article>
+              <h2>Service API Keys</h2>
+              <form className="compact-form" onSubmit={async (event) => {
+                event.preventDefault();
+                const created = await postAdmin('/api/v1/service-keys', { name: newServiceKey.name, permissions: newServiceKey.permissions.split(',').map((item) => item.trim()).filter(Boolean) }, 'Service key created. Copy it now from the response modal if needed.');
+                if (created?.api_key) window.alert(`Service key created. Store it now; it will not be shown again.\\n${created.api_key}`);
+              }}>
+                <input placeholder="key name" value={newServiceKey.name} onChange={(event) => setNewServiceKey({ ...newServiceKey, name: event.target.value })} />
+                <input placeholder="permissions comma-separated" value={newServiceKey.permissions} onChange={(event) => setNewServiceKey({ ...newServiceKey, permissions: event.target.value })} />
+                <button type="submit">Create Key</button>
+              </form>
+              <div className="mini-list">{operatorData.serviceKeys.slice(0, 6).map((item) => <span key={item.key_id}>{item.name} · {item.enabled ? 'enabled' : 'disabled'}</span>)}</div>
+            </article>
+            <article>
+              <h2>Agent Task Queue</h2>
+              <form className="compact-form" onSubmit={(event) => {
+                event.preventDefault();
+                postAdmin('/api/v1/agents/tasks', { assigned_agent: newTask.assigned_agent, task_type: newTask.task_type, request_json: { request: newTask.request } }, 'Agent task queued.');
+              }}>
+                <input value={newTask.assigned_agent} onChange={(event) => setNewTask({ ...newTask, assigned_agent: event.target.value })} />
+                <input value={newTask.task_type} onChange={(event) => setNewTask({ ...newTask, task_type: event.target.value })} />
+                <input placeholder="request" value={newTask.request} onChange={(event) => setNewTask({ ...newTask, request: event.target.value })} />
+                <button type="submit">Queue Task</button>
+              </form>
+              <div className="mini-list">{operatorData.tasks.slice(0, 6).map((task) => <span key={task.task_id}>{task.assigned_agent} · {task.status}</span>)}</div>
+            </article>
+            <article className="wide-card">
+              <h2>Audit Trail</h2>
+              <div className="mini-list audit-list">{operatorData.audit.slice(0, 10).map((item) => <span key={item.id}>{item.actor} · {item.action} · {item.resource_type}:{item.resource_id}</span>)}</div>
+            </article>
+          </div>
+        )}
       </section>
       <section className="theater">
         <div className="section-title">

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import secrets
 import time
 import urllib.error
 import urllib.request
@@ -18,6 +19,7 @@ from sqlalchemy.orm import Session
 from ..auth import decode_token
 from ..crud import audit
 from ..db import SessionLocal
+from ..models import AgentTask
 from agent_theater.loki import push_event
 from agent_theater.redaction import redact
 
@@ -243,6 +245,12 @@ def _orchestrator_reply(message: str, language: str) -> tuple[str, str]:
             "Agent Theater so the team conversation stays visible without exposing hidden reasoning or secrets."
         )
         next_action = "Ask for system status, risk posture, adapter readiness, or the next deployment step."
+    elif any(word in lowered for word in ("risk", "drawdown", "loss", "approve", "approval")):
+        summary = (
+            "I queued this as a governed Risk Manager review. No trade, approval, or policy change is assumed from chat; "
+            "the Risk Manager will use account state, risk policy, permissions, and Execution Guard rules before anything can move forward."
+        )
+        next_action = "Review the queued agent task and risk policy records in the Control Plane."
     elif any(word in lowered for word in ("news", "calendar", "fundamental")):
         summary = (
             "News analysis is still conservative because the live economic-calendar adapter is not connected yet. "
@@ -270,6 +278,42 @@ def _audit_chat(action: str, session_id: str, details: dict[str, Any]) -> None:
     try:
         audit(db, None, action, "orchestrator_chat", session_id, details)
         db.commit()
+    finally:
+        db.close()
+
+
+def _agent_for_message(message: str) -> tuple[str, str]:
+    lowered = message.lower()
+    if any(word in lowered for word in ("strategy", "backtest", "signal", "tuning")):
+        return "Strategy Agent", "strategy_request"
+    if any(word in lowered for word in ("risk", "drawdown", "loss", "approve", "approval")):
+        return "Risk Manager", "risk_review"
+    if any(word in lowered for word in ("mt5", "bridge", "symbol", "price", "candle", "tick", "eurusd", "xauusd")):
+        return "Market Data Agent", "market_data_review"
+    if any(word in lowered for word in ("deploy", "rollback", "backup", "service", "server")):
+        return "Deployment Agent", "deployment_review"
+    return "Orchestrator Agent", "operator_request"
+
+
+def _queue_agent_task(session_id: str, message: str, language: str) -> str:
+    assigned_agent, task_type = _agent_for_message(message)
+    task_id = f"task_{secrets.token_hex(8)}"
+    db: Session = SessionLocal()
+    try:
+        db.add(
+            AgentTask(
+                task_id=task_id,
+                requested_by="operator_chat",
+                assigned_agent=assigned_agent,
+                task_type=task_type,
+                priority=5,
+                request_json={"session_id": session_id, "message": _safe_chat_text(message), "language": language},
+                status="queued",
+            )
+        )
+        audit(db, None, "queue", "agent_task", task_id, {"assigned_agent": assigned_agent, "task_type": task_type})
+        db.commit()
+        return task_id
     finally:
         db.close()
 
@@ -426,6 +470,7 @@ def chat_with_orchestrator(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
 
     safe_message = _safe_chat_text(payload.message)
+    task_id = _queue_agent_task(payload.session_id, payload.message, payload.language)
     operator_event = {
         "agent": "Operator",
         "stream": "Orchestrator Chat",
@@ -435,7 +480,7 @@ def chat_with_orchestrator(
         "confidence": 1.0,
         "risk_status": "read_only_chat_no_execution",
         "next_action": "Orchestrator will answer with a safe status summary.",
-        "metadata": {"session_id": payload.session_id, "language": payload.language, "message_type": "operator_chat"},
+        "metadata": {"session_id": payload.session_id, "language": payload.language, "message_type": "operator_chat", "task_id": task_id},
         "timestamp": _timestamp(),
         "contains_hidden_chain_of_thought": False,
     }
@@ -453,7 +498,7 @@ def chat_with_orchestrator(
         "confidence": 0.86,
         "risk_status": "read_only_no_trade_execution",
         "next_action": next_action,
-        "metadata": {"session_id": payload.session_id, "language": payload.language, "message_type": "orchestrator_reply"},
+        "metadata": {"session_id": payload.session_id, "language": payload.language, "message_type": "orchestrator_reply", "task_id": task_id},
         "timestamp": _timestamp(),
         "contains_hidden_chain_of_thought": False,
     }
@@ -463,7 +508,7 @@ def chat_with_orchestrator(
         payload.session_id,
         {"language": payload.language, "message_redacted": safe_message != " ".join(payload.message.strip().split())},
     )
-    return {"accepted": True, "reply": reply, "next_action": next_action}
+    return {"accepted": True, "reply": reply, "next_action": next_action, "task_id": task_id}
 
 
 @router.post("/events", status_code=status.HTTP_202_ACCEPTED)
