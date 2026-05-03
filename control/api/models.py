@@ -100,6 +100,40 @@ class NotificationEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
 
+class LlmUsage(Base):
+    __tablename__ = "llm_usage"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    request_id: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    provider: Mapped[str] = mapped_column(String(40), index=True)
+    model: Mapped[str] = mapped_column(String(120), default="", index=True)
+    task_type: Mapped[str] = mapped_column(String(120), index=True)
+    user_id: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
+    strategy_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    units: Mapped[int] = mapped_column(Integer, default=0)
+    estimated_cost: Mapped[float] = mapped_column(Float, default=0.0)
+    approved: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    fallback_reason: Mapped[str] = mapped_column(String(160), default="")
+    metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class ModelEvaluation(Base):
+    __tablename__ = "model_evaluations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    evaluation_id: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    provider: Mapped[str] = mapped_column(String(40), index=True)
+    model: Mapped[str] = mapped_column(String(120), index=True)
+    task_type: Mapped[str] = mapped_column(String(120), index=True)
+    score: Mapped[float] = mapped_column(Float, default=0.0, index=True)
+    latency_ms: Mapped[int] = mapped_column(Integer, default=0)
+    estimated_cost: Mapped[float] = mapped_column(Float, default=0.0)
+    accepted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    feedback_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
 class PermissionAssignment(Base):
     __tablename__ = "permission_assignments"
 

@@ -246,16 +246,16 @@ This checklist tracks the original full-system prompt. The current deployment is
 ## Paid And Local LLM Routing
 
 - `[x]` Ollama installed with local model pulls.
-- `[~]` Paid LLM gateway scaffold/mock mode.
-- `[~]` LLM Cost Center scaffold.
-- `[~]` Model Evaluation Center scaffold.
-- `[ ]` Production model router.
-- `[ ]` OpenAI API integration.
-- `[ ]` Gemini API integration.
-- `[ ]` Cost budgets and approval thresholds enforced.
-- `[ ]` Secret redaction before paid LLM calls.
-- `[ ]` Fallback-to-local policy enforcement.
-- `[ ]` Model quality reports.
+- `[x]` Paid LLM gateway scaffold/mock mode.
+- `[x]` LLM Cost Center scaffold with persisted usage records.
+- `[x]` Model Evaluation Center scaffold with persisted evaluation records.
+- `[~]` Production model router; safe route/approval/fallback logic is wired, real paid API calls still disabled until keys and approvals are configured.
+- `[~]` OpenAI API integration readiness; blocked/falls back without `OPENAI_API_KEY`.
+- `[~]` Gemini API integration readiness; blocked/falls back without `GEMINI_API_KEY`.
+- `[x]` Cost budgets and approval thresholds enforced.
+- `[x]` Secret redaction before paid LLM calls.
+- `[x]` Fallback-to-local policy enforcement.
+- `[x]` Model quality reports.
 
 ## OpenClaw Optional Gateway
 

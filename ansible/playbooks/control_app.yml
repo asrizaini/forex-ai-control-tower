@@ -99,6 +99,22 @@
         group: aiops
         mode: preserve
 
+    - name: Copy LLM cost center package
+      ansible.builtin.copy:
+        src: ../../llm_cost_center/
+        dest: /opt/forex-ai-control-tower/app/llm_cost_center/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
+    - name: Copy model evaluation package
+      ansible.builtin.copy:
+        src: ../../model_evaluation/
+        dest: /opt/forex-ai-control-tower/app/model_evaluation/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
     - name: Copy localization package
       ansible.builtin.copy:
         src: ../../localization/

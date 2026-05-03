@@ -133,6 +133,61 @@ class NotificationOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class LlmRouteRequest(BaseModel):
+    task_type: str = Field(default="general", max_length=120)
+    prompt: str = Field(max_length=4000)
+    paid_requested: bool = False
+    estimated_cost: float = 0.0
+    model: str = ""
+    strategy_id: str | None = None
+
+
+class LlmRouteOut(BaseModel):
+    request_id: str
+    provider: str
+    paid_allowed: bool
+    reason: str
+    prompt_redacted: bool
+    approved: bool
+
+
+class LlmUsageOut(BaseModel):
+    id: int
+    request_id: str
+    provider: str
+    model: str
+    task_type: str
+    user_id: str | None
+    strategy_id: str | None
+    units: int
+    estimated_cost: float
+    approved: bool
+    fallback_reason: str
+    metadata_json: dict[str, Any]
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ModelEvaluationCreate(BaseModel):
+    provider: str = Field(max_length=40)
+    model: str = Field(max_length=120)
+    task_type: str = Field(max_length=120)
+    score: float = Field(ge=0, le=100)
+    latency_ms: int = 0
+    estimated_cost: float = 0.0
+    feedback_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ModelEvaluationOut(ModelEvaluationCreate):
+    id: int
+    evaluation_id: str
+    accepted: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class PermissionCreate(BaseModel):
     user_id: str
     permission: str
