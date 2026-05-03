@@ -128,6 +128,23 @@ class ExecutionGuardCheckOut(BaseModel):
     policy_id: int | None
 
 
+class KillSwitchCreate(BaseModel):
+    scope: str = Field(max_length=60)
+    target_id: str | None = Field(default=None, max_length=160)
+    reason: str = Field(default="", max_length=500)
+
+
+class KillSwitchOut(KillSwitchCreate):
+    id: int
+    active: bool
+    created_by: str
+    deactivated_by: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class AuditLogOut(BaseModel):
     id: int
     actor: str

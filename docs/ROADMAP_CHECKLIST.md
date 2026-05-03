@@ -152,10 +152,10 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[~]` Duplicate trade risk detection as an Execution Guard input; position/signal matching still pending.
 - `[~]` Margin availability validation as an Execution Guard input; MT5 account binding still pending.
 - `[~]` Correlation exposure checks as an Execution Guard input; portfolio exposure model still pending.
-- `[ ]` Broker compatibility enforcement.
-- `[ ]` Market data quality enforcement.
-- `[ ]` System health score execution gating.
-- `[ ]` Global and scoped kill switch API fully wired.
+- `[~]` Broker compatibility enforcement through Execution Guard input; broker checker binding still pending.
+- `[~]` Market data quality enforcement through Execution Guard input; live quality checker binding still pending.
+- `[x]` System health score execution gating.
+- `[x]` Global and scoped kill switch API fully wired with persistent activation, listing, deactivation, audit logging, and Execution Guard blocking.
 
 ## MT5 Bridge
 

@@ -172,3 +172,58 @@ def test_execution_guard_check_endpoint_returns_no_secret_token(monkeypatch, tmp
     assert body["approved"] is True
     assert body["token_issued"] is True
     assert "token" not in body
+
+
+def test_persistent_kill_switch_blocks_execution_guard(monkeypatch, tmp_path):
+    monkeypatch.setenv("JWT_SECRET_KEY", "unit-test-jwt-key")
+    monkeypatch.setenv("EXECUTION_GUARD_SIGNING_KEY", "unit-test-signing-key")
+    db = _seed_guard_fixture(tmp_path)
+    db.close()
+    app = create_app()
+    client = TestClient(app)
+    token = issue_token("admin", "super_admin")["access_token"]
+
+    created = client.post(
+        "/api/v1/risk/kill-switch",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"scope": "account", "target_id": "demo_main", "reason": "unit test halt"},
+    )
+    assert created.status_code == 200
+    assert created.json()["active"] is True
+
+    check = client.post(
+        "/api/v1/risk/execution/check",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "account_id": "demo_main",
+            "strategy_id": "trend_pullback_v1",
+            "symbol": "EURUSD",
+            "side": "BUY",
+            "volume": 0.1,
+            "environment": "demo",
+            "trading_mode": "demo_auto",
+            "order_check_passed": True,
+            "daily_loss_pct": 1.0,
+            "weekly_loss_pct": 2.0,
+            "open_trades": 1,
+            "trades_today": 2,
+            "spread_points": 12.0,
+            "slippage_points": 1.0,
+            "market_data_quality_ok": True,
+            "broker_compatibility_ok": True,
+            "margin_available": True,
+            "duplicate_trade_risk": False,
+            "correlation_exposure_ok": True,
+            "news_halt_active": False,
+        },
+    )
+    assert check.status_code == 200
+    assert check.json()["approved"] is False
+    assert "kill_switch_active" in check.json()["reasons"]
+
+    deactivated = client.post(
+        f"/api/v1/risk/kill-switches/{created.json()['id']}/deactivate",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert deactivated.status_code == 200
+    assert deactivated.json()["active"] is False

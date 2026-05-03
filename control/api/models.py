@@ -78,6 +78,20 @@ class RiskPolicy(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class KillSwitch(Base):
+    __tablename__ = "kill_switches"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    scope: Mapped[str] = mapped_column(String(60), index=True)
+    target_id: Mapped[str | None] = mapped_column(String(160), nullable=True, index=True)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_by: Mapped[str] = mapped_column(String(120), default="system", index=True)
+    deactivated_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 

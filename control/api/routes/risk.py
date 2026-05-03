@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter
 from fastapi import Depends, HTTPException
 from sqlalchemy import select
@@ -7,14 +9,15 @@ from sqlalchemy.orm import Session
 
 from ..dependencies import current_principal
 from ..auth import Principal
-from ..control_schemas import ExecutionGuardCheckOut, ExecutionGuardCheckRequest, RiskPolicyCreate, RiskPolicyOut
+from ..control_schemas import ExecutionGuardCheckOut, ExecutionGuardCheckRequest, KillSwitchCreate, KillSwitchOut, RiskPolicyCreate, RiskPolicyOut
 from ..crud import audit
 from ..db import get_db
-from ..models import RiskPolicy
+from ..models import Account, KillSwitch, RiskPolicy
 from ..permissions import has_permission
 from execution_guard.control_plane import ExecutionTelemetry, evaluate_control_plane_policy
 from execution_guard.guard import approve_execution
 from execution_guard.schemas import ExecutionRequest
+from risk.kill_switch import active_kill_switch_exists, validate_scope
 
 router = APIRouter(prefix="/risk", tags=["risk"])
 
@@ -24,11 +27,52 @@ def list_resource() -> dict:
     return {"module": "risk", "description": "Risk status and kill-switch controls", "mode": "production-required"}
 
 
-@router.post("/kill-switch")
-def kill_switch(payload: dict, principal: Principal = Depends(current_principal)) -> dict:
+@router.post("/kill-switch", response_model=KillSwitchOut)
+def kill_switch(payload: KillSwitchCreate, principal: Principal = Depends(current_principal), db: Session = Depends(get_db)) -> KillSwitch:
     if not has_permission(principal.role, "system:halt"):
         raise HTTPException(status_code=403, detail="Permission denied")
-    return {"halt_scope": payload.get("scope", "all_execution"), "active": True, "overrides_agents": True}
+    if not validate_scope(payload.scope):
+        raise HTTPException(status_code=400, detail="Invalid kill switch scope")
+    if payload.scope in {"user", "account", "account_group", "strategy", "symbol"} and not payload.target_id:
+        raise HTTPException(status_code=400, detail="target_id is required for scoped kill switch")
+    record = KillSwitch(scope=payload.scope, target_id=payload.target_id, reason=payload.reason, created_by=principal.user_id)
+    db.add(record)
+    audit(db, principal, "activate", "kill_switch", f"{payload.scope}:{payload.target_id or '*'}", {"reason": payload.reason})
+    db.commit()
+    db.refresh(record)
+    return record
+
+
+@router.get("/kill-switches", response_model=list[KillSwitchOut])
+def list_kill_switches(
+    active_only: bool = True,
+    principal: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+) -> list[KillSwitch]:
+    statement = select(KillSwitch).order_by(KillSwitch.created_at.desc()).limit(200)
+    if active_only:
+        statement = select(KillSwitch).where(KillSwitch.active.is_(True)).order_by(KillSwitch.created_at.desc()).limit(200)
+    return list(db.scalars(statement))
+
+
+@router.post("/kill-switches/{kill_switch_id}/deactivate", response_model=KillSwitchOut)
+def deactivate_kill_switch(
+    kill_switch_id: int,
+    principal: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+) -> KillSwitch:
+    if not has_permission(principal.role, "system:halt"):
+        raise HTTPException(status_code=403, detail="Permission denied")
+    record = db.get(KillSwitch, kill_switch_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Kill switch not found")
+    record.active = False
+    record.deactivated_by = principal.user_id
+    record.updated_at = datetime.utcnow()
+    audit(db, principal, "deactivate", "kill_switch", str(kill_switch_id), {"scope": record.scope, "target_id": record.target_id})
+    db.commit()
+    db.refresh(record)
+    return record
 
 
 @router.get("/policies", response_model=list[RiskPolicyOut])
@@ -56,6 +100,16 @@ def check_execution_guard(
     principal: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ) -> ExecutionGuardCheckOut:
+    account = db.scalar(select(Account).where(Account.account_id == payload.account_id).limit(1))
+    db_kill_switch_active = active_kill_switch_exists(
+        db,
+        environment=account.environment if account else payload.environment,
+        user_id=principal.user_id,
+        account_id=payload.account_id,
+        account_group=account.account_group if account else None,
+        strategy_id=payload.strategy_id,
+        symbol=payload.symbol,
+    )
     request = ExecutionRequest(
         user_id=principal.user_id,
         account_id=payload.account_id,
@@ -69,7 +123,7 @@ def check_execution_guard(
         manual_approval=payload.manual_approval,
         order_check_passed=payload.order_check_passed,
         system_health_score=payload.system_health_score,
-        kill_switch_active=payload.kill_switch_active,
+        kill_switch_active=payload.kill_switch_active or db_kill_switch_active,
     )
     telemetry = ExecutionTelemetry(
         daily_loss_pct=payload.daily_loss_pct,

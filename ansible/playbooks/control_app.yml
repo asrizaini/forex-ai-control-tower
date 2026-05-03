@@ -59,6 +59,14 @@
         group: aiops
         mode: preserve
 
+    - name: Copy risk package
+      ansible.builtin.copy:
+        src: ../../risk/
+        dest: /opt/forex-ai-control-tower/app/risk/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
     - name: Copy localization package
       ansible.builtin.copy:
         src: ../../localization/
