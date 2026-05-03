@@ -13,8 +13,8 @@ def push_event(event: dict[str, Any]) -> bool:
     labels = {
         "app": "forex-ai-control-tower",
         "stream": "agent-theater",
-        "agent": str(event.get("agent", "unknown")).replace(" ", "_"),
-        "room": str(event.get("stream", "Live Chat View")).replace(" ", "_"),
+        "agent_slug": str(event.get("agent", "unknown")).replace(" ", "_"),
+        "room_slug": str(event.get("stream", "Live Chat View")).replace(" ", "_"),
     }
     payload = {
         "streams": [

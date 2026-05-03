@@ -12,10 +12,10 @@
       "id": 1,
       "options": {
         "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
+        "enableLogDetails": false,
+        "prettifyLogMessage": false,
         "showCommonLabels": false,
-        "showLabels": true,
+        "showLabels": false,
         "showTime": true,
         "sortOrder": "Descending",
         "wrapLogMessage": true
@@ -24,12 +24,12 @@
         {
           "datasource": {"type": "loki", "uid": "Loki"},
           "editorMode": "code",
-          "expr": "{app=\"forex-ai-control-tower\", stream=\"agent-theater\"}",
+          "expr": "{app=\"forex-ai-control-tower\", stream=\"agent-theater\"} | json | line_format \"[{{.agent}}] {{.summary}}\"",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "Agent Theater Live Feed",
+      "title": "Agent Theater Chat Room",
       "type": "logs"
     }
   ],
