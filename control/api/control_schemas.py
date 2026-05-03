@@ -56,6 +56,27 @@ class StrategyOut(StrategyCreate):
     model_config = {"from_attributes": True}
 
 
+class StrategyPromoteRequest(BaseModel):
+    target_state: str = Field(max_length=60)
+    notes: str = Field(default="", max_length=500)
+    rollback_target: str | None = Field(default=None, max_length=100)
+    approve_production_live: bool = False
+
+
+class StrategyApprovalOut(BaseModel):
+    id: int
+    strategy_id: str
+    target_state: str
+    status: str
+    approver: str
+    gate: str
+    notes: str
+    rollback_target: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class PermissionCreate(BaseModel):
     user_id: str
     permission: str

@@ -67,6 +67,22 @@
         group: aiops
         mode: preserve
 
+    - name: Copy strategies package
+      ansible.builtin.copy:
+        src: ../../strategies/
+        dest: /opt/forex-ai-control-tower/app/strategies/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
+    - name: Copy governance package
+      ansible.builtin.copy:
+        src: ../../governance/
+        dest: /opt/forex-ai-control-tower/app/governance/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
     - name: Copy localization package
       ansible.builtin.copy:
         src: ../../localization/

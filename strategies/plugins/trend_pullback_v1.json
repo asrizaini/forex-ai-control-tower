@@ -1,0 +1,20 @@
+{
+  "strategy_id": "trend_pullback_v1",
+  "name": "Trend Pullback v1",
+  "version": "0.1.0",
+  "owner": "system",
+  "lifecycle": "draft",
+  "changelog": ["Initial governed demo-only plugin manifest."],
+  "supported_trade_styles": ["intraday", "trend following"],
+  "supported_symbols": ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD"],
+  "supported_timeframes": ["M15", "H1"],
+  "entry_rules": ["Trend alignment required.", "Pullback confirmation required.", "No high-impact news uncertainty."],
+  "exit_rules": ["Stop loss and take profit must be defined before approval.", "Exit if risk policy changes invalidate setup."],
+  "risk_rules": ["Execution Guard required.", "Manual approval required until demo_auto approval.", "Per-account risk policy required."],
+  "news_behavior": "block_on_unknown_high_impact_news",
+  "allowed_users": [],
+  "allowed_accounts": [],
+  "allowed_environments": ["demo"],
+  "test_files": [],
+  "rollback_target": null
+}

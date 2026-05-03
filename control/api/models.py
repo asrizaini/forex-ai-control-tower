@@ -49,6 +49,20 @@ class Strategy(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class StrategyApproval(Base):
+    __tablename__ = "strategy_approvals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    strategy_id: Mapped[str] = mapped_column(String(100), index=True)
+    target_state: Mapped[str] = mapped_column(String(60), index=True)
+    status: Mapped[str] = mapped_column(String(60), default="approved", index=True)
+    approver: Mapped[str] = mapped_column(String(120), index=True)
+    gate: Mapped[str] = mapped_column(String(120), index=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    rollback_target: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
 class PermissionAssignment(Base):
     __tablename__ = "permission_assignments"
 

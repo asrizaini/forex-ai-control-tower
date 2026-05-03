@@ -176,18 +176,18 @@ This checklist tracks the original full-system prompt. The current deployment is
 
 ## Strategy Registry And Governance
 
-- `[~]` Strategy registry/plugin skeleton.
-- `[~]` Lifecycle states documented/scaffolded.
-- `[~]` Governance modules scaffolded.
-- `[ ]` Real strategy plugin loader.
-- `[ ]` Strategy database.
-- `[ ]` Strategy approval workflow UI.
-- `[ ]` User/account/environment strategy permissions.
-- `[ ]` Backtest status gate.
-- `[ ]` Forward test status gate.
-- `[ ]` Demo validation gate.
-- `[ ]` Live approval gate.
-- `[ ]` Rollback target enforcement.
+- `[x]` Strategy registry/plugin skeleton.
+- `[x]` Lifecycle states documented and enforced in order.
+- `[x]` Governance modules scaffolded.
+- `[x]` Real JSON strategy plugin loader.
+- `[x]` Strategy database.
+- `[~]` Strategy approval workflow UI; API workflow and audit records are wired, richer dashboard controls still pending.
+- `[x]` User/account/environment strategy permissions.
+- `[~]` Backtest status gate defined in promotion workflow; actual backtest report validation still pending.
+- `[~]` Forward test status gate defined in promotion workflow; actual forward-test report validation still pending.
+- `[~]` Demo validation gate defined in promotion workflow; demo performance adapter still pending.
+- `[x]` Live approval gate blocks production-live unless super_admin live approval is recorded.
+- `[~]` Rollback target captured in approval records; automated rollback enforcement still pending.
 
 ## Backtest, Forward Test, And Tuning
 
