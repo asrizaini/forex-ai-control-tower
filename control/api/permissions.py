@@ -10,6 +10,7 @@ ROLE_PERMISSIONS = {
         "system:halt",
         "audit:read",
         "agents:write",
+        "deployment:write",
     },
     "strategy_admin": {"strategies:approve", "audit:read"},
     "account_manager": {"accounts:write", "trades:approve"},

@@ -317,3 +317,23 @@ class AgentToolPolicy(Base):
     environment: Mapped[str] = mapped_column(String(40), default="demo", index=True)
     reason: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class ReleaseRecord(Base):
+    __tablename__ = "release_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    deployment_id: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    version: Mapped[str] = mapped_column(String(80), index=True)
+    environment: Mapped[str] = mapped_column(String(40), default="staging", index=True)
+    status: Mapped[str] = mapped_column(String(60), default="planned", index=True)
+    changelog: Mapped[str] = mapped_column(Text, default="")
+    backup_point: Mapped[str] = mapped_column(String(255), default="")
+    test_result: Mapped[str] = mapped_column(String(120), default="not_run")
+    approver: Mapped[str] = mapped_column(String(120), default="")
+    rollback_command: Mapped[str] = mapped_column(Text, default="")
+    rollback_target: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_by: Mapped[str] = mapped_column(String(120), default="system", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)

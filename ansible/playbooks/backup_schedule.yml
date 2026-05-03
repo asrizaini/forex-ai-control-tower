@@ -1,0 +1,136 @@
+---
+- name: Install backup and verification schedule on control node
+  hosts: control
+  become: true
+  tasks:
+    - name: Install PostgreSQL backup client
+      ansible.builtin.apt:
+        name:
+          - postgresql-client
+        state: present
+        update_cache: true
+
+    - name: Copy backup package
+      ansible.builtin.copy:
+        src: ../../backup/
+        dest: /opt/forex-ai-control-tower/app/backup/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
+    - name: Ensure backup scripts are executable
+      ansible.builtin.file:
+        path: "/opt/forex-ai-control-tower/app/backup/{{ item }}"
+        owner: aiops
+        group: aiops
+        mode: "0750"
+      loop:
+        - backup_postgres.sh
+        - backup_configs.sh
+        - backup_all.sh
+        - restore_postgres.sh
+        - restore_configs.sh
+        - restore_all.sh
+        - verify_backup.sh
+
+    - name: Create private backup root
+      ansible.builtin.file:
+        path: /opt/forex-ai-control-tower/backups
+        state: directory
+        owner: aiops
+        group: aiops
+        mode: "0700"
+
+    - name: Install backup service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/forex-backup.service
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Forex AI Control Tower backup
+          After=network-online.target forex-control-stack.service
+          Wants=network-online.target
+
+          [Service]
+          Type=oneshot
+          User=aiops
+          Group=aiops
+          WorkingDirectory=/opt/forex-ai-control-tower/app/backup
+          Environment=POSTGRES_HOST=127.0.0.1
+          Environment=POSTGRES_DB=forex_ai
+          Environment=POSTGRES_USER=forex_ai
+          Environment=BACKUP_ROOT=/opt/forex-ai-control-tower/backups
+          PassEnvironment=POSTGRES_PASSWORD
+          ExecStart=/opt/forex-ai-control-tower/app/backup/backup_all.sh
+          NoNewPrivileges=true
+
+    - name: Install backup verification service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/forex-backup-verify.service
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Forex AI Control Tower backup verification
+          After=forex-backup.service
+
+          [Service]
+          Type=oneshot
+          User=aiops
+          Group=aiops
+          WorkingDirectory=/opt/forex-ai-control-tower/app/backup
+          Environment=BACKUP_ROOT=/opt/forex-ai-control-tower/backups
+          ExecStart=/opt/forex-ai-control-tower/app/backup/verify_backup.sh
+          NoNewPrivileges=true
+
+    - name: Install daily backup timer
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/forex-backup.timer
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Run Forex AI Control Tower backup daily
+
+          [Timer]
+          OnCalendar=*-*-* 02:30:00
+          Persistent=true
+          Unit=forex-backup.service
+
+          [Install]
+          WantedBy=timers.target
+
+    - name: Install daily backup verification timer
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/forex-backup-verify.timer
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Verify Forex AI Control Tower backups daily
+
+          [Timer]
+          OnCalendar=*-*-* 02:45:00
+          Persistent=true
+          Unit=forex-backup-verify.service
+
+          [Install]
+          WantedBy=timers.target
+
+    - name: Reload systemd
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+
+    - name: Enable backup timers
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        state: started
+        enabled: true
+      loop:
+        - forex-backup.timer
+        - forex-backup-verify.timer

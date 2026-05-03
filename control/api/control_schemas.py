@@ -459,3 +459,32 @@ class AgentToolPolicyOut(AgentToolPolicyCreate):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ReleaseRecordCreate(BaseModel):
+    version: str = Field(min_length=1, max_length=80)
+    environment: str = Field(default="staging", pattern="^(dev|staging|demo|production-live)$")
+    changelog: str = Field(min_length=1, max_length=4000)
+    backup_point: str = Field(min_length=1, max_length=255)
+    test_result: str = Field(min_length=1, max_length=120)
+    approver: str = Field(min_length=1, max_length=120)
+    rollback_command: str = Field(min_length=1, max_length=1000)
+    rollback_target: str | None = Field(default=None, max_length=100)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReleaseRecordOut(ReleaseRecordCreate):
+    id: int
+    deployment_id: str
+    status: str
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ReleaseStatusUpdate(BaseModel):
+    status: str = Field(pattern="^(planned|approved|deployed|failed|rolled_back)$")
+    test_result: str | None = Field(default=None, max_length=120)
+    notes: str = Field(default="", max_length=500)

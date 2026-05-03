@@ -290,15 +290,15 @@ This checklist tracks the original full-system prompt. The current deployment is
 
 ## Backup, Restore, Deployment, Rollback
 
-- `[~]` Backup/restore scripts scaffolded.
-- `[~]` Deployment/rollback scripts scaffolded.
+- `[x]` Backup/restore scripts scaffolded and hardened with checksums, private permissions, and restore confirmation gates.
+- `[~]` Deployment/rollback scripts scaffolded; API release records now persist backup points, test results, approvers, and rollback commands.
 - `[x]` Runtime secret rotation playbook.
 - `[x]` GitHub source control and rollback base.
-- `[ ]` Scheduled backups.
-- `[ ]` Backup verification.
+- `[x]` Scheduled backups through systemd timer on the control node.
+- `[x]` Backup verification script and systemd timer.
 - `[ ]` Restore drill.
-- `[ ]` Deployment approval workflow.
-- `[ ]` Release IDs, changelogs, approvers, rollback commands persisted.
+- `[~]` Deployment approval workflow; super-admin API gate and audit records are wired, richer dashboard approval UI pending.
+- `[x]` Release IDs, changelogs, approvers, rollback commands persisted.
 
 ## Mobile And External API Readiness
 
