@@ -7,7 +7,7 @@ from fastapi import APIRouter
 from sqlalchemy import func, select
 
 from ..db import SessionLocal
-from ..models import AgentTask, KillSwitch, MarketSnapshot, NotificationEvent, StrategyLabJob
+from ..models import AgentTask, KillSwitch, MarketSnapshot, NotificationEvent, RiskPolicy, Strategy, StrategyLabJob, TradeApproval, User, Account
 from ..secret_manager import secret_manager_status
 
 router = APIRouter(prefix="/system", tags=["system"])
@@ -87,6 +87,53 @@ def observability_status() -> dict:
             "notifications": notifications,
             "active_kill_switches": active_kill_switches,
             "latest_market": latest_market,
+        }
+    finally:
+        db.close()
+
+
+@router.get("/production-readiness")
+def production_readiness() -> dict:
+    db = SessionLocal()
+    try:
+        secrets_status = secret_manager_status()
+        users = db.scalar(select(func.count()).select_from(User)) or 0
+        accounts = db.scalar(select(func.count()).select_from(Account)) or 0
+        risk_policies = db.scalar(select(func.count()).select_from(RiskPolicy)) or 0
+        strategies = db.scalar(select(func.count()).select_from(Strategy)) or 0
+        approvals = db.scalar(select(func.count()).select_from(TradeApproval)) or 0
+        kill_switches = db.scalar(select(func.count()).select_from(KillSwitch)) or 0
+        fresh_market = db.scalar(select(func.count()).select_from(MarketSnapshot).where(MarketSnapshot.feed_fresh.is_(True))) or 0
+        gates = {
+            "user_account_persistence": users > 0 and accounts > 0,
+            "rbac_audit_persistence": True,
+            "risk_policies": risk_policies > 0,
+            "strategy_validation_pipeline": strategies > 0,
+            "manual_approval_workflow": approvals > 0,
+            "secret_manager_or_runtime_secrets": bool(secrets_status.get("required_runtime_secrets_present")),
+            "backup_restore_drill": False,
+            "monitoring_alerts_connected": False,
+            "security_review_completed": False,
+            "broker_compatibility_checks_passed": False,
+            "market_data_quality_gates_passed": fresh_market > 0,
+            "kill_switch_tested": kill_switches > 0,
+            "production_live_explicitly_approved": False,
+        }
+        blocking = [name for name, passed in gates.items() if not passed]
+        return {
+            "environment": "demo",
+            "trading_mode": "monitor_only",
+            "restricted_live_auto_allowed": False,
+            "live_trading_allowed": False,
+            "gates": gates,
+            "blocking_gates": blocking,
+            "next_required_actions": [
+                "Complete backup restore drill.",
+                "Connect monitoring alerts to notification hub.",
+                "Complete security review.",
+                "Pass broker compatibility and market data quality gates.",
+                "Explicitly approve production-live only after demo validation reports pass.",
+            ],
         }
     finally:
         db.close()
