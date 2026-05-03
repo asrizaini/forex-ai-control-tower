@@ -279,12 +279,12 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Linux node exporter on Linux hosts.
 - `[x]` Windows exporter on MT5 host.
 - `[x]` Host metrics dashboard provisioned.
-- `[~]` Structured JSON logs in selected services.
-- `[ ]` Docker/container dashboards.
-- `[ ]` API request dashboards.
-- `[ ]` Worker queue dashboards.
-- `[ ]` Agent event dashboards.
-- `[ ]` Trade/risk dashboards.
+- `[x]` Structured JSON API access logs in the control service; Agent Theater events continue to stream to Loki.
+- `[x]` Docker/container metrics through cAdvisor on the control node and Grafana operations dashboard.
+- `[x]` API request dashboards with request rate and p95 latency.
+- `[x]` Worker/agent queue dashboards from database-backed Prometheus gauges.
+- `[x]` Agent event dashboards through Agent Theater Loki and operations panels.
+- `[~]` Trade/risk dashboards; kill-switch, risk-policy, stale-market, and account gauges are live, full trade lifecycle dashboards still pending.
 - `[ ]` Loki log ingestion from all services.
 - `[ ]` Alert rules and notification routing.
 

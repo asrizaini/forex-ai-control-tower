@@ -19,6 +19,10 @@ scrape_configs:
     static_configs:
       - targets: ["10.10.1.81:6333"]
 
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["10.10.1.81:8080"]
+
   - job_name: loki
     metrics_path: /metrics
     static_configs:
@@ -49,6 +53,7 @@ scrape_configs:
           - http://10.10.1.81:3000/api/health
           - http://10.10.1.81:9090/-/healthy
           - http://10.10.1.81:6333/
+          - http://10.10.1.81:8080/healthz
           - http://10.10.1.81:3100/ready
           - http://10.10.1.82:11434/api/tags
           - http://10.10.1.83:11434/api/tags

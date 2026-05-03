@@ -14,6 +14,7 @@ from agent_theater.renderer import render_event
 
 from .auth import decode_token
 from .db import init_db
+from .observability import JsonAccessLogAndMetricsMiddleware, collect_database_metrics
 from .routes import (
     accounts,
     agents,
@@ -53,11 +54,12 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(
         CORSMiddleware,
-            allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://10.10.1.81:5173"],
+        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://10.10.1.81:5173"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(JsonAccessLogAndMetricsMiddleware)
 
     for router in [
         auth.router,
@@ -102,6 +104,7 @@ def create_app() -> FastAPI:
 
     @app.get("/metrics", tags=["system"])
     def metrics() -> Response:
+        collect_database_metrics()
         return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
     async def authenticated_ws(websocket: WebSocket, stream: str) -> None:
