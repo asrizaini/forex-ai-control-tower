@@ -51,6 +51,22 @@
         group: aiops
         mode: preserve
 
+    - name: Copy localization package
+      ansible.builtin.copy:
+        src: ../../localization/
+        dest: /opt/forex-ai-control-tower/app/localization/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
+    - name: Copy locale files
+      ansible.builtin.copy:
+        src: ../../locales/
+        dest: /opt/forex-ai-control-tower/app/locales/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
     - name: Create runtime state directory
       ansible.builtin.file:
         path: /opt/forex-ai-control-tower/runtime

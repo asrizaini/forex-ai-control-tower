@@ -10,6 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.responses import Response
 
+from agent_theater.renderer import render_event
+
 from .auth import decode_token
 from .db import init_db
 from .routes import (
@@ -131,6 +133,7 @@ def create_app() -> FastAPI:
     @app.websocket("/ws/v1/agent-theater")
     async def ws_agent_theater(websocket: WebSocket) -> None:
         token = websocket.query_params.get("token")
+        language = websocket.query_params.get("language", "en")
         internal_mode = os.getenv("AGENT_THEATER_INTERNAL_WS", "true").lower() == "true"
         if not internal_mode and (not token or not decode_token(token)):
             raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
@@ -149,7 +152,7 @@ def create_app() -> FastAPI:
                         last_size = handle.tell()
                     for line in lines[-20:]:
                         try:
-                            await websocket.send_json(json.loads(line))
+                            await websocket.send_json(render_event(json.loads(line), language))
                         except json.JSONDecodeError:
                             continue
             await asyncio.sleep(1)

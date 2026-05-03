@@ -1,4 +1,7 @@
 {
   "summary": "Summary",
-  "next_action": "Next action"
+  "next_action": "Next action",
+  "risk_status": "Risk status",
+  "result": "Result",
+  "safe_note": "Safe visible summary only. Hidden reasoning and secrets are not displayed."
 }

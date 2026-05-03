@@ -113,23 +113,24 @@ This checklist tracks the original full-system prompt. The current deployment is
 
 ## Agent Theater / AI Trading Room
 
-- `[~]` Agent Theater module scaffold.
-- `[~]` Event schema, formatter, redaction, sample events.
-- `[~]` WebSocket route skeleton.
+- `[x]` Agent Theater module scaffold.
+- `[x]` Event schema, formatter, redaction, sample events.
+- `[x]` WebSocket route for live event stream.
 - `[x]` Dashboard live Agent Theater event feed.
 - `[x]` Live event ingestion from agents; worker-side market, technical, strategy, and risk summaries are live.
 - `[x]` Live chat stream over WebSocket.
 - `[x]` Operator-to-Orchestrator chat UI embedded in Grafana.
 - `[x]` Orchestrator chat publishes operator messages, agent task acknowledgements, and safe replies into the Theater transcript.
 - `[x]` Human-readable trading-room style status messages.
+- `[x]` Room catalog API for Live Chat View, Workflow Timeline, Debate Mode, Boardroom Mode, Strategy War Room, Account Routing Room, and System Improvement Room.
+- `[x]` Debate Mode safe challenge summaries between Strategy Agent and Risk Manager.
+- `[x]` System Improvement Room for roadmap, deployment, rollback, test, and audit coordination.
+- `[x]` Bilingual rendered event stream labels and selected safe summaries for English and Bahasa Melayu Malaysia.
 - `[~]` Real market/news/strategy content in dialogue; current messages honestly show standby or pending-adapter status until integrations are complete.
 - `[~]` Workflow Timeline.
-- `[ ]` Debate Mode.
 - `[~]` Boardroom Mode.
 - `[~]` Strategy War Room.
 - `[~]` Account Routing Room.
-- `[ ]` System Improvement Room.
-- `[ ]` Bilingual rendered event stream.
 
 ## Execution Guard And Risk
 

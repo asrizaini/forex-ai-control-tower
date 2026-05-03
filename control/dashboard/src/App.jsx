@@ -11,6 +11,8 @@ function App() {
   const [runtime, setRuntime] = useState({ orchestrator_event_log_exists: false });
   const [secretStatus, setSecretStatus] = useState({ active_provider: 'env', required_runtime_secrets_present: false });
   const [events, setEvents] = useState([]);
+  const [theaterModes, setTheaterModes] = useState([]);
+  const [selectedTheaterMode, setSelectedTheaterMode] = useState('All Rooms');
   const [marketSnapshots, setMarketSnapshots] = useState([]);
   const [accountSnapshots, setAccountSnapshots] = useState([]);
   const [token, setToken] = useState(window.localStorage.getItem('fx_access_token') || '');
@@ -37,24 +39,27 @@ function App() {
       fetch(`${apiBase}/api/v1/system/secret-manager/status`).then((r) => r.json()).then(setSecretStatus).catch(() => {
         setSecretStatus({ active_provider: 'unknown', required_runtime_secrets_present: false });
       });
-      fetch(`${apiBase}/api/v1/agent-theater/events?limit=8`).then((r) => r.json()).then((body) => {
+      const streamParam = selectedTheaterMode !== 'All Rooms' ? `&stream=${encodeURIComponent(selectedTheaterMode)}` : '';
+      fetch(`${apiBase}/api/v1/agent-theater/events?limit=12&language=${encodeURIComponent(language)}${streamParam}`).then((r) => r.json()).then((body) => {
         setEvents(body.events || []);
+        setTheaterModes(body.modes || []);
       }).catch(() => setEvents([]));
       fetch(`${apiBase}/api/v1/telemetry/market/latest?limit=4`).then((r) => r.json()).then(setMarketSnapshots).catch(() => setMarketSnapshots([]));
       fetch(`${apiBase}/api/v1/telemetry/accounts/latest?limit=1`).then((r) => r.json()).then(setAccountSnapshots).catch(() => setAccountSnapshots([]));
     };
     loadRuntime();
     const timer = window.setInterval(loadRuntime, 15000);
-    const ws = new WebSocket(`${wsBase}/ws/v1/agent-theater`);
+    const ws = new WebSocket(`${wsBase}/ws/v1/agent-theater?language=${encodeURIComponent(language)}`);
     ws.onmessage = (message) => {
       const event = JSON.parse(message.data);
+      if (selectedTheaterMode !== 'All Rooms' && event.stream !== selectedTheaterMode) return;
       setEvents((current) => [...current.slice(-40), event]);
     };
     return () => {
       window.clearInterval(timer);
       ws.close();
     };
-  }, []);
+  }, [language, selectedTheaterMode]);
 
   useEffect(() => {
     if (!token) return;
@@ -137,6 +142,24 @@ function App() {
       setChatStatus(body.next_action || 'Orchestrator replied in Agent Theater.');
     } catch (error) {
       setChatStatus(error.message || 'Unable to reach Orchestrator chat.');
+    }
+  };
+
+  const seedTheaterRoom = async () => {
+    if (selectedTheaterMode === 'All Rooms') {
+      setChatStatus('Choose a room first, then I can seed its safe status message.');
+      return;
+    }
+    try {
+      const response = await fetch(`${apiBase}/api/v1/agent-theater/rooms/${encodeURIComponent(selectedTheaterMode)}/seed`, {
+        method: 'POST',
+        headers: { ...authHeaders() },
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.detail || 'Unable to activate room');
+      setChatStatus(`${selectedTheaterMode} is active.`);
+    } catch (error) {
+      setChatStatus(error.message || 'Unable to activate room.');
     }
   };
 
@@ -286,10 +309,18 @@ function App() {
               <MessageCircle size={20} />
               <h3>Talk To Orchestrator</h3>
             </div>
+            <label className="room-select">
+              Room
+              <select value={selectedTheaterMode} onChange={(event) => setSelectedTheaterMode(event.target.value)}>
+                <option>All Rooms</option>
+                {theaterModes.map((mode) => <option key={mode}>{mode}</option>)}
+              </select>
+            </label>
             <div className="operator-presets">
-              {['System status?', 'What is blocking demo trading?', 'What should we wire next?'].map((prompt) => (
+              {['System status?', 'Debate the safest next step.', 'Open the System Improvement Room.'].map((prompt) => (
                 <button type="button" key={prompt} onClick={() => setChatMessage(prompt)}>{prompt}</button>
               ))}
+              <button type="button" onClick={seedTheaterRoom}>Activate Room</button>
             </div>
             <form onSubmit={sendChat} className="chat-form">
               <textarea
@@ -312,11 +343,11 @@ function App() {
                     <strong>{event.agent}</strong>
                     <span>{event.stream} · {event.timestamp}</span>
                   </div>
-                  <p>{event.summary}</p>
+                  <p>{event.display?.summary || event.summary}</p>
                   <div className="message-meta">
                     <span>{event.result}</span>
-                    <span>{event.risk_status}</span>
-                    <span>{event.next_action}</span>
+                    <span>{event.display?.risk_status || event.risk_status}</span>
+                    <span>{event.display?.next_action || event.next_action}</span>
                   </div>
                 </article>
               ))}

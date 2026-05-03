@@ -72,3 +72,50 @@ def test_orchestrator_console_serves_embeddable_ui():
     assert response.status_code == 200
     assert "Orchestrator Console" in response.text
     assert "/api/v1/agent-theater/chat" in response.text
+
+
+def test_agent_theater_modes_and_ms_my_rendering(monkeypatch, tmp_path):
+    event_log = tmp_path / "events.jsonl"
+    monkeypatch.setenv("AGENT_THEATER_EVENT_LOG", str(event_log))
+    app = create_app()
+    client = TestClient(app, client=("10.10.1.84", 12345))
+
+    modes = client.get("/api/v1/agent-theater/modes").json()["modes"]
+    assert "Debate Mode" in {mode["name"] for mode in modes}
+    assert "System Improvement Room" in {mode["name"] for mode in modes}
+
+    response = client.post(
+        "/api/v1/agent-theater/events",
+        json={
+            "agent": "News Agent",
+            "stream": "Live Chat View",
+            "summary": "News adapter is not connected yet. Until ForexFactory/economic-calendar integration is live, high-impact news status stays conservative.",
+            "risk_status": "news_safe_mode",
+            "next_action": "Continue monitoring.",
+        },
+    )
+    assert response.status_code == 202
+
+    rendered = client.get("/api/v1/agent-theater/events?language=ms-MY").json()["events"][0]
+    assert rendered["display"]["language"] == "ms-MY"
+    assert "Adapter berita" in rendered["display"]["summary"]
+    assert rendered["display"]["risk_status"] == "mod_selamat_berita"
+
+
+def test_orchestrator_chat_supports_debate_and_improvement_rooms(monkeypatch, tmp_path):
+    event_log = tmp_path / "events.jsonl"
+    monkeypatch.setenv("AGENT_THEATER_EVENT_LOG", str(event_log))
+    configure_database(f"sqlite:///{tmp_path / 'control.db'}")
+    init_db()
+    app = create_app()
+    client = TestClient(app, client=("10.10.1.50", 12345))
+
+    response = client.post(
+        "/api/v1/agent-theater/chat",
+        json={"message": "Debate the next roadmap improvement step.", "language": "en", "session_id": "test-session"},
+    )
+
+    assert response.status_code == 202
+    streams = {event["stream"] for event in client.get("/api/v1/agent-theater/events").json()["events"]}
+    assert "Debate Mode" in streams
+    assert "System Improvement Room" in streams

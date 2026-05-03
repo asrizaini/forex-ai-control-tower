@@ -1,4 +1,7 @@
 {
   "summary": "Ringkasan",
-  "next_action": "Tindakan seterusnya"
+  "next_action": "Tindakan seterusnya",
+  "risk_status": "Status risiko",
+  "result": "Keputusan",
+  "safe_note": "Ringkasan selamat sahaja. Penaakulan tersembunyi dan rahsia tidak dipaparkan."
 }

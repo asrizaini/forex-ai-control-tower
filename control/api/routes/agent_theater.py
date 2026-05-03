@@ -21,7 +21,9 @@ from ..crud import audit
 from ..db import SessionLocal
 from ..models import AgentTask
 from agent_theater.loki import push_event
+from agent_theater.modes import mode_names, modes_as_dicts
 from agent_theater.redaction import redact
+from agent_theater.renderer import render_event, render_events
 
 router = APIRouter(prefix="/agent-theater", tags=["agent-theater"])
 
@@ -62,6 +64,11 @@ class OrchestratorChatIn(BaseModel):
 @router.get("")
 def list_resource() -> dict:
     return {"module": "agent_theater", "description": "Human-readable agent event summaries", "mode": "production-required"}
+
+
+@router.get("/modes")
+def list_modes() -> dict:
+    return {"modes": modes_as_dicts()}
 
 
 def _event_log_path() -> Path:
@@ -173,6 +180,53 @@ def _append_event(event: dict[str, Any]) -> Path:
 def _supporting_agent_events(message: str, language: str, session_id: str) -> list[dict[str, Any]]:
     lowered = message.lower()
     events: list[dict[str, Any]] = []
+    if any(word in lowered for word in ("debate", "challenge", "compare", "should we")):
+        events.extend(
+            [
+                {
+                    "agent": "Strategy Agent",
+                    "stream": "Debate Mode",
+                    "summary": "From a strategy perspective, I can discuss the setup quality, but I will not promote a trade unless backtest, forward test, demo validation, and governance gates pass.",
+                    "input_sources": ["Orchestrator Chat", "Strategy Registry"],
+                    "result": "strategy_position_visible",
+                    "confidence": 0.77,
+                    "risk_status": "no_executable_signal",
+                    "next_action": "Ask Risk Manager and Signal Reviewer to challenge the setup before approval.",
+                    "metadata": {"session_id": session_id, "language": language, "message_type": "debate_mode"},
+                    "timestamp": _timestamp(),
+                    "contains_hidden_chain_of_thought": False,
+                },
+                {
+                    "agent": "Risk Manager",
+                    "stream": "Debate Mode",
+                    "summary": "From a risk perspective, I will block anything that lacks account permission, strategy permission, loss-limit checks, fresh market data, and approval records.",
+                    "input_sources": ["Risk Policy", "Execution Guard"],
+                    "result": "risk_challenge_visible",
+                    "confidence": 0.86,
+                    "risk_status": "approval_gates_required",
+                    "next_action": "Keep the discussion visible, but do not create an order request from debate alone.",
+                    "metadata": {"session_id": session_id, "language": language, "message_type": "debate_mode"},
+                    "timestamp": _timestamp(),
+                    "contains_hidden_chain_of_thought": False,
+                },
+            ]
+        )
+    if any(word in lowered for word in ("improve", "upgrade", "roadmap", "system improvement", "complete prompt", "next step")):
+        events.append(
+            {
+                "agent": "System Improvement Agent",
+                "stream": "System Improvement Room",
+                "summary": "I received the improvement request. I will compare it with the roadmap, identify the next safest dependency, and keep deployment, rollback, tests, and audit records in scope.",
+                "input_sources": ["Roadmap Checklist", "Deployment Agent", "Security Review Agent"],
+                "result": "improvement_task_triaged",
+                "confidence": 0.82,
+                "risk_status": "change_requires_test_and_rollback_path",
+                "next_action": "Work from the top incomplete roadmap section unless a lower dependency is required first.",
+                "metadata": {"session_id": session_id, "language": language, "message_type": "system_improvement_room"},
+                "timestamp": _timestamp(),
+                "contains_hidden_chain_of_thought": False,
+            }
+        )
     if any(word in lowered for word in ("strategy", "backtest", "forward test", "signal", "tuning")):
         events.append(
             {
@@ -319,18 +373,21 @@ def _queue_agent_task(session_id: str, message: str, language: str) -> str:
 
 
 @router.get("/events")
-def list_events(limit: int = 50) -> dict:
+def list_events(limit: int = 50, language: str = "en", stream: str | None = None) -> dict:
     event_log = _event_log_path()
     if not event_log.exists():
-        return {"events": [], "source": str(event_log)}
+        return {"events": [], "source": str(event_log), "modes": mode_names()}
     lines = event_log.read_text(encoding="utf-8").splitlines()[-max(1, min(limit, 200)) :]
     events = []
     for line in lines:
         try:
-            events.append(json.loads(line))
+            event = json.loads(line)
         except json.JSONDecodeError:
             continue
-    return {"events": events, "source": str(event_log)}
+        if stream and event.get("stream") != stream:
+            continue
+        events.append(event)
+    return {"events": render_events(events, language), "source": str(event_log), "modes": mode_names()}
 
 
 @router.get("/console", response_class=HTMLResponse)
@@ -524,4 +581,31 @@ def publish_event(
     payload["contains_hidden_chain_of_thought"] = False
     event_log = _append_event(payload)
     return {"accepted": True, "source": str(event_log)}
+
+
+@router.post("/rooms/{room_name}/seed", status_code=status.HTTP_202_ACCEPTED)
+def seed_room_status(
+    room_name: str,
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    if room_name not in mode_names():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown Agent Theater room")
+    if not _chat_allowed(request, authorization):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+    event = {
+        "agent": "Orchestrator Agent",
+        "stream": room_name,
+        "summary": f"{room_name} is active. I will show only safe summaries, visible conclusions, confidence, risk status, and next action.",
+        "input_sources": ["Agent Theater mode catalog"],
+        "result": "room_active",
+        "confidence": 0.9,
+        "risk_status": "safe_display_only",
+        "next_action": "Use this room for visibility and governed coordination; it cannot bypass approvals.",
+        "metadata": {"message_type": "room_seed"},
+        "timestamp": _timestamp(),
+        "contains_hidden_chain_of_thought": False,
+    }
+    _append_event(redact(event))
+    return {"accepted": True, "event": render_event(event)}
 

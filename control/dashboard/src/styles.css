@@ -32,6 +32,7 @@ strong { color: #0b6b5d; }
 .operator-chat { background: white; border: 1px solid #dfe4ea; border-radius: 8px; padding: 16px; }
 .operator-heading { display: flex; align-items: center; gap: 10px; }
 .operator-heading h3 { font-size: 15px; margin: 0; }
+.room-select { color: #425466; display: grid; font-size: 13px; gap: 6px; margin-top: 14px; }
 .operator-presets { display: grid; gap: 8px; margin-top: 14px; }
 .operator-presets button { border: 1px solid #d7dee7; border-radius: 6px; background: #f8fafc; color: #253444; cursor: pointer; padding: 9px 10px; text-align: left; }
 .chat-form { display: grid; gap: 10px; margin-top: 14px; }

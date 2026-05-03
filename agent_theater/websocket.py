@@ -1,9 +1,6 @@
-STREAMS = [
-    "Live Chat View",
-    "Workflow Timeline",
-    "Debate Mode",
-    "Boardroom Mode",
-    "Strategy War Room",
-    "Account Routing Room",
-    "System Improvement Room",
-]
+from __future__ import annotations
+
+from .modes import mode_names
+
+
+STREAMS = list(mode_names())
