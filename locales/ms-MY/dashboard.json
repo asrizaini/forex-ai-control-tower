@@ -1,5 +1,17 @@
 {
+  "title": "Forex AI Control Tower",
+  "system_health": "Kesihatan Sistem",
+  "risk_status": "Status Risiko",
+  "orchestrator": "Orchestrator",
+  "secret_manager": "Pengurus Rahsia",
+  "agent_catalog": "Katalog Agen",
+  "workflow_engine": "Enjin Aliran Kerja",
+  "mt5_demo_account": "Akaun Demo MT5",
+  "market_snapshot": "Gambaran Pasaran",
+  "control_plane": "Panel Kawalan",
+  "agent_theater": "Agent Theater",
+  "talk_to_orchestrator": "Bercakap Dengan Orchestrator",
+  "send": "Hantar",
   "health": "Kesihatan",
-  "risk": "Risiko",
-  "agent_theater": "Agent Theater"
+  "risk": "Risiko"
 }

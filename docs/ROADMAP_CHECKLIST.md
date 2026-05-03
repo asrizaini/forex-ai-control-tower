@@ -223,12 +223,12 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Localization service scaffold.
 - `[x]` Glossary file.
 - `[x]` Tests for non-translation rules.
-- `[~]` Dashboard language selector.
-- `[ ]` Full dashboard translation coverage.
-- `[ ]` Notification translation coverage.
-- `[ ]` Agent Theater translation coverage.
-- `[ ]` Trade approval message translation coverage.
-- `[ ]` Automatic language detection in live user workflows.
+- `[x]` Dashboard language selector.
+- `[~]` Full dashboard translation coverage; primary panels are API-localized, deeper admin forms still pending.
+- `[~]` Notification translation coverage through locale files/templates; channel adapters still pending.
+- `[~]` Agent Theater translation coverage through rendered labels and selected safe summaries; full free-text translation adapter still pending.
+- `[~]` Trade approval message translation coverage through templates; approval workflow adapter still pending.
+- `[x]` Automatic language detection API for live user workflows.
 
 ## Notifications
 

@@ -5,6 +5,21 @@ import './styles.css';
 
 const apiBase = import.meta.env.VITE_API_BASE || `${window.location.protocol}//${window.location.hostname}:8000`;
 const wsBase = apiBase.replace(/^http/, 'ws');
+const fallbackDashboardText = {
+  title: 'Forex AI Control Tower',
+  system_health: 'System Health',
+  risk_status: 'Risk Status',
+  orchestrator: 'Orchestrator',
+  secret_manager: 'Secret Manager',
+  agent_catalog: 'Agent Catalog',
+  workflow_engine: 'Workflow Engine',
+  mt5_demo_account: 'MT5 Demo Account',
+  market_snapshot: 'Market Snapshot',
+  control_plane: 'Control Plane',
+  agent_theater: 'Agent Theater',
+  talk_to_orchestrator: 'Talk To Orchestrator',
+  send: 'Send',
+};
 
 function App() {
   const [health, setHealth] = useState({ status: 'loading', environment: 'demo', trading_mode: 'monitor_only' });
@@ -24,10 +39,14 @@ function App() {
   const [newServiceKey, setNewServiceKey] = useState({ name: '', permissions: 'telemetry:write' });
   const [newTask, setNewTask] = useState({ assigned_agent: 'Orchestrator Agent', task_type: 'operator_request', request: '' });
   const [language, setLanguage] = useState('en');
+  const [dashboardText, setDashboardText] = useState(fallbackDashboardText);
   const [chatMessage, setChatMessage] = useState('');
   const [chatStatus, setChatStatus] = useState('Ready for safe status questions.');
 
   useEffect(() => {
+    fetch(`${apiBase}/api/v1/localization/locales/${encodeURIComponent(language)}/dashboard`).then((r) => r.json()).then((body) => {
+      setDashboardText({ ...fallbackDashboardText, ...(body.messages || {}) });
+    }).catch(() => setDashboardText(fallbackDashboardText));
     fetch(`${apiBase}/health`).then((r) => r.json()).then(setHealth).catch(() => {
       setHealth({ status: 'offline', environment: 'demo', trading_mode: 'monitor_only' });
     });
@@ -167,24 +186,24 @@ function App() {
     <main className="shell">
       <header className="topbar">
         <div>
-          <h1>Forex AI Control Tower</h1>
+          <h1>{dashboardText.title}</h1>
           <p>{health.environment} · {health.trading_mode}</p>
         </div>
         <label className="language"><Globe2 size={18} /> <select value={language} onChange={(e) => setLanguage(e.target.value)}><option>en</option><option>ms-MY</option><option>auto</option></select></label>
       </header>
       <section className="grid">
-        <article><Activity /><h2>System Health</h2><strong>{health.status}</strong></article>
-        <article><ShieldCheck /><h2>Risk Status</h2><strong>Execution guarded</strong></article>
-        <article><ServerCog /><h2>Orchestrator</h2><strong>{runtime.orchestrator_event_log_exists ? 'running' : 'warming up'}</strong></article>
+        <article><Activity /><h2>{dashboardText.system_health}</h2><strong>{health.status}</strong></article>
+        <article><ShieldCheck /><h2>{dashboardText.risk_status}</h2><strong>Execution guarded</strong></article>
+        <article><ServerCog /><h2>{dashboardText.orchestrator}</h2><strong>{runtime.orchestrator_event_log_exists ? 'running' : 'warming up'}</strong></article>
       </section>
       <section className="grid">
-        <article><ShieldCheck /><h2>Secret Manager</h2><strong>{secretStatus.active_provider}</strong><p>{secretStatus.required_runtime_secrets_present ? 'Required runtime secrets present' : 'Missing required runtime secret'}</p></article>
-        <article><ServerCog /><h2>Agent Catalog</h2><strong>{operatorData.catalog.length || 'login required'}</strong><p>Registered governed agents</p></article>
-        <article><Activity /><h2>Workflow Engine</h2><strong>{operatorData.states.length ? 'active' : 'running'}</strong><p>DB-backed task processing</p></article>
+        <article><ShieldCheck /><h2>{dashboardText.secret_manager}</h2><strong>{secretStatus.active_provider}</strong><p>{secretStatus.required_runtime_secrets_present ? 'Required runtime secrets present' : 'Missing required runtime secret'}</p></article>
+        <article><ServerCog /><h2>{dashboardText.agent_catalog}</h2><strong>{operatorData.catalog.length || 'login required'}</strong><p>Registered governed agents</p></article>
+        <article><Activity /><h2>{dashboardText.workflow_engine}</h2><strong>{operatorData.states.length ? 'active' : 'running'}</strong><p>DB-backed task processing</p></article>
       </section>
       <section className="telemetry-grid">
         <article>
-          <h2>MT5 Demo Account</h2>
+          <h2>{dashboardText.mt5_demo_account}</h2>
           {accountSnapshots[0] ? (
             <div className="telemetry-list">
               <span>Account <strong>{accountSnapshots[0].login_masked}</strong></span>
@@ -197,7 +216,7 @@ function App() {
           ) : <p>Waiting for account telemetry.</p>}
         </article>
         <article>
-          <h2>Market Snapshot</h2>
+          <h2>{dashboardText.market_snapshot}</h2>
           {marketSnapshots.length ? (
             <div className="market-table">
               {marketSnapshots.map((snapshot) => (
@@ -215,7 +234,7 @@ function App() {
       <section className="admin-panel">
         <div className="section-title">
           <ShieldCheck size={20} />
-          <h2>Control Plane</h2>
+          <h2>{dashboardText.control_plane}</h2>
         </div>
         {!token ? (
           <form className="admin-login" onSubmit={doLogin}>
@@ -301,13 +320,13 @@ function App() {
       <section className="theater">
         <div className="section-title">
           <RadioTower size={20} />
-          <h2>Agent Theater</h2>
+          <h2>{dashboardText.agent_theater}</h2>
         </div>
         <div className="theater-layout">
           <div className="operator-chat">
             <div className="operator-heading">
               <MessageCircle size={20} />
-              <h3>Talk To Orchestrator</h3>
+              <h3>{dashboardText.talk_to_orchestrator}</h3>
             </div>
             <label className="room-select">
               Room
@@ -329,7 +348,7 @@ function App() {
                 placeholder="Ask the Orchestrator about status, risk, MT5 bridge, strategies, notifications, or agents."
                 rows={5}
               />
-              <button type="submit" aria-label="Send message to Orchestrator"><Send size={18} /> Send</button>
+              <button type="submit" aria-label="Send message to Orchestrator"><Send size={18} /> {dashboardText.send}</button>
             </form>
             <p className="chat-status">{chatStatus}</p>
           </div>

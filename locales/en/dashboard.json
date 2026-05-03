@@ -1,5 +1,17 @@
 {
+  "title": "Forex AI Control Tower",
+  "system_health": "System Health",
+  "risk_status": "Risk Status",
+  "orchestrator": "Orchestrator",
+  "secret_manager": "Secret Manager",
+  "agent_catalog": "Agent Catalog",
+  "workflow_engine": "Workflow Engine",
+  "mt5_demo_account": "MT5 Demo Account",
+  "market_snapshot": "Market Snapshot",
+  "control_plane": "Control Plane",
+  "agent_theater": "Agent Theater",
+  "talk_to_orchestrator": "Talk To Orchestrator",
+  "send": "Send",
   "health": "Health",
-  "risk": "Risk",
-  "agent_theater": "Agent Theater"
+  "risk": "Risk"
 }
