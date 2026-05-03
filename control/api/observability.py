@@ -18,6 +18,7 @@ from .models import (
     Account,
     AccountSnapshot,
     AgentTask,
+    HistoricalCandle,
     KillSwitch,
     MarketSnapshot,
     MobilePushRegistration,
@@ -131,6 +132,7 @@ def collect_database_metrics() -> None:
         CONTROL_PLANE_RECORDS.labels("strategies").set(db.scalar(select(func.count()).select_from(Strategy)) or 0)
         CONTROL_PLANE_RECORDS.labels("risk_policies").set(db.scalar(select(func.count()).select_from(RiskPolicy)) or 0)
         CONTROL_PLANE_RECORDS.labels("market_snapshots").set(db.scalar(select(func.count()).select_from(MarketSnapshot)) or 0)
+        CONTROL_PLANE_RECORDS.labels("historical_candles").set(db.scalar(select(func.count()).select_from(HistoricalCandle)) or 0)
         CONTROL_PLANE_RECORDS.labels("account_snapshots").set(db.scalar(select(func.count()).select_from(AccountSnapshot)) or 0)
         CONTROL_PLANE_RECORDS.labels("release_records").set(db.scalar(select(func.count()).select_from(ReleaseRecord)) or 0)
         CONTROL_PLANE_RECORDS.labels("mobile_push_registrations").set(db.scalar(select(func.count()).select_from(MobilePushRegistration)) or 0)

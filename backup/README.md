@@ -6,6 +6,7 @@ Backups are designed for the control node and read secrets only from environment
 - `backup_configs.sh` archives deployable app/config files while excluding `.env`, secrets, keys, logs, and backup data.
 - `backup_all.sh` runs both and writes a manifest.
 - `verify_backup.sh` validates checksums and verifies both archive formats.
+- `restore_drill.sh` restores the latest PostgreSQL dump into a temporary database and removes it afterward.
 - Restore scripts require `RESTORE_CONFIRM=YES` and explicit restore file paths.
 
 Default backup root:

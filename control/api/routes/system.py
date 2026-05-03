@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 from fastapi import APIRouter
@@ -104,6 +106,12 @@ def production_readiness() -> dict:
         approvals = db.scalar(select(func.count()).select_from(TradeApproval)) or 0
         kill_switches = db.scalar(select(func.count()).select_from(KillSwitch)) or 0
         fresh_market = db.scalar(select(func.count()).select_from(MarketSnapshot).where(MarketSnapshot.feed_fresh.is_(True))) or 0
+        restore_drill_marker = Path("/opt/forex-ai-control-tower/backups/restore_drills/latest.json")
+        try:
+            with urllib.request.urlopen("http://127.0.0.1:9093/-/healthy", timeout=2) as response:
+                alertmanager_healthy = 200 <= response.status < 300
+        except (OSError, urllib.error.URLError, TimeoutError):
+            alertmanager_healthy = False
         gates = {
             "user_account_persistence": users > 0 and accounts > 0,
             "rbac_audit_persistence": True,
@@ -111,8 +119,8 @@ def production_readiness() -> dict:
             "strategy_validation_pipeline": strategies > 0,
             "manual_approval_workflow": approvals > 0,
             "secret_manager_or_runtime_secrets": bool(secrets_status.get("required_runtime_secrets_present")),
-            "backup_restore_drill": False,
-            "monitoring_alerts_connected": False,
+            "backup_restore_drill": restore_drill_marker.exists(),
+            "monitoring_alerts_connected": alertmanager_healthy,
             "security_review_completed": False,
             "broker_compatibility_checks_passed": False,
             "market_data_quality_gates_passed": fresh_market > 0,
@@ -120,6 +128,21 @@ def production_readiness() -> dict:
             "production_live_explicitly_approved": False,
         }
         blocking = [name for name, passed in gates.items() if not passed]
+        action_by_gate = {
+            "user_account_persistence": "Create at least one admin/user account and one MT5 account record.",
+            "rbac_audit_persistence": "Verify RBAC and append-only audit persistence.",
+            "risk_policies": "Create default demo and account risk policies.",
+            "strategy_validation_pipeline": "Register at least one strategy and run backtest, forward-test, tuning, and demo validation records.",
+            "manual_approval_workflow": "Run a demo manual approval request and decision through the dashboard or API.",
+            "secret_manager_or_runtime_secrets": "Set required runtime secrets through environment or the approved secret manager.",
+            "backup_restore_drill": "Complete a backup restore drill and write the restore drill marker.",
+            "monitoring_alerts_connected": "Start Alertmanager and connect monitoring alerts to the notification hub.",
+            "security_review_completed": "Complete the pre-live security review checklist.",
+            "broker_compatibility_checks_passed": "Run broker compatibility checks against the logged-in MT5 demo terminal.",
+            "market_data_quality_gates_passed": "Collect fresh MT5 market data and pass market data quality gates.",
+            "kill_switch_tested": "Execute and audit a demo kill-switch test.",
+            "production_live_explicitly_approved": "Explicitly approve production-live only after demo validation reports pass.",
+        }
         return {
             "environment": "demo",
             "trading_mode": "monitor_only",
@@ -127,13 +150,7 @@ def production_readiness() -> dict:
             "live_trading_allowed": False,
             "gates": gates,
             "blocking_gates": blocking,
-            "next_required_actions": [
-                "Complete backup restore drill.",
-                "Connect monitoring alerts to notification hub.",
-                "Complete security review.",
-                "Pass broker compatibility and market data quality gates.",
-                "Explicitly approve production-live only after demo validation reports pass.",
-            ],
+            "next_required_actions": [action_by_gate[name] for name in blocking],
         }
     finally:
         db.close()

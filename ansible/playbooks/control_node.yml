@@ -35,6 +35,30 @@
         group: aiops
         mode: "0644"
 
+    - name: Copy Prometheus alert rules
+      ansible.builtin.copy:
+        src: ../../monitoring/alert_rules.yml
+        dest: /opt/forex-ai-control-tower/monitoring/alert_rules.yml
+        owner: aiops
+        group: aiops
+        mode: "0644"
+
+    - name: Copy Alertmanager config
+      ansible.builtin.copy:
+        src: ../../monitoring/alertmanager.yml
+        dest: /opt/forex-ai-control-tower/monitoring/alertmanager.yml
+        owner: aiops
+        group: aiops
+        mode: "0644"
+
+    - name: Copy Promtail config
+      ansible.builtin.copy:
+        src: ../../monitoring/promtail.yml
+        dest: /opt/forex-ai-control-tower/monitoring/promtail.yml
+        owner: aiops
+        group: aiops
+        mode: "0644"
+
     - name: Copy Blackbox exporter config
       ansible.builtin.copy:
         src: ../../monitoring/blackbox.yml

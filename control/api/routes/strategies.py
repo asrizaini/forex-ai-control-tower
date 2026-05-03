@@ -10,7 +10,7 @@ from ..control_schemas import StrategyApprovalOut, StrategyCreate, StrategyOut, 
 from ..crud import audit
 from ..db import get_db
 from ..dependencies import current_principal
-from ..models import PermissionAssignment, Strategy, StrategyApproval
+from ..models import PermissionAssignment, Strategy, StrategyApproval, StrategyLabJob, TradeApproval
 from ..permissions import has_permission
 from governance.strategy_governance import next_state_allowed, production_live_environment_allowed, required_gate_for_state
 from strategies.registry import discover_plugins, plugin_metadata
@@ -126,6 +126,39 @@ def promote_strategy(
 @router.get("/records/{strategy_id}/approvals", response_model=list[StrategyApprovalOut])
 def strategy_approvals(strategy_id: str, db: Session = Depends(get_db)) -> list[StrategyApproval]:
     return list(db.scalars(select(StrategyApproval).where(StrategyApproval.strategy_id == strategy_id).order_by(StrategyApproval.created_at.desc()).limit(100)))
+
+
+@router.get("/records/{strategy_id}/demo-validation-report")
+def demo_validation_report(strategy_id: str, db: Session = Depends(get_db)) -> dict:
+    jobs = list(db.scalars(select(StrategyLabJob).where(StrategyLabJob.strategy_id == strategy_id).order_by(StrategyLabJob.created_at.desc()).limit(200)))
+    approvals = list(db.scalars(select(TradeApproval).where(TradeApproval.strategy_id == strategy_id).order_by(TradeApproval.created_at.desc()).limit(200)))
+    completed_backtests = [job for job in jobs if job.job_type == "backtest" and job.quality_score is not None]
+    forward_tests = [job for job in jobs if job.job_type == "forward_test"]
+    tuning_jobs = [job for job in jobs if job.job_type == "tuning"]
+    demo_approvals = [approval for approval in approvals if approval.environment == "demo"]
+    best_quality = max([job.quality_score or 0 for job in completed_backtests], default=0)
+    passed = bool(completed_backtests and forward_tests and demo_approvals and best_quality >= 70)
+    blockers = []
+    if not completed_backtests:
+        blockers.append("missing_completed_backtest")
+    if best_quality < 70:
+        blockers.append("quality_score_below_demo_threshold")
+    if not forward_tests:
+        blockers.append("missing_forward_test_record")
+    if not demo_approvals:
+        blockers.append("missing_demo_manual_approval_record")
+    return {
+        "strategy_id": strategy_id,
+        "demo_validation_passed": passed,
+        "best_quality_score": best_quality,
+        "backtest_jobs": len(completed_backtests),
+        "forward_test_jobs": len(forward_tests),
+        "tuning_jobs": len(tuning_jobs),
+        "demo_approval_records": len(demo_approvals),
+        "blockers": blockers,
+        "live_trading_allowed": False,
+        "note": "Report is for demo validation only. Production-live requires separate governance approval.",
+    }
 
 
 @router.post("/records/{strategy_id}/permissions", response_model=dict)

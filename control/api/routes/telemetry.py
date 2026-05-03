@@ -8,9 +8,11 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..control_schemas import AccountSnapshotOut, MarketSnapshotOut, WorkerTelemetryIn
+from datetime import datetime, timezone
+
+from ..control_schemas import AccountSnapshotOut, HistoricalCandleOut, MarketSnapshotOut, WorkerTelemetryIn
 from ..db import get_db
-from ..models import AccountSnapshot, MarketSnapshot
+from ..models import AccountSnapshot, HistoricalCandle, MarketSnapshot
 from market_data_quality.analysis import multi_timeframe_summary, price_action_summary, spread_slippage_summary
 
 router = APIRouter(prefix="/telemetry", tags=["telemetry"])
@@ -62,11 +64,53 @@ def _bool_or_none(value: Any) -> bool | None:
     return bool(value)
 
 
-def _persist_market_snapshots(db: Session, worker: str, result: dict[str, Any]) -> int:
+def _datetime_or_now(value: Any) -> datetime:
+    if value is None:
+        return datetime.now(timezone.utc).replace(tzinfo=None)
+    if isinstance(value, (int, float)):
+        return datetime.fromtimestamp(value, tz=timezone.utc).replace(tzinfo=None)
+    if isinstance(value, str):
+        normalized = value.replace("Z", "+00:00")
+        try:
+            return datetime.fromisoformat(normalized).astimezone(timezone.utc).replace(tzinfo=None)
+        except ValueError:
+            return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _persist_historical_candles(db: Session, symbol: str, item: dict[str, Any]) -> int:
+    rates = item.get("rates") or item.get("candles") or []
+    if not isinstance(rates, list):
+        return 0
+    timeframe = str(item.get("timeframe", "M1"))
+    count = 0
+    for rate in rates[-500:]:
+        if not isinstance(rate, dict):
+            continue
+        db.add(
+            HistoricalCandle(
+                symbol=symbol,
+                timeframe=timeframe,
+                candle_time=_datetime_or_now(rate.get("time") or rate.get("timestamp")),
+                open=_float_or_none(rate.get("open")),
+                high=_float_or_none(rate.get("high")),
+                low=_float_or_none(rate.get("low")),
+                close=_float_or_none(rate.get("close")),
+                tick_volume=_float_or_none(rate.get("tick_volume") or rate.get("volume")),
+                spread=_float_or_none(rate.get("spread") or item.get("spread")),
+                payload_json=rate,
+            )
+        )
+        count += 1
+    return count
+
+
+def _persist_market_snapshots(db: Session, worker: str, result: dict[str, Any]) -> tuple[int, int]:
     snapshots = result.get("snapshots", [])
     if not isinstance(snapshots, list):
-        return 0
+        return 0, 0
     count = 0
+    candle_count = 0
     for item in snapshots:
         if not isinstance(item, dict):
             continue
@@ -87,7 +131,8 @@ def _persist_market_snapshots(db: Session, worker: str, result: dict[str, Any]) 
             )
         )
         count += 1
-    return count
+        candle_count += _persist_historical_candles(db, symbol, item)
+    return count, candle_count
 
 
 def _persist_account_snapshot(db: Session, worker: str, result: dict[str, Any]) -> int:
@@ -125,10 +170,10 @@ def ingest_worker_snapshot(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Telemetry ingest is restricted")
     worker = payload.worker
     result = payload.result
-    market_count = _persist_market_snapshots(db, worker, result) if worker == "market" else 0
+    market_count, candle_count = _persist_market_snapshots(db, worker, result) if worker == "market" else (0, 0)
     account_count = _persist_account_snapshot(db, worker, result) if worker == "strategy_risk" else 0
     db.commit()
-    return {"accepted": True, "market_snapshots": market_count, "account_snapshots": account_count}
+    return {"accepted": True, "market_snapshots": market_count, "historical_candles": candle_count, "account_snapshots": account_count}
 
 
 @router.get("/market/latest", response_model=list[MarketSnapshotOut])
@@ -137,6 +182,18 @@ def latest_market_snapshots(symbol: str | None = None, limit: int = 50, db: Sess
     if symbol:
         query = select(MarketSnapshot).where(MarketSnapshot.symbol == symbol.upper()).order_by(MarketSnapshot.created_at.desc()).limit(max(1, min(limit, 200)))
     return list(db.scalars(query))
+
+
+@router.get("/market/candles", response_model=list[HistoricalCandleOut])
+def historical_candles(symbol: str, timeframe: str = "M1", limit: int = 500, db: Session = Depends(get_db)) -> list[HistoricalCandle]:
+    return list(
+        db.scalars(
+            select(HistoricalCandle)
+            .where(HistoricalCandle.symbol == symbol.upper(), HistoricalCandle.timeframe == timeframe)
+            .order_by(HistoricalCandle.candle_time.desc())
+            .limit(max(1, min(limit, 5000)))
+        )
+    )
 
 
 @router.get("/accounts/latest", response_model=list[AccountSnapshotOut])

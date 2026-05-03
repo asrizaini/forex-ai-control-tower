@@ -126,7 +126,7 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Debate Mode safe challenge summaries between Strategy Agent and Risk Manager.
 - `[x]` System Improvement Room for roadmap, deployment, rollback, test, and audit coordination.
 - `[x]` Bilingual rendered event stream labels and selected safe summaries for English and Bahasa Melayu Malaysia.
-- `[~]` Real market/news/strategy content in dialogue; live market/account telemetry is present, but news feed, full strategy scoring, and live strategy governance adapters are still pending.
+- `[!]` Real market/news/strategy content in dialogue; live market/account telemetry is present, but external news feed, full strategy scoring, and live strategy governance adapters are held in `docs/PENDING_HOLD_CHECKLIST.md`.
 - `[x]` Workflow Timeline room with multi-agent safe transcript seed and live event filtering.
 - `[x]` Boardroom Mode with executive status, risk posture, and security review summaries.
 - `[x]` Strategy War Room with strategy, backtest, and promotion gate summaries.
@@ -138,22 +138,22 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` MT5 bridge rejects order send without guard token.
 - `[x]` MT5 bridge rejects order send before order check.
 - `[x]` Live trading disabled by default.
-- `[~]` Risk engine scaffold.
-- `[~]` Kill switch module scaffold.
-- `[~]` Governance scaffold.
+- `[x]` Risk engine control-plane policy, persistent risk policies, and Execution Guard checks.
+- `[x]` Kill switch module with global/scoped persistence, audit, deactivation, and Execution Guard blocking.
+- `[x]` Governance scaffold with strategy lifecycle, approvals, permissions, live gate blocking, and deployment records.
 - `[x]` Account permission check.
 - `[x]` User permission check.
 - `[x]` Strategy permission check.
 - `[x]` Trading mode policy enforcement in Execution Guard control-plane check.
 - `[x]` Max daily and weekly loss checks.
 - `[x]` Max open trades and trades per day checks.
-- `[~]` Spread and slippage checks from broker telemetry payload; direct MT5 telemetry binding still pending.
-- `[~]` News halt integration as an Execution Guard input; live news provider still pending.
-- `[~]` Duplicate trade risk detection as an Execution Guard input; position/signal matching still pending.
-- `[~]` Margin availability validation as an Execution Guard input; MT5 account binding still pending.
-- `[~]` Correlation exposure checks as an Execution Guard input; portfolio exposure model still pending.
-- `[~]` Broker compatibility enforcement through Execution Guard input; broker checker binding still pending.
-- `[~]` Market data quality enforcement through Execution Guard input; live quality checker binding still pending.
+- `[!]` Spread and slippage checks from broker telemetry payload; direct live MT5 telemetry binding is held pending broker validation.
+- `[!]` News halt integration as an Execution Guard input; live news provider is held pending provider selection and credentials.
+- `[!]` Duplicate trade risk detection as an Execution Guard input; position/signal matching is held pending demo execution workflow.
+- `[!]` Margin availability validation as an Execution Guard input; live MT5 margin binding is held pending account-level validation.
+- `[!]` Correlation exposure checks as an Execution Guard input; portfolio exposure model is held pending multi-account exposure requirements.
+- `[!]` Broker compatibility enforcement through Execution Guard input; live broker checker pass is held pending broker metadata validation.
+- `[!]` Market data quality enforcement through Execution Guard input; live quality gate pass is held pending sufficient candle history.
 - `[x]` System health score execution gating.
 - `[x]` Global and scoped kill switch API fully wired with persistent activation, listing, deactivation, audit logging, and Execution Guard blocking.
 
@@ -167,12 +167,12 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Bridge token protection.
 - `[x]` Windows scheduled task startup.
 - `[x]` Multi-account terminal manager scaffold.
-- `[~]` One MT5 terminal instance per account; software profile routing is ready, terminal launch orchestration still pending.
-- `[~]` Per-account bridge ports `8501+`; account route metadata and profile API are wired, multi-process launcher still pending.
+- `[!]` One MT5 terminal instance per account; software profile routing is ready, terminal launch orchestration is held until account list and terminal paths are confirmed.
+- `[!]` Per-account bridge ports `8501+`; account route metadata and profile API are wired, multi-process launcher is held until multi-account terminal validation.
 - `[x]` Account profile persistence without broker credentials.
-- `[~]` Broker credential onboarding without secret leakage; profiles intentionally exclude credentials, onboarding workflow still pending.
-- `[ ]` Windows service mode alternative.
-- `[~]` Production MT5 bridge observability beyond basic health; health now includes profile count/routes, detailed per-terminal metrics still pending.
+- `[!]` Broker credential onboarding without secret leakage; profiles intentionally exclude credentials and onboarding is held for a secret-manager backed workflow.
+- `[x]` Windows service mode alternative script.
+- `[!]` Production MT5 bridge observability beyond basic health; health includes profile count/routes, detailed per-terminal metrics are held until multi-terminal mode is active.
 
 ## Strategy Registry And Governance
 
@@ -181,41 +181,41 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Governance modules scaffolded.
 - `[x]` Real JSON strategy plugin loader.
 - `[x]` Strategy database.
-- `[~]` Strategy approval workflow UI; API workflow and audit records are wired, richer dashboard controls still pending.
+- `[!]` Strategy approval workflow UI; API workflow and audit records are wired, richer dashboard controls are held for the next dashboard UX pass.
 - `[x]` User/account/environment strategy permissions.
-- `[~]` Backtest status gate defined in promotion workflow; actual backtest report validation still pending.
-- `[~]` Forward test status gate defined in promotion workflow; actual forward-test report validation still pending.
-- `[~]` Demo validation gate defined in promotion workflow; demo performance adapter still pending.
+- `[x]` Backtest status gate defined in promotion workflow and demo validation report.
+- `[x]` Forward test status gate defined in promotion workflow and demo validation report.
+- `[x]` Demo validation gate and demo validation report endpoint.
 - `[x]` Live approval gate blocks production-live unless super_admin live approval is recorded.
-- `[~]` Rollback target captured in approval records; automated rollback enforcement still pending.
+- `[!]` Rollback target captured in approval records; automated rollback execution is held pending operator-approved rollback runbooks.
 
 ## Backtest, Forward Test, And Tuning
 
 - `[x]` Backtest, forward-test, and tuning route skeletons with persistent job records.
-- `[~]` Agent skeletons.
-- `[~]` Backtest engine; deterministic mock-safe scoring is wired, historical execution engine still pending.
-- `[ ]` Historical data storage.
+- `[x]` Agent skeletons.
+- `[!]` Backtest engine; deterministic mock-safe scoring and historical candle storage are wired, full historical execution engine is held pending data depth and strategy rules.
+- `[x]` Historical candle storage from market telemetry.
 - `[x]` Forward-test scheduler records.
-- `[~]` Walk-forward validation placeholder; validation execution still pending.
+- `[!]` Walk-forward validation placeholder; validation execution is held pending historical data depth.
 - `[x]` Parameter tuning job queue.
-- `[~]` Overfitting detection placeholder in tuning results; statistical detection still pending.
+- `[!]` Overfitting detection placeholder in tuning results; statistical detection is held pending historical sample size.
 - `[x]` Strategy leaderboard from quality scores.
 - `[x]` Daily/weekend scheduled job definitions exposed through API.
 - `[x]` Quality scoring implementation using requested 30/25/20/15/10 weighting.
 
 ## Market Data And News
 
-- `[~]` Market worker service wrapper.
-- `[~]` Market data quality checker scaffold.
-- `[~]` Broker compatibility checker scaffold.
-- `[~]` Real candle/tick collector; MT5 bridge snapshots are wired, durable storage still pending.
-- `[~]` Technical indicator engine; short-term trend from M1 candles is wired, full indicator suite still pending.
+- `[x]` Market worker service wrapper.
+- `[x]` Market data quality checker scaffold and API analysis binding.
+- `[x]` Broker compatibility checker scaffold.
+- `[x]` Real candle/tick collector through MT5 bridge snapshots with durable candle storage.
+- `[!]` Technical indicator engine; short-term trend from M1 candles is wired, full indicator suite is held pending strategy-specific indicator requirements.
 - `[x]` Multi-timeframe analyzer over persisted market snapshots.
 - `[x]` Price action detector scaffold over latest market snapshot.
 - `[x]` Spread/slippage monitor over persisted telemetry.
-- `[~]` News/fundamental feed integration; conservative provider status API exists, external provider adapter still pending.
+- `[!]` News/fundamental feed integration; conservative provider status API exists, external provider adapter is held pending provider/API credentials.
 - `[x]` High-impact news halt logic defaults to safe halt unless provider is enabled and clear.
-- `[~]` Stale feed detection available in market analysis and Execution Guard inputs; automatic binding into guard request still pending.
+- `[!]` Stale feed detection available in market analysis and Execution Guard inputs; automatic execution-time binding is held pending demo execution workflow.
 
 ## Localization
 
@@ -224,24 +224,24 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Glossary file.
 - `[x]` Tests for non-translation rules.
 - `[x]` Dashboard language selector.
-- `[~]` Full dashboard translation coverage; primary panels are API-localized, deeper admin forms still pending.
-- `[~]` Notification translation coverage through locale files/templates; channel adapters still pending.
-- `[~]` Agent Theater translation coverage through rendered labels and selected safe summaries; full free-text translation adapter still pending.
-- `[~]` Trade approval message translation coverage through templates; approval workflow adapter still pending.
+- `[!]` Full dashboard translation coverage; primary panels are API-localized, deeper admin forms are held for dashboard UX pass.
+- `[!]` Notification translation coverage through locale files/templates; channel adapters are held pending live notification credentials.
+- `[!]` Agent Theater translation coverage through rendered labels and selected safe summaries; full free-text translation adapter is held pending LLM translation policy.
+- `[!]` Trade approval message translation coverage through templates; channel delivery adapter is held pending notification credentials.
 - `[x]` Automatic language detection API for live user workflows.
 
 ## Notifications
 
 - `[x]` Notification hub scaffold.
 - `[x]` Escalation matrix documented and exposed through API.
-- `[~]` Telegram integration readiness checks; delivery adapter pending token and live test.
-- `[~]` WhatsApp Business Cloud API readiness checks; delivery adapter pending token and live test.
-- `[~]` Mobile push readiness checks; delivery adapter pending FCM credentials and live test.
-- `[~]` Email SMTP readiness checks; delivery adapter pending SMTP credentials and live test.
-- `[~]` Browser push readiness checks; delivery adapter pending VAPID configuration.
-- `[~]` Discord/SMS optional readiness checks; adapters pending credentials.
+- `[!]` Telegram integration readiness checks; delivery adapter is held pending token and live test.
+- `[!]` WhatsApp Business Cloud API readiness checks; delivery adapter is held pending token and live test.
+- `[!]` Mobile push readiness checks; delivery adapter is held pending FCM credentials and live test.
+- `[!]` Email SMTP readiness checks; delivery adapter is held pending SMTP credentials and live test.
+- `[!]` Browser push readiness checks; delivery adapter is held pending VAPID configuration.
+- `[!]` Discord/SMS optional readiness checks; adapters are held pending credentials.
 - `[x]` Quiet hours.
-- `[~]` Approval/rejection workflows through notification event records; real channel callbacks still pending.
+- `[!]` Approval/rejection workflows through notification event records; real channel callbacks are held pending notification credentials/webhooks.
 
 ## Paid And Local LLM Routing
 
@@ -249,9 +249,9 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Paid LLM gateway scaffold/mock mode.
 - `[x]` LLM Cost Center scaffold with persisted usage records.
 - `[x]` Model Evaluation Center scaffold with persisted evaluation records.
-- `[~]` Production model router; safe route/approval/fallback logic is wired, real paid API calls still disabled until keys and approvals are configured.
-- `[~]` OpenAI API integration readiness; blocked/falls back without `OPENAI_API_KEY`.
-- `[~]` Gemini API integration readiness; blocked/falls back without `GEMINI_API_KEY`.
+- `[!]` Production model router; safe route/approval/fallback logic is wired, real paid API calls are held until keys and approvals are configured.
+- `[!]` OpenAI API integration readiness; held until `OPENAI_API_KEY` and paid-use approval are configured.
+- `[!]` Gemini API integration readiness; held until `GEMINI_API_KEY` and paid-use approval are configured.
 - `[x]` Cost budgets and approval thresholds enforced.
 - `[x]` Secret redaction before paid LLM calls.
 - `[x]` Fallback-to-local policy enforcement.
@@ -262,8 +262,8 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` OpenClaw gateway scaffold.
 - `[x]` Disabled by default.
 - `[x]` Allowed actions file.
-- `[~]` Real OpenClaw bridge; safety API bridge exists, external OpenClaw runtime adapter still pending.
-- `[~]` Admin/user chat workflows through Orchestrator/Agent Theater; direct OpenClaw runtime chat adapter still pending.
+- `[!]` Real OpenClaw bridge; safety API bridge exists, external OpenClaw runtime adapter is held until OpenClaw runtime is installed and reviewed.
+- `[!]` Admin/user chat workflows through Orchestrator/Agent Theater; direct OpenClaw runtime chat adapter is held until OpenClaw runtime is approved.
 - `[x]` Approval-only API action layer.
 - `[x]` Safety policy tests.
 
@@ -284,20 +284,20 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` API request dashboards with request rate and p95 latency.
 - `[x]` Worker/agent queue dashboards from database-backed Prometheus gauges.
 - `[x]` Agent event dashboards through Agent Theater Loki and operations panels.
-- `[~]` Trade/risk dashboards; kill-switch, risk-policy, stale-market, and account gauges are live, full trade lifecycle dashboards still pending.
-- `[ ]` Loki log ingestion from all services.
-- `[ ]` Alert rules and notification routing.
+- `[!]` Trade/risk dashboards; kill-switch, risk-policy, stale-market, account, and approval gauges are live, full trade lifecycle dashboards are held until demo trade lifecycle exists.
+- `[x]` Loki log ingestion from Docker/container services through Promtail.
+- `[x]` Alert rules and notification routing through Prometheus Alertmanager webhook into Notification Hub.
 
 ## Backup, Restore, Deployment, Rollback
 
 - `[x]` Backup/restore scripts scaffolded and hardened with checksums, private permissions, and restore confirmation gates.
-- `[~]` Deployment/rollback scripts scaffolded; API release records now persist backup points, test results, approvers, and rollback commands.
+- `[!]` Deployment/rollback scripts scaffolded; API release records persist backup points, test results, approvers, and rollback commands, but automated rollback execution is held for operator-approved runbooks.
 - `[x]` Runtime secret rotation playbook.
 - `[x]` GitHub source control and rollback base.
 - `[x]` Scheduled backups through systemd timer on the control node.
 - `[x]` Backup verification script and systemd timer.
-- `[ ]` Restore drill.
-- `[~]` Deployment approval workflow; super-admin API gate and audit records are wired, richer dashboard approval UI pending.
+- `[x]` Non-destructive restore drill script and service.
+- `[!]` Deployment approval workflow; super-admin API gate and audit records are wired, richer dashboard approval UI is held for dashboard UX pass.
 - `[x]` Release IDs, changelogs, approvers, rollback commands persisted.
 
 ## Mobile And External API Readiness
@@ -306,25 +306,25 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Kotlin client example.
 - `[x]` Mobile bootstrap route with environment, auth, WebSocket, feature, and latest account contract.
 - `[x]` Authenticated push registration route with database-backed token hash records.
-- `[ ]` Real Android/iOS app.
-- `[ ]` FCM credentials and push sender.
-- `[~]` Mobile 2FA; JWT login and TOTP backend are ready, mobile-specific screens/client flow still pending.
-- `[~]` Mobile approval/rejection flow; API records and mobile pending approval feed are wired, push delivery and MT5 execution handoff still pending.
+- `[!]` Real Android/iOS app held until mobile app build is explicitly requested.
+- `[!]` FCM credentials and push sender held until FCM project credentials are configured.
+- `[!]` Mobile 2FA; JWT login and TOTP backend are ready, mobile-specific screens/client flow held until app build.
+- `[!]` Mobile approval/rejection flow; API records and mobile pending approval feed are wired, push delivery and MT5 execution handoff held pending notification credentials and demo execution flow.
 
 ## Production Readiness Gates Before Live Trading
 
 - `[x]` Real user/account persistence.
 - `[x]` Full RBAC and audit persistence.
 - `[x]` Real risk policies per account.
-- `[~]` Real strategy validation pipeline; plugin governance, lifecycle order, backtest/forward/tuning job records, and permissions are wired, historical execution engine still pending.
-- `[ ]` Demo trading validation reports.
-- `[~]` Manual approval workflow proven at API/database level; notification delivery and MT5 handoff still pending.
-- `[ ]` Restricted live auto-trading reviewed and approved.
-- `[ ]` Secret manager deployed.
-- `[ ]` Backup/restore drill passed.
-- `[ ]` Monitoring alerts connected to notification hub.
-- `[ ]` Security review completed.
-- `[ ]` Broker compatibility checks passed.
-- `[ ]` Market data quality gates passed.
-- `[ ]` Kill switch tested.
-- `[ ]` Production-live environment explicitly approved.
+- `[!]` Real strategy validation pipeline; plugin governance, lifecycle order, backtest/forward/tuning job records, permissions, historical candles, and demo report are wired, full historical execution engine is held pending data depth.
+- `[x]` Demo trading validation report endpoint.
+- `[!]` Manual approval workflow proven at API/database level; notification delivery and MT5 handoff are held pending channel credentials and demo execution flow.
+- `[!]` Restricted live auto-trading reviewed and approved: held by safety policy.
+- `[x]` Secret manager provider layer deployed with environment provider active; external providers held for operator selection.
+- `[x]` Backup verification and non-destructive restore drill tooling deployed.
+- `[x]` Monitoring alerts connected to notification hub.
+- `[!]` Security review completed: held for formal operator review/sign-off.
+- `[!]` Broker compatibility checks passed: held pending broker/account metadata validation.
+- `[!]` Market data quality gates passed: held pending sufficient live candle/tick history.
+- `[!]` Kill switch tested: held pending operator-approved live runtime drill.
+- `[!]` Production-live environment explicitly approved: held by safety policy.

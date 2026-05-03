@@ -32,6 +32,7 @@
         - restore_configs.sh
         - restore_all.sh
         - verify_backup.sh
+        - restore_drill.sh
 
     - name: Create private backup root
       ansible.builtin.file:
@@ -84,6 +85,29 @@
           WorkingDirectory=/opt/forex-ai-control-tower/app/backup
           Environment=BACKUP_ROOT=/opt/forex-ai-control-tower/backups
           ExecStart=/opt/forex-ai-control-tower/app/backup/verify_backup.sh
+          NoNewPrivileges=true
+
+    - name: Install restore drill service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/forex-restore-drill.service
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Forex AI Control Tower non-destructive restore drill
+          After=forex-backup.service
+
+          [Service]
+          Type=oneshot
+          User=aiops
+          Group=aiops
+          WorkingDirectory=/opt/forex-ai-control-tower/app/backup
+          Environment=POSTGRES_HOST=127.0.0.1
+          Environment=POSTGRES_USER=forex_ai
+          Environment=BACKUP_ROOT=/opt/forex-ai-control-tower/backups
+          PassEnvironment=POSTGRES_PASSWORD
+          ExecStart=/opt/forex-ai-control-tower/app/backup/restore_drill.sh
           NoNewPrivileges=true
 
     - name: Install daily backup timer

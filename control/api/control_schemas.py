@@ -311,6 +311,24 @@ class MarketSnapshotOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class HistoricalCandleOut(BaseModel):
+    id: int
+    source: str
+    symbol: str
+    timeframe: str
+    candle_time: datetime
+    open: float | None
+    high: float | None
+    low: float | None
+    close: float | None
+    tick_volume: float | None
+    spread: float | None
+    payload_json: dict[str, Any]
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class AccountSnapshotOut(BaseModel):
     id: int
     worker: str

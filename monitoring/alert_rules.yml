@@ -1,0 +1,38 @@
+groups:
+  - name: forex-ai-control-tower
+    rules:
+      - alert: ForexControlApiDown
+        expr: up{job="control-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Control API is down
+          description: The Forex AI Control Tower API is not scrapeable. Auto execution must remain disabled.
+
+      - alert: ForexMt5BridgeDown
+        expr: probe_success{instance="http://10.10.1.86:8501/health"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: MT5 bridge health check failed
+          description: The MT5 bridge is unreachable. Execution must stay blocked.
+
+      - alert: ForexMarketDataStale
+        expr: forex_market_data_stale_symbols > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Market data quality is stale or limited
+          description: One or more symbols have stale or limited market data. Signal generation and execution should remain blocked.
+
+      - alert: ForexBackupVerificationFailed
+        expr: time() - node_systemd_unit_state{name="forex-backup-verify.service",state="active"} > 86400
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Backup verification may be stale
+          description: Check forex-backup-verify.service and the latest backup manifest.
