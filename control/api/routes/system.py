@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from sqlalchemy import func, select
 
 from ..db import SessionLocal
-from ..models import AgentTask, KillSwitch, MarketSnapshot, NotificationEvent, RiskPolicy, Strategy, StrategyLabJob, TradeApproval, User, Account
+from ..models import AgentTask, AuditLog, KillSwitch, MarketSnapshot, NotificationEvent, RiskPolicy, Strategy, StrategyLabJob, TradeApproval, User, Account
 from ..secret_manager import secret_manager_status
 
 router = APIRouter(prefix="/system", tags=["system"])
@@ -106,6 +106,25 @@ def production_readiness() -> dict:
         approvals = db.scalar(select(func.count()).select_from(TradeApproval)) or 0
         kill_switches = db.scalar(select(func.count()).select_from(KillSwitch)) or 0
         fresh_market = db.scalar(select(func.count()).select_from(MarketSnapshot).where(MarketSnapshot.feed_fresh.is_(True))) or 0
+        security_review = db.scalar(
+            select(func.count())
+            .select_from(AuditLog)
+            .where(AuditLog.action == "prelive_gate_passed", AuditLog.resource_type == "prelive_gate", AuditLog.resource_id == "security_review")
+        ) or 0
+        broker_compatibility = db.scalar(
+            select(func.count())
+            .select_from(AuditLog)
+            .where(AuditLog.action == "prelive_gate_passed", AuditLog.resource_type == "prelive_gate", AuditLog.resource_id == "broker_compatibility")
+        ) or 0
+        production_live_approval = db.scalar(
+            select(func.count())
+            .select_from(AuditLog)
+            .where(
+                AuditLog.action == "prelive_gate_passed",
+                AuditLog.resource_type == "prelive_gate",
+                AuditLog.resource_id == "production_live_explicitly_approved",
+            )
+        ) or 0
         restore_drill_marker = Path("/opt/forex-ai-control-tower/backups/restore_drills/latest.json")
         try:
             with urllib.request.urlopen("http://127.0.0.1:9093/-/healthy", timeout=2) as response:
@@ -121,13 +140,15 @@ def production_readiness() -> dict:
             "secret_manager_or_runtime_secrets": bool(secrets_status.get("required_runtime_secrets_present")),
             "backup_restore_drill": restore_drill_marker.exists(),
             "monitoring_alerts_connected": alertmanager_healthy,
-            "security_review_completed": False,
-            "broker_compatibility_checks_passed": False,
+            "security_review_completed": security_review > 0,
+            "broker_compatibility_checks_passed": broker_compatibility > 0,
             "market_data_quality_gates_passed": fresh_market > 0,
             "kill_switch_tested": kill_switches > 0,
-            "production_live_explicitly_approved": False,
+            "production_live_explicitly_approved": production_live_approval > 0,
         }
         blocking = [name for name, passed in gates.items() if not passed]
+        all_gates_passed = not blocking
+        runtime_live_enabled = os.getenv("ALLOW_LIVE_TRADING", "false").lower() == "true"
         action_by_gate = {
             "user_account_persistence": "Create at least one admin/user account and one MT5 account record.",
             "rbac_audit_persistence": "Verify RBAC and append-only audit persistence.",
@@ -146,8 +167,8 @@ def production_readiness() -> dict:
         return {
             "environment": "demo",
             "trading_mode": "monitor_only",
-            "restricted_live_auto_allowed": False,
-            "live_trading_allowed": False,
+            "restricted_live_auto_allowed": all_gates_passed and runtime_live_enabled,
+            "live_trading_allowed": all_gates_passed and runtime_live_enabled,
             "gates": gates,
             "blocking_gates": blocking,
             "next_required_actions": [action_by_gate[name] for name in blocking],

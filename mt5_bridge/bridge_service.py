@@ -166,6 +166,14 @@ def symbols() -> dict[str, Any]:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
+@app.get("/symbols/{symbol}/info", dependencies=[Depends(require_bridge_token)])
+def symbol_info(symbol: str) -> dict[str, Any]:
+    try:
+        return {"symbol": symbol, "info": client().symbol_info(symbol)}
+    except MT5Unavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 @app.get("/rates/{symbol}", dependencies=[Depends(require_bridge_token)])
 def rates(symbol: str) -> dict[str, Any]:
     try:

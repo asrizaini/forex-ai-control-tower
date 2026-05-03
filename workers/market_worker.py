@@ -57,9 +57,11 @@ def _symbol_snapshot(symbol: str) -> dict[str, Any]:
     freshness = _freshness_seconds(tick)
     return {
         "symbol": symbol,
+        "timeframe": "M1",
         "rates_ok": bool(rates_response.get("ok")),
         "tick_ok": bool(tick_response.get("ok")),
         "rates_count": len(rates),
+        "rates": rates[-100:],
         "trend": _trend_from_rates(rates),
         "spread": _spread_from_tick(tick),
         "freshness_seconds": freshness,

@@ -8,6 +8,16 @@ class MT5Unavailable(RuntimeError):
     pass
 
 
+def _json_safe(value: Any) -> Any:
+    if hasattr(value, "item"):
+        return value.item()
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    return value
+
+
 class MT5Client:
     def __init__(self) -> None:
         try:
@@ -41,11 +51,23 @@ class MT5Client:
         symbols = self.mt5.symbols_get()
         return [symbol.name for symbol in symbols or ()]
 
+    def symbol_info(self, symbol: str) -> dict[str, Any]:
+        self.require_connection()
+        info = self.mt5.symbol_info(symbol)
+        if info is None:
+            raise MT5Unavailable(f"MT5 symbol info unavailable for {symbol}: {self.mt5.last_error()}")
+        return _json_safe(info._asdict())
+
     def rates(self, symbol: str, timeframe: int | None = None, count: int = 100) -> list[dict[str, Any]]:
         self.require_connection()
         tf = timeframe or self.mt5.TIMEFRAME_M1
         rates = self.mt5.copy_rates_from_pos(symbol, tf, 0, count)
-        return [] if rates is None else [dict(row) for row in rates.tolist()]
+        if rates is None:
+            return []
+        names = getattr(getattr(rates, "dtype", None), "names", None)
+        if names:
+            return [_json_safe({name: row[name] for name in names}) for row in rates]
+        return [_json_safe(row) for row in rates.tolist()]
 
     def ticks(self, symbol: str) -> dict[str, Any]:
         self.require_connection()

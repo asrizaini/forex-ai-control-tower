@@ -91,6 +91,14 @@
         group: aiops
         mode: preserve
 
+    - name: Copy broker compatibility package
+      ansible.builtin.copy:
+        src: ../../broker_compatibility/
+        dest: /opt/forex-ai-control-tower/app/broker_compatibility/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
     - name: Copy notifications package
       ansible.builtin.copy:
         src: ../../notifications/
