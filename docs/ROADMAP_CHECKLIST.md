@@ -191,17 +191,17 @@ This checklist tracks the original full-system prompt. The current deployment is
 
 ## Backtest, Forward Test, And Tuning
 
-- `[~]` Backtest, forward-test, and tuning route skeletons.
+- `[x]` Backtest, forward-test, and tuning route skeletons with persistent job records.
 - `[~]` Agent skeletons.
-- `[ ]` Backtest engine.
+- `[~]` Backtest engine; deterministic mock-safe scoring is wired, historical execution engine still pending.
 - `[ ]` Historical data storage.
-- `[ ]` Forward-test scheduler.
-- `[ ]` Walk-forward validation.
-- `[ ]` Parameter tuning engine.
-- `[ ]` Overfitting detection.
-- `[ ]` Strategy leaderboard.
-- `[ ]` Daily/weekend scheduled jobs.
-- `[ ]` Quality scoring implementation.
+- `[x]` Forward-test scheduler records.
+- `[~]` Walk-forward validation placeholder; validation execution still pending.
+- `[x]` Parameter tuning job queue.
+- `[~]` Overfitting detection placeholder in tuning results; statistical detection still pending.
+- `[x]` Strategy leaderboard from quality scores.
+- `[x]` Daily/weekend scheduled job definitions exposed through API.
+- `[x]` Quality scoring implementation using requested 30/25/20/15/10 weighting.
 
 ## Market Data And News
 

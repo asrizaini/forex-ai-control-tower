@@ -77,6 +77,31 @@ class StrategyApprovalOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class StrategyLabJobCreate(BaseModel):
+    strategy_id: str = Field(min_length=1, max_length=100)
+    symbol: str = Field(min_length=1, max_length=40)
+    timeframe: str = Field(min_length=1, max_length=20)
+    parameters_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class StrategyLabJobOut(BaseModel):
+    id: int
+    job_id: str
+    job_type: str
+    strategy_id: str
+    symbol: str
+    timeframe: str
+    status: str
+    parameters_json: dict[str, Any]
+    result_json: dict[str, Any]
+    quality_score: float | None
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class PermissionCreate(BaseModel):
     user_id: str
     permission: str

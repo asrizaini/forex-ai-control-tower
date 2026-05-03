@@ -63,6 +63,24 @@ class StrategyApproval(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
 
+class StrategyLabJob(Base):
+    __tablename__ = "strategy_lab_jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    job_id: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    job_type: Mapped[str] = mapped_column(String(60), index=True)
+    strategy_id: Mapped[str] = mapped_column(String(100), index=True)
+    symbol: Mapped[str] = mapped_column(String(40), index=True)
+    timeframe: Mapped[str] = mapped_column(String(20), index=True)
+    status: Mapped[str] = mapped_column(String(60), default="queued", index=True)
+    parameters_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    result_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    quality_score: Mapped[float | None] = mapped_column(Float, nullable=True, index=True)
+    created_by: Mapped[str] = mapped_column(String(120), default="system", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
 class PermissionAssignment(Base):
     __tablename__ = "permission_assignments"
 
