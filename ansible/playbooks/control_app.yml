@@ -51,6 +51,14 @@
         group: aiops
         mode: preserve
 
+    - name: Copy Execution Guard package
+      ansible.builtin.copy:
+        src: ../../execution_guard/
+        dest: /opt/forex-ai-control-tower/app/execution_guard/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
     - name: Copy localization package
       ansible.builtin.copy:
         src: ../../localization/

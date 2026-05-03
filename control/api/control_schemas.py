@@ -91,6 +91,43 @@ class RiskPolicyOut(RiskPolicyCreate):
     model_config = {"from_attributes": True}
 
 
+class ExecutionGuardCheckRequest(BaseModel):
+    account_id: str = Field(min_length=1, max_length=80)
+    strategy_id: str = Field(min_length=1, max_length=100)
+    symbol: str = Field(min_length=1, max_length=40)
+    side: str = Field(pattern="^(BUY|SELL)$")
+    volume: float = Field(gt=0)
+    environment: str = "demo"
+    trading_mode: str = "monitor_only"
+    live_order: bool = False
+    manual_approval: bool = False
+    order_check_passed: bool = False
+    system_health_score: int = Field(default=100, ge=0, le=100)
+    kill_switch_active: bool = False
+    daily_loss_pct: float = 0.0
+    weekly_loss_pct: float = 0.0
+    open_trades: int = 0
+    trades_today: int = 0
+    spread_points: float | None = None
+    slippage_points: float | None = None
+    market_data_quality_ok: bool = False
+    broker_compatibility_ok: bool = False
+    margin_available: bool = False
+    duplicate_trade_risk: bool = True
+    correlation_exposure_ok: bool = False
+    news_halt_active: bool = True
+
+
+class ExecutionGuardCheckOut(BaseModel):
+    approved: bool
+    reasons: list[str]
+    token_issued: bool
+    checks: dict[str, bool]
+    effective_environment: str
+    effective_trading_mode: str
+    policy_id: int | None
+
+
 class AuditLogOut(BaseModel):
     id: int
     actor: str

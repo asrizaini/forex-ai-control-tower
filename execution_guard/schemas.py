@@ -22,6 +22,7 @@ class ExecutionRequest:
     symbol: str
     side: Literal["BUY", "SELL"]
     volume: float
+    user_id: str | None = None
     environment: str = "demo"
     trading_mode: TradingMode = "monitor_only"
     live_order: bool = False

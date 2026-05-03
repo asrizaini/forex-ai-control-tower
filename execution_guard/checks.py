@@ -9,8 +9,14 @@ REQUIRED_CHECKS = (
     "strategy_permission",
     "risk_limits",
     "spread_limit",
+    "slippage_limit",
     "market_data_quality",
     "broker_compatibility",
+    "margin_availability",
+    "duplicate_trade_risk",
+    "correlation_exposure",
+    "news_halt",
+    "trading_mode_policy",
 )
 
 

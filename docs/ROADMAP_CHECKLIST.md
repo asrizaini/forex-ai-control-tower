@@ -141,17 +141,17 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[~]` Risk engine scaffold.
 - `[~]` Kill switch module scaffold.
 - `[~]` Governance scaffold.
-- `[ ]` Account permission check.
-- `[ ]` User permission check.
-- `[ ]` Strategy permission check.
-- `[ ]` Trading mode policy enforcement across all services.
-- `[ ]` Max daily and weekly loss checks.
-- `[ ]` Max open trades and trades per day checks.
-- `[ ]` Spread and slippage checks from real broker data.
-- `[ ]` News halt integration.
-- `[ ]` Duplicate trade risk detection.
-- `[ ]` Margin availability validation.
-- `[ ]` Correlation exposure checks.
+- `[x]` Account permission check.
+- `[x]` User permission check.
+- `[x]` Strategy permission check.
+- `[x]` Trading mode policy enforcement in Execution Guard control-plane check.
+- `[x]` Max daily and weekly loss checks.
+- `[x]` Max open trades and trades per day checks.
+- `[~]` Spread and slippage checks from broker telemetry payload; direct MT5 telemetry binding still pending.
+- `[~]` News halt integration as an Execution Guard input; live news provider still pending.
+- `[~]` Duplicate trade risk detection as an Execution Guard input; position/signal matching still pending.
+- `[~]` Margin availability validation as an Execution Guard input; MT5 account binding still pending.
+- `[~]` Correlation exposure checks as an Execution Guard input; portfolio exposure model still pending.
 - `[ ]` Broker compatibility enforcement.
 - `[ ]` Market data quality enforcement.
 - `[ ]` System health score execution gating.
