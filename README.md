@@ -68,3 +68,7 @@ To deploy after the required environment variables are set:
 ```powershell
 docker compose -f docker/controller-runner.compose.yml run --rm controller ansible-playbook -i ansible/inventory.yml ansible/playbooks/site.yml
 ```
+
+## Progress Roadmap
+
+Track what is deployed, scaffolded, and still pending in [docs/ROADMAP_CHECKLIST.md](docs/ROADMAP_CHECKLIST.md).

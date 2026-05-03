@@ -201,10 +201,8 @@
       "fieldConfig": {
         "defaults": {
           "color": {"mode": "thresholds"},
-          "custom": {"align": "auto", "cellOptions": {"type": "color-background"}, "inspect": false},
-          "mappings": [
-            {"options": {"0": {"color": "red", "index": 0, "text": "DOWN"}, "1": {"color": "green", "index": 1, "text": "UP"}}, "type": "value"}
-          ],
+          "custom": {"align": "auto", "cellOptions": {"type": "auto"}, "inspect": false},
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -213,7 +211,18 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Status"},
+            "properties": [
+              {"id": "custom.cellOptions", "value": {"type": "color-background"}},
+              {"id": "mappings", "value": [
+                {"options": {"0": {"color": "red", "index": 0, "text": "DOWN"}, "1": {"color": "green", "index": 1, "text": "UP"}}, "type": "value"}
+              ]},
+              {"id": "thresholds", "value": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}
+            ]
+          }
+        ]
       },
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
       "id": 5,
@@ -307,10 +316,8 @@
       "fieldConfig": {
         "defaults": {
           "color": {"mode": "thresholds"},
-          "custom": {"align": "auto", "cellOptions": {"type": "color-background"}, "inspect": false},
-          "mappings": [
-            {"options": {"0": {"color": "red", "index": 0, "text": "DOWN"}, "1": {"color": "green", "index": 1, "text": "UP"}}, "type": "value"}
-          ],
+          "custom": {"align": "auto", "cellOptions": {"type": "auto"}, "inspect": false},
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -319,7 +326,18 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Status"},
+            "properties": [
+              {"id": "custom.cellOptions", "value": {"type": "color-background"}},
+              {"id": "mappings", "value": [
+                {"options": {"0": {"color": "red", "index": 0, "text": "DOWN"}, "1": {"color": "green", "index": 1, "text": "UP"}}, "type": "value"}
+              ]},
+              {"id": "thresholds", "value": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}
+            ]
+          }
+        ]
       },
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
       "id": 7,
@@ -333,7 +351,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "Prometheus"},
           "editorMode": "code",
-          "expr": "up",
+          "expr": "up{instance!~\"fx-.*\"}",
           "format": "table",
           "instant": true,
           "legendFormat": "{{ job }} {{ instance }}",
