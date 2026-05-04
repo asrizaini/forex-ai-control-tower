@@ -9,6 +9,7 @@
     $theaterEvents = array_reverse($events['events'] ?? []);
     $availableAgents = $events['agents'] ?? [];
     $availableStreams = $events['streams'] ?? [];
+    $roomModes = $modes['modes'] ?? [];
     $selectedAgents = (array)($filters['agent'] ?? []);
     $selectedStream = $filters['stream'] ?? '';
 @endphp
@@ -21,6 +22,9 @@
     .agent-picker{background:#111c29;border:1px solid #304158;border-radius:8px;display:flex;flex-wrap:wrap;gap:6px;max-height:86px;overflow:auto;padding:8px}
     .agent-chip{align-items:center;background:#162233;border:1px solid #2d4058;border-radius:999px;color:#cfdae8;display:flex;font-size:12px;font-weight:700;gap:5px;padding:5px 8px}
     .agent-chip input{accent-color:#15a388;width:auto}
+    .room-strip{display:flex;flex-wrap:wrap;gap:6px;grid-column:1/-1}
+    .room-strip form{display:inline-flex}
+    .room-strip button{background:#162233;border-color:#2d4058;color:#cfdae8;font-size:12px;min-height:30px;padding:5px 8px}
     .feed-status{align-items:center;color:#90a3b8;display:flex;font-size:12px;gap:10px;justify-content:space-between}
     .compact-feed{background:#0b1119;border:1px solid #233044;border-radius:8px;display:grid;max-height:calc(100vh - 360px);min-height:480px;overflow:auto}
     .feed-row{border-bottom:1px solid #1c2a3a;display:grid;gap:10px;grid-template-columns:170px minmax(0,1fr) 180px;padding:9px 12px}
@@ -81,6 +85,14 @@
                     <span class="muted">No agent names have been seen yet.</span>
                 @endforelse
             </div>
+        </div>
+        <div class="room-strip">
+            @foreach($roomModes as $mode)
+                <form method="POST" action="{{ route('agent-theater.rooms.seed', $mode['name']) }}">
+                    @csrf
+                    <button type="submit" {{ $authenticated ? '' : 'disabled' }}>{{ $mode['name'] }}</button>
+                </form>
+            @endforeach
         </div>
     </form>
     <div class="feed-status">

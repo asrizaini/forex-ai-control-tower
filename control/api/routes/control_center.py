@@ -25,6 +25,7 @@ from ..models import (
     WorkerStatus,
 )
 from news_feed.providers import PROVIDERS
+from news_feed.adapter import evaluate_news_status
 
 from ..time_utils import iso_local
 
@@ -212,6 +213,60 @@ def _seed_control_center(db: Session) -> None:
         existing = db.scalar(select(SystemSetting).where(SystemSetting.setting_key == key))
         if not existing:
             db.add(SystemSetting(setting_key=key, setting_value=value, value_type=value_type, category=category))
+    db.commit()
+
+
+def _refresh_worker_runtime_status(db: Session) -> None:
+    now = _now()
+    try:
+        news = evaluate_news_status(None)
+    except Exception as exc:
+        news = {"provider_enabled": False, "provider_error": type(exc).__name__, "events_count": 0, "risk_status": "news_safe_mode"}
+
+    news_ready = bool(news.get("provider_enabled")) and not news.get("provider_error") and int(news.get("events_count") or 0) > 0
+    status_updates = {
+        "news_worker": (
+            "running" if news_ready else "degraded",
+            {
+                "note": news.get("note", "News provider status unavailable."),
+                "provider_type": news.get("provider_type"),
+                "events_count": news.get("events_count", 0),
+                "risk_status": news.get("risk_status"),
+            },
+        ),
+        "calendar_worker": (
+            "running" if news_ready else "degraded",
+            {
+                "note": "Calendar ingestion is backed by the active news/calendar provider.",
+                "provider_type": news.get("provider_type"),
+                "events_count": news.get("events_count", 0),
+            },
+        ),
+        "fundamental_analysis_worker": (
+            "running" if news_ready else "waiting_news",
+            {
+                "note": "Fundamental analysis consumes normalized calendar/news events.",
+                "news_risk_status": news.get("risk_status"),
+            },
+        ),
+        "technical_analysis_worker": (
+            "ready",
+            {"note": "Technical analysis runtime is ready; market worker supplies candle context and news risk overlay."},
+        ),
+        "risk_analysis_worker": ("ready", {"note": "Risk analysis rules are active in monitor-only mode."}),
+        "data_validation_worker": ("ready", {"note": "Data validation gates are active for market/news quality checks."}),
+        "signal_generation_worker": ("blocked_by_governance", {"note": "Signal generation remains blocked until strategy governance and demo validation are complete."}),
+        "notification_worker": ("waiting_channels", {"note": "Notification worker requires configured Telegram/WhatsApp/email/mobile credentials before delivery."}),
+    }
+    for worker_id, (status, health) in status_updates.items():
+        row = db.scalar(select(WorkerStatus).where(WorkerStatus.worker_id == worker_id))
+        if not row:
+            continue
+        row.status = status
+        row.last_run_at = now
+        row.next_run_at = now + timedelta(minutes=5)
+        row.health_json = health
+        row.updated_at = now
     db.commit()
 
 
@@ -521,6 +576,7 @@ def alert_delivery_history(db: Session = Depends(get_db), limit: int = Query(def
 @router.get("/workers/status")
 def workers_status(db: Session = Depends(get_db)) -> dict[str, Any]:
     _seed_control_center(db)
+    _refresh_worker_runtime_status(db)
     rows = db.scalars(select(WorkerStatus).order_by(WorkerStatus.worker_type, WorkerStatus.worker_id)).all()
     return {
         "workers": [

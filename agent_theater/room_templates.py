@@ -94,6 +94,29 @@ def room_seed_events(room_name: str, session_id: str = "room-seed") -> list[dict
                 "next_action": "Create the strategy approval workflow and rollback target records.",
             },
         ],
+        "Analysis War Room": [
+            {
+                "agent": "Technical Analysis Agent",
+                "summary": "Analysis War Room is active. Technical context can be prepared from candle data, but every setup must still be checked against news and risk gates.",
+                "result": "technical_context_ready",
+                "risk_status": "no_executable_signal",
+                "next_action": "Combine indicators with market-data quality and upcoming high-impact news before any signal review.",
+            },
+            {
+                "agent": "Fundamental Analysis Agent",
+                "summary": "Fundamental lane is active. Calendar and news events are mapped to currencies and pairs before strategy scoring.",
+                "result": "fundamental_context_ready",
+                "risk_status": "news_context_required",
+                "next_action": "Use the News Agent status to decide whether signals should be blocked, delayed, or sent for manual review.",
+            },
+            {
+                "agent": "News Agent",
+                "summary": "News lane is active. High-impact events, stale feeds, or provider errors keep news-sensitive trading halted.",
+                "result": "news_gate_visible",
+                "risk_status": "news_guard_enabled",
+                "next_action": "Review /api/v1/news/status and Economic Calendar before approving any demo signal.",
+            },
+        ],
         "Account Routing Room": [
             {
                 "agent": "Account Router Agent",

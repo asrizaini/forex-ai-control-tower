@@ -38,6 +38,11 @@ MODE_CATALOG: tuple[TheaterMode, ...] = (
         ("Strategy Agent", "Backtest Agent", "Forward Test Agent", "Strategy Promotion Agent"),
     ),
     TheaterMode(
+        "Analysis War Room",
+        "Technical, fundamental, news, and market-data context before any signal can be reviewed.",
+        ("Technical Analysis Agent", "Fundamental Analysis Agent", "News Agent", "Market Data Agent", "Risk Manager"),
+    ),
+    TheaterMode(
         "Account Routing Room",
         "Per-account risk, permission, routing, and execution readiness conversation.",
         ("Account Router Agent", "Risk Manager", "Execution Agent", "Broker Compatibility Agent"),

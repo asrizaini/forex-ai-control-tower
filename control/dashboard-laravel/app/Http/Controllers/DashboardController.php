@@ -382,6 +382,12 @@ class DashboardController extends Controller
         return $this->redirectResponse($response, 'Orchestrator replied. The dedicated console feed has been updated.', 'Orchestrator chat failed.');
     }
 
+    public function seedAgentRoom(Request $request, string $roomName): RedirectResponse
+    {
+        $response = $this->client->post('/api/v1/agent-theater/rooms/' . rawurlencode($roomName) . '/seed', [], $this->requireToken($request));
+        return $this->redirectResponse($response, "{$roomName} opened in Agent Theater.", 'Unable to open Agent Theater room.');
+    }
+
     public function updateSetting(Request $request, string $settingKey): RedirectResponse
     {
         $token = $this->requireToken($request);

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import csv
+import io
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, asdict
@@ -9,6 +11,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
+from xml.etree import ElementTree
 
 
 HIGH_IMPACT_LEVELS = {"high", "red", "critical", "3"}
@@ -63,6 +66,7 @@ COUNTRY_TO_CURRENCY = {
     "us": "USD",
     "usa": "USD",
 }
+_PROVIDER_CACHE: dict[str, Any] = {"expires_at": datetime.min.replace(tzinfo=UTC), "value": None}
 
 
 @dataclass(frozen=True)
@@ -218,6 +222,8 @@ def _read_json_url(url: str, headers: dict[str, str]) -> tuple[Any, str | None]:
     try:
         with urllib.request.urlopen(request, timeout=15) as response:
             return json.loads(response.read().decode("utf-8")), None
+    except urllib.error.HTTPError as exc:
+        return None, f"HTTPError:{exc.code}"
     except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
         return None, type(exc).__name__
 
@@ -245,8 +251,114 @@ def _load_fmp(api_key: str | None) -> tuple[list[NewsEvent], str | None]:
     headers = {"Accept": "application/json", "User-Agent": "forex-ai-control-tower/0.1"}
     data, error = _read_json_url(url, headers)
     if error:
+        legacy_url = f"https://financialmodelingprep.com/api/v3/economic_calendar?{query}"
+        data, error = _read_json_url(legacy_url, headers)
+    if error:
         return [], error
     return _normalise_fmp_events(data), None
+
+
+def _load_forex_factory_xml() -> tuple[list[NewsEvent], str | None]:
+    json_url = _config("NEWS_FOREX_FACTORY_JSON_URL", "https://nfs.faireconomy.media/ff_calendar_thisweek.json")
+    data, json_error = _read_json_url(json_url, {"Accept": "application/json,*/*", "User-Agent": "Mozilla/5.0 (compatible; forex-ai-control-tower/1.0)"})
+    if not json_error:
+        events = []
+        for raw in data if isinstance(data, list) else []:
+            if not isinstance(raw, dict):
+                continue
+            event_time = _parse_time(raw.get("date"))
+            currency = str(raw.get("country", "")).upper().strip()
+            title = str(raw.get("title", "Economic event"))[:240]
+            if not event_time or not currency:
+                continue
+            events.append(
+                NewsEvent(
+                    title=title,
+                    event_time=event_time,
+                    impact=_impact_level({"impact": raw.get("impact")}, title),
+                    currencies=(currency,),
+                    source="forex_factory_json",
+                )
+            )
+        if events:
+            return sorted(events, key=lambda item: item.event_time), None
+
+    csv_url = _config("NEWS_FOREX_FACTORY_CSV_URL", "https://nfs.faireconomy.media/ff_calendar_thisweek.csv")
+    csv_request = urllib.request.Request(
+        csv_url,
+        headers={"Accept": "text/csv,*/*", "User-Agent": "Mozilla/5.0 (compatible; forex-ai-control-tower/1.0)"},
+    )
+    try:
+        with urllib.request.urlopen(csv_request, timeout=12) as response:
+            csv_raw = response.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        csv_error = f"HTTPError:{exc.code}"
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        csv_error = type(exc).__name__
+    else:
+        csv_error = None
+        events = []
+        for row in csv.DictReader(io.StringIO(csv_raw)):
+            title = str(row.get("Title") or "Economic event").strip()
+            currency = str(row.get("Country") or "").strip().upper()
+            date_text = str(row.get("Date") or "").strip()
+            time_text = str(row.get("Time") or "").strip().lower()
+            if not currency or not date_text or not time_text or time_text in {"all day", "tentative"}:
+                continue
+            try:
+                parsed = datetime.strptime(f"{date_text} {time_text}", "%m-%d-%Y %I:%M%p").replace(tzinfo=UTC)
+            except ValueError:
+                continue
+            events.append(
+                NewsEvent(
+                    title=title[:240],
+                    event_time=parsed,
+                    impact=_impact_level({"impact": row.get("Impact")}, title),
+                    currencies=(currency,),
+                    source="forex_factory_csv",
+                )
+            )
+        if events:
+            return sorted(events, key=lambda item: item.event_time), None
+
+    url = _config("NEWS_FOREX_FACTORY_XML_URL", "https://nfs.faireconomy.media/ff_calendar_thisweek.xml")
+    request = urllib.request.Request(url, headers={"Accept": "application/xml,*/*", "User-Agent": "Mozilla/5.0 (compatible; forex-ai-control-tower/1.0)"})
+    try:
+        with urllib.request.urlopen(request, timeout=12) as response:
+            raw = response.read()
+    except urllib.error.HTTPError as exc:
+        return [], json_error or csv_error or f"HTTPError:{exc.code}"
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        return [], json_error or csv_error or type(exc).__name__
+
+    try:
+        root = ElementTree.fromstring(raw)
+    except ElementTree.ParseError as exc:
+        return [], type(exc).__name__
+
+    events: list[NewsEvent] = []
+    for item in root.findall(".//event"):
+        title = (item.findtext("title") or "Economic event").strip()
+        currency = (item.findtext("country") or "").strip().upper()
+        date_text = (item.findtext("date") or "").strip()
+        time_text = (item.findtext("time") or "").strip().lower()
+        if not currency or not date_text or not time_text or time_text in {"all day", "tentative"}:
+            continue
+        try:
+            parsed = datetime.strptime(f"{date_text} {time_text}", "%m-%d-%Y %I:%M%p").replace(tzinfo=UTC)
+        except ValueError:
+            continue
+        impact = (item.findtext("impact") or "unknown").strip().lower()
+        events.append(
+            NewsEvent(
+                title=title[:240],
+                event_time=parsed,
+                impact=_impact_level({"impact": impact}, title),
+                currencies=(currency,),
+                source="forex_factory_xml",
+            )
+        )
+    return sorted(events, key=lambda item: item.event_time), None
 
 
 def _currencies_for_symbol(symbol: str | None) -> set[str]:
@@ -261,6 +373,9 @@ def _currencies_for_symbol(symbol: str | None) -> set[str]:
 
 
 def _load_provider_events() -> tuple[str, list[NewsEvent], str | None]:
+    now = _utcnow()
+    if _PROVIDER_CACHE["value"] is not None and _PROVIDER_CACHE["expires_at"] > now:
+        return _PROVIDER_CACHE["value"]
     provider_type = _config("NEWS_PROVIDER_TYPE", "disabled").lower().strip()
     if _config("NEWS_PROVIDER_ENABLED", "false").lower() != "true":
         return provider_type, [], "NEWS_PROVIDER_ENABLED is false"
@@ -278,7 +393,24 @@ def _load_provider_events() -> tuple[str, list[NewsEvent], str | None]:
         return provider_type, events, error
     if provider_type in {"fmp", "fmp_economic_calendar", "financial_modeling_prep"}:
         events, error = _load_fmp(_config("NEWS_PROVIDER_API_KEY", ""))
-        return provider_type, events, error
+        fallback_allowed = _config("NEWS_PROVIDER_FALLBACK_FOREX_FACTORY_XML", "true").lower() != "false" or error == "HTTPError:429"
+        if error and fallback_allowed:
+            fallback_events, fallback_error = _load_forex_factory_xml()
+            if fallback_events and not fallback_error:
+                result = ("forex_factory_xml_fallback", fallback_events, None)
+                _PROVIDER_CACHE["value"] = result
+                _PROVIDER_CACHE["expires_at"] = now + timedelta(minutes=5)
+                return result
+        result = (provider_type, events, error)
+        _PROVIDER_CACHE["value"] = result
+        _PROVIDER_CACHE["expires_at"] = now + timedelta(minutes=2 if error else 5)
+        return result
+    if provider_type in {"forex_factory_xml", "forex_factory_calendar_xml"}:
+        events, error = _load_forex_factory_xml()
+        result = (provider_type, events, error)
+        _PROVIDER_CACHE["value"] = result
+        _PROVIDER_CACHE["expires_at"] = now + timedelta(minutes=5)
+        return result
     if provider_type == "env_window":
         minutes = int(_config("NEWS_HIGH_IMPACT_NEXT_MINUTES", "999"))
         event_time = _utcnow() + timedelta(minutes=minutes)
@@ -288,6 +420,10 @@ def _load_provider_events() -> tuple[str, list[NewsEvent], str | None]:
 
 def evaluate_news_status(symbol: str | None = None) -> dict[str, Any]:
     provider_type, events, error = _load_provider_events()
+    if provider_type in {"fmp", "fmp_economic_calendar", "financial_modeling_prep"} and error and not events:
+        fallback_events, fallback_error = _load_forex_factory_xml()
+        if fallback_events and not fallback_error:
+            provider_type, events, error = "forex_factory_xml_fallback", fallback_events, None
     now = _utcnow()
     high_impact_window = int(_config("NEWS_HIGH_IMPACT_WINDOW_MINUTES", "45"))
     stale_after_minutes = int(_config("NEWS_STALE_AFTER_MINUTES", "720"))
@@ -346,6 +482,10 @@ def evaluate_news_status(symbol: str | None = None) -> dict[str, Any]:
 
 def list_news_events(symbol: str | None = None, limit: int = 50) -> dict[str, Any]:
     provider_type, events, error = _load_provider_events()
+    if provider_type in {"fmp", "fmp_economic_calendar", "financial_modeling_prep"} and error and not events:
+        fallback_events, fallback_error = _load_forex_factory_xml()
+        if fallback_events and not fallback_error:
+            provider_type, events, error = "forex_factory_xml_fallback", fallback_events, None
     relevant_currencies = _currencies_for_symbol(symbol)
     if relevant_currencies:
         events = [event for event in events if relevant_currencies.intersection(event.currencies)]

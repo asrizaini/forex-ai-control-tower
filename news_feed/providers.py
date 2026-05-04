@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from typing import Any, Protocol
 
+from news_feed.adapter import _load_provider_events
+
 
 @dataclass(frozen=True)
 class NormalizedCalendarEvent:
@@ -141,8 +143,39 @@ class ForexFactoryScrapperApiProvider:
         )
 
 
+class FmpEconomicCalendarProvider:
+    source_id = "fmp_economic_calendar"
+    provider = "fmp"
+
+    def fetch(self, date_from: date, date_to: date, config: dict[str, Any]) -> ProviderResult:
+        provider_type, events, error = _load_provider_events()
+        normalized = [
+            NormalizedCalendarEvent(
+                source_id=self.source_id,
+                source=event.source,
+                event_time_utc=event.event_time,
+                currency=event.currencies[0] if event.currencies else "",
+                impact=event.impact,
+                event_name=event.title,
+                raw=event.to_dict(),
+            )
+            for event in events
+            if date_from <= event.event_time.date() <= date_to and event.currencies
+        ]
+        return ProviderResult(
+            source_id=self.source_id,
+            provider=self.provider,
+            ok=not error and bool(normalized),
+            events=normalized,
+            error=error or ("" if normalized else "No FMP or fallback calendar events returned."),
+            metadata={"provider_type": provider_type, "events_count": len(normalized)},
+        )
+
+
 PROVIDERS: dict[str, CalendarProvider] = {
     "forex_factory": ForexFactoryProvider(),
     "market_calendar_tool": MarketCalendarToolProvider(),
     "forex_factory_scrapper_api": ForexFactoryScrapperApiProvider(),
+    "fmp": FmpEconomicCalendarProvider(),
+    "fmp_economic_calendar": FmpEconomicCalendarProvider(),
 }

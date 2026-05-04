@@ -37,5 +37,6 @@ Route::post('/alert-rules/{ruleId}', [DashboardController::class, 'updateAlertRu
 Route::post('/alert-rules/{ruleId}/test', [DashboardController::class, 'testAlertRule'])->name('alert-rules.test');
 Route::post('/workers/{workerId}/{action}', [DashboardController::class, 'workerAction'])->name('workers.action');
 Route::post('/agent-theater/chat', [DashboardController::class, 'sendOrchestratorChat'])->name('agent-theater.chat');
+Route::post('/agent-theater/rooms/{roomName}/seed', [DashboardController::class, 'seedAgentRoom'])->name('agent-theater.rooms.seed');
 Route::post('/settings/{settingKey}', [DashboardController::class, 'updateSetting'])->name('settings.update');
 Route::post('/analysis/{analysisType}/seed', [DashboardController::class, 'seedAnalysis'])->name('analysis.seed');

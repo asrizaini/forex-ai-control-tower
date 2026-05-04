@@ -8,6 +8,7 @@ import urllib.error
 import urllib.request
 from ipaddress import ip_address, ip_network
 from pathlib import Path
+from time import time
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request, status
@@ -160,7 +161,8 @@ def _ask_local_llm(message: str, language: str) -> str | None:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
+        timeout_seconds = int(os.getenv("ORCHESTRATOR_LLM_TIMEOUT_SECONDS", "8"))
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
             body = json.loads(response.read().decode("utf-8"))
     except (OSError, urllib.error.URLError, TimeoutError, json.JSONDecodeError):
         return None
@@ -168,6 +170,28 @@ def _ask_local_llm(message: str, language: str) -> str | None:
     if not answer:
         return None
     return _sentence_safe_trim(answer)
+
+
+def _is_recent_duplicate(session_id: str, safe_message: str, stream_name: str) -> bool:
+    event_log = _event_log_path()
+    if not event_log.exists():
+        return False
+    now = time()
+    for line in event_log.read_text(encoding="utf-8").splitlines()[-20:]:
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        metadata = event.get("metadata") or {}
+        if (
+            event.get("agent") == "Operator"
+            and event.get("stream") == stream_name
+            and event.get("summary") == safe_message
+            and metadata.get("session_id") == session_id
+            and now - float(metadata.get("timestamp_epoch", 0)) < 8
+        ):
+            return True
+    return False
 
 
 def _append_event(event: dict[str, Any]) -> Path:
@@ -300,6 +324,19 @@ def _orchestrator_reply(message: str, language: str) -> tuple[str, str]:
                 "Operator-facing API and Agent Theater messages are displayed in Asia/Kuala_Lumpur time."
             )
             next_action = "Use the Agent Theater page in the dashboard for time, system, risk, and agent questions."
+    elif any(word in lowered for word in ("who are you", "what are you", "which llm", "what llm", "model are you", "jenis apa", "llm apa", "siapa kamu")):
+        if is_ms:
+            summary = (
+                "Saya ialah Orchestrator Agent untuk Forex AI Control Tower. Saya bukan saluran execution; "
+                "saya menyelaras status, agen, analisis, risiko, dan tugasan operator melalui workflow yang diaudit."
+            )
+            next_action = "Tanya status sistem, risiko, berita, MT5 bridge, strategi, atau bilik agen yang anda mahu lihat."
+        else:
+            summary = (
+                "I am the Forex AI Control Tower Orchestrator Agent. I am not a direct execution channel; "
+                "I coordinate system status, agents, analysis, risk, and operator tasks through audited governed workflows."
+            )
+            next_action = "Ask for system status, risk, news, MT5 bridge, strategy readiness, or a specific Agent Theater room."
     elif any(word in lowered for word in ("buy", "sell", "order", "trade", "execute", "live", "lot")):
         summary = (
             "I understand the trading request and I can coordinate the required agents, but chat is not a direct execution channel. "
@@ -421,7 +458,15 @@ def list_events(
         if selected_agents and event.get("agent") not in selected_agents:
             continue
         events.append(event)
-    events = events[-max(1, min(limit, 200)) :]
+    deduped_reversed = []
+    seen = set()
+    for event in reversed(events):
+        key = (event.get("agent"), event.get("stream"), event.get("summary"), event.get("result"), event.get("risk_status"))
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped_reversed.append(event)
+    events = list(reversed(deduped_reversed))[-max(1, min(limit, 200)) :]
     return {
         "events": render_events(events, language),
         "source": str(event_log),
@@ -568,8 +613,10 @@ def chat_with_orchestrator(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
 
     safe_message = _safe_chat_text(payload.message)
-    task_id = _queue_agent_task(payload.session_id, payload.message, payload.language)
     stream_name = "Orchestrator Console" if payload.orchestrator_only else "Orchestrator Chat"
+    if _is_recent_duplicate(payload.session_id, safe_message, stream_name):
+        return {"accepted": True, "duplicate_suppressed": True, "reply": "Duplicate message suppressed.", "next_action": "Wait for the existing orchestrator reply.", "task_id": None}
+    task_id = f"chat_{secrets.token_hex(8)}" if payload.orchestrator_only else _queue_agent_task(payload.session_id, payload.message, payload.language)
     operator_event = {
         "agent": "Operator",
         "stream": stream_name,
@@ -579,7 +626,7 @@ def chat_with_orchestrator(
         "confidence": 1.0,
         "risk_status": "read_only_chat_no_execution",
         "next_action": "Orchestrator will answer with a safe status summary.",
-        "metadata": {"session_id": payload.session_id, "language": payload.language, "message_type": "operator_chat", "task_id": task_id},
+        "metadata": {"session_id": payload.session_id, "language": payload.language, "message_type": "operator_chat", "task_id": task_id, "timestamp_epoch": time()},
         "timestamp": _timestamp(),
         "contains_hidden_chain_of_thought": False,
     }
