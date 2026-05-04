@@ -9,6 +9,7 @@ from control.api.models import MarketSnapshot
 from control.api.db import SessionLocal
 from market_data_quality.indicators import indicator_summary
 from market_data_quality.analysis import multi_timeframe_summary, price_action_summary, spread_slippage_summary
+from news_feed.adapter import _normalise_fmp_events
 
 
 def test_market_analysis_helpers():
@@ -115,3 +116,24 @@ def test_news_adapter_manual_json_halts_on_high_impact(monkeypatch, tmp_path):
 
     events = client.get("/api/v1/news/events?symbol=EURUSD").json()
     assert events["events"][0]["currencies"] == ["USD"]
+
+
+def test_fmp_economic_calendar_normalization_infers_impact_and_currency():
+    event_time = (datetime.now(UTC) + timedelta(minutes=20)).isoformat().replace("+00:00", "Z")
+    events = _normalise_fmp_events(
+        [
+            {
+                "date": event_time,
+                "event": "Nonfarm Payrolls",
+                "country": "United States",
+                "previous": "180K",
+                "estimate": "170K",
+            }
+        ]
+    )
+
+    assert len(events) == 1
+    assert events[0].title == "Nonfarm Payrolls"
+    assert events[0].currencies == ("USD",)
+    assert events[0].impact == "high"
+    assert events[0].source == "financial_modeling_prep"

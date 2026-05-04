@@ -8,9 +8,33 @@ from dataclasses import dataclass, asdict
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
 
 
 HIGH_IMPACT_LEVELS = {"high", "red", "critical", "3"}
+MEDIUM_IMPACT_LEVELS = {"medium", "orange", "moderate", "2"}
+LOW_IMPACT_LEVELS = {"low", "yellow", "minor", "1"}
+HIGH_IMPACT_KEYWORDS = (
+    "cpi",
+    "consumer price",
+    "inflation",
+    "interest rate",
+    "rate decision",
+    "fomc",
+    "nonfarm",
+    "nfp",
+    "payroll",
+    "unemployment",
+    "gdp",
+    "retail sales",
+    "pce",
+    "ppi",
+    "central bank",
+    "ecb",
+    "boe",
+    "boj",
+    "fed",
+)
 CURRENCY_BY_SYMBOL = {
     "EURUSD": {"EUR", "USD"},
     "GBPUSD": {"GBP", "USD"},
@@ -20,6 +44,24 @@ CURRENCY_BY_SYMBOL = {
     "USDCAD": {"USD", "CAD"},
     "USDCHF": {"USD", "CHF"},
     "NZDUSD": {"NZD", "USD"},
+}
+COUNTRY_TO_CURRENCY = {
+    "australia": "AUD",
+    "canada": "CAD",
+    "china": "CNY",
+    "euro area": "EUR",
+    "eurozone": "EUR",
+    "france": "EUR",
+    "germany": "EUR",
+    "italy": "EUR",
+    "japan": "JPY",
+    "new zealand": "NZD",
+    "switzerland": "CHF",
+    "united kingdom": "GBP",
+    "uk": "GBP",
+    "united states": "USD",
+    "us": "USD",
+    "usa": "USD",
 }
 
 
@@ -65,6 +107,28 @@ def _event_currencies(raw: dict[str, Any]) -> tuple[str, ...]:
     return tuple(sorted({str(item).upper().strip() for item in values if str(item).strip()}))
 
 
+def _impact_level(raw: dict[str, Any], title: str) -> str:
+    values = (
+        raw.get("impact"),
+        raw.get("importance"),
+        raw.get("volatility"),
+        raw.get("priority"),
+        raw.get("level"),
+    )
+    for value in values:
+        normalized = str(value).lower().strip()
+        if normalized in HIGH_IMPACT_LEVELS:
+            return "high"
+        if normalized in MEDIUM_IMPACT_LEVELS:
+            return "medium"
+        if normalized in LOW_IMPACT_LEVELS:
+            return "low"
+    lowered_title = title.lower()
+    if any(keyword in lowered_title for keyword in HIGH_IMPACT_KEYWORDS):
+        return "high"
+    return "unknown"
+
+
 def _normalise_events(data: Any, source: str) -> list[NewsEvent]:
     if isinstance(data, dict):
         raw_events = data.get("events", [])
@@ -86,9 +150,39 @@ def _normalise_events(data: Any, source: str) -> list[NewsEvent]:
             NewsEvent(
                 title=str(raw.get("title", raw.get("name", "Economic event")))[:240],
                 event_time=event_time,
-                impact=str(raw.get("impact", "unknown")).lower().strip(),
+                impact=_impact_level(raw, str(raw.get("title", raw.get("name", "")))),
                 currencies=currencies,
                 source=str(raw.get("source", source))[:120],
+            )
+        )
+    return sorted(events, key=lambda item: item.event_time)
+
+
+def _normalise_fmp_events(data: Any) -> list[NewsEvent]:
+    if not isinstance(data, list):
+        return []
+    events: list[NewsEvent] = []
+    for raw in data:
+        if not isinstance(raw, dict):
+            continue
+        event_time = _parse_time(raw.get("date", raw.get("event_time", raw.get("time"))))
+        if not event_time:
+            continue
+        title = str(raw.get("event", raw.get("title", raw.get("name", "Economic event"))))[:240]
+        currency = str(raw.get("currency", "")).upper().strip()
+        if not currency:
+            country = str(raw.get("country", "")).lower().strip()
+            currency = COUNTRY_TO_CURRENCY.get(country, "")
+        currencies = (currency,) if currency else ()
+        if not currencies:
+            continue
+        events.append(
+            NewsEvent(
+                title=title,
+                event_time=event_time,
+                impact=_impact_level(raw, title),
+                currencies=currencies,
+                source="financial_modeling_prep",
             )
         )
     return sorted(events, key=lambda item: item.event_time)
@@ -102,19 +196,40 @@ def _load_file(path: str) -> tuple[list[NewsEvent], str | None]:
     return _normalise_events(data, "file"), None
 
 
+def _read_json_url(url: str, headers: dict[str, str]) -> tuple[Any, str | None]:
+    request = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            return json.loads(response.read().decode("utf-8")), None
+    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+        return None, type(exc).__name__
+
+
 def _load_url(url: str, api_key: str | None) -> tuple[list[NewsEvent], str | None]:
     if not url.lower().startswith("https://"):
         return [], "NEWS_CALENDAR_URL must use https"
     headers = {"Accept": "application/json", "User-Agent": "forex-ai-control-tower/0.1"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
-    request = urllib.request.Request(url, headers=headers)
-    try:
-        with urllib.request.urlopen(request, timeout=15) as response:
-            data = json.loads(response.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-        return [], type(exc).__name__
+    data, error = _read_json_url(url, headers)
+    if error:
+        return [], error
     return _normalise_events(data, "https"), None
+
+
+def _load_fmp(api_key: str | None) -> tuple[list[NewsEvent], str | None]:
+    if not api_key:
+        return [], "NEWS_PROVIDER_API_KEY is not configured"
+    today = _utcnow().date()
+    start_date = os.getenv("NEWS_CALENDAR_FROM", today.isoformat())
+    end_date = os.getenv("NEWS_CALENDAR_TO", (today + timedelta(days=7)).isoformat())
+    query = urlencode({"from": start_date, "to": end_date, "apikey": api_key})
+    url = f"https://financialmodelingprep.com/stable/economic-calendar?{query}"
+    headers = {"Accept": "application/json", "User-Agent": "forex-ai-control-tower/0.1"}
+    data, error = _read_json_url(url, headers)
+    if error:
+        return [], error
+    return _normalise_fmp_events(data), None
 
 
 def _currencies_for_symbol(symbol: str | None) -> set[str]:
@@ -143,6 +258,9 @@ def _load_provider_events() -> tuple[str, list[NewsEvent], str | None]:
         if not url:
             return provider_type, [], "NEWS_CALENDAR_URL is not configured"
         events, error = _load_url(url, os.getenv("NEWS_PROVIDER_API_KEY"))
+        return provider_type, events, error
+    if provider_type in {"fmp", "fmp_economic_calendar", "financial_modeling_prep"}:
+        events, error = _load_fmp(os.getenv("NEWS_PROVIDER_API_KEY"))
         return provider_type, events, error
     if provider_type == "env_window":
         minutes = int(os.getenv("NEWS_HIGH_IMPACT_NEXT_MINUTES", "999"))

@@ -10,8 +10,8 @@
     - name: Validate news provider type
       ansible.builtin.assert:
         that:
-          - provider_type in ['manual_json', 'https_json']
-        fail_msg: "NEWS_PROVIDER_TYPE must be manual_json or https_json."
+          - provider_type in ['manual_json', 'https_json', 'fmp_economic_calendar']
+        fail_msg: "NEWS_PROVIDER_TYPE must be manual_json, https_json, or fmp_economic_calendar."
 
     - name: Require reviewed local calendar file for manual_json provider
       ansible.builtin.assert:
@@ -70,6 +70,39 @@
       when:
         - provider_type == 'https_json'
         - lookup('env', 'NEWS_PROVIDER_API_KEY') | length > 0
+
+    - name: Require FMP API key for FMP economic calendar provider
+      ansible.builtin.assert:
+        that:
+          - lookup('env', 'NEWS_PROVIDER_API_KEY') | length > 0
+        fail_msg: "Set NEWS_PROVIDER_API_KEY in the controller environment before deploying the FMP provider."
+      no_log: true
+      when: provider_type == 'fmp_economic_calendar'
+
+    - name: Set FMP economic calendar provider runtime environment
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - set-environment
+          - NEWS_PROVIDER_ENABLED=true
+          - NEWS_PROVIDER_TYPE=fmp_economic_calendar
+          - NEWS_PROVIDER_API_KEY={{ lookup('env', 'NEWS_PROVIDER_API_KEY') }}
+          - NEWS_HIGH_IMPACT_WINDOW_MINUTES={{ lookup('env', 'NEWS_HIGH_IMPACT_WINDOW_MINUTES') | default('45', true) }}
+          - NEWS_STALE_AFTER_MINUTES={{ lookup('env', 'NEWS_STALE_AFTER_MINUTES') | default('720', true) }}
+      no_log: true
+      when: provider_type == 'fmp_economic_calendar'
+
+    - name: Set optional FMP provider date window
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - set-environment
+          - NEWS_CALENDAR_FROM={{ lookup('env', 'NEWS_CALENDAR_FROM') }}
+          - NEWS_CALENDAR_TO={{ lookup('env', 'NEWS_CALENDAR_TO') }}
+      when:
+        - provider_type == 'fmp_economic_calendar'
+        - lookup('env', 'NEWS_CALENDAR_FROM') | length > 0
+        - lookup('env', 'NEWS_CALENDAR_TO') | length > 0
 
     - name: Restart control API after news provider configuration
       ansible.builtin.systemd_service:
