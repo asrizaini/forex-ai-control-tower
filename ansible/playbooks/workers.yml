@@ -27,6 +27,22 @@
         group: aiops
         mode: preserve
 
+    - name: Copy news feed package for worker context
+      ansible.builtin.copy:
+        src: ../../news_feed/
+        dest: /opt/forex-ai-control-tower/news_feed/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
+    - name: Copy market data quality package for indicators
+      ansible.builtin.copy:
+        src: ../../market_data_quality/
+        dest: /opt/forex-ai-control-tower/market_data_quality/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
     - name: Write worker role marker
       ansible.builtin.copy:
         dest: /opt/forex-ai-control-tower/workers/role.txt

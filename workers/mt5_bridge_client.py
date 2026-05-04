@@ -46,6 +46,26 @@ def _request(path: str, require_token: bool = True, timeout_seconds: int = 8) ->
         return {"ok": False, "status": 0, "error": type(exc).__name__, "url": url}
 
 
+def request_json(url: str, timeout_seconds: int = 8) -> dict[str, Any]:
+    request = urllib.request.Request(url, method="GET")
+    started = time.time()
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+            text = response.read().decode("utf-8", errors="replace")
+            body = json.loads(text) if text else {}
+            return {
+                "ok": 200 <= response.status < 400,
+                "status": response.status,
+                "latency_ms": int((time.time() - started) * 1000),
+                "body": body,
+                "url": url,
+            }
+    except urllib.error.HTTPError as exc:
+        return {"ok": False, "status": exc.code, "error": "http_error", "url": url}
+    except (OSError, TimeoutError, json.JSONDecodeError) as exc:
+        return {"ok": False, "status": 0, "error": type(exc).__name__, "url": url}
+
+
 def bridge_health() -> dict[str, Any]:
     return _request("/health", require_token=False)
 
@@ -86,4 +106,3 @@ def mask_login(value: Any) -> str:
 def configured_watchlist() -> list[str]:
     raw = os.getenv("MARKET_WATCH_SYMBOLS", "EURUSD,XAUUSD,GBPUSD,USDJPY")
     return [item.strip().upper() for item in raw.split(",") if item.strip()]
-

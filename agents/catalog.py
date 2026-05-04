@@ -16,8 +16,8 @@ AGENT_CATALOG: tuple[AgentCatalogEntry, ...] = (
     AgentCatalogEntry("Orchestrator Agent", "Coordinates monitored workflows and routes safe tasks.", "operational", "governed", "Health loop and task routing are live."),
     AgentCatalogEntry("Market Data Agent", "Reads MT5 bridge market telemetry.", "operational", "read_only", "Ticks/candles are monitor-only and quality gated."),
     AgentCatalogEntry("Technical Analysis Agent", "Summarizes candle-derived technical state.", "operational", "read_only", "No executable BUY/SELL signals until governance gates pass."),
-    AgentCatalogEntry("Fundamental Analysis Agent", "Tracks fundamental-analysis readiness.", "operational_monitor", "read_only", "External fundamental provider is not connected yet."),
-    AgentCatalogEntry("News Impact Agent", "Tracks economic-calendar/news halt readiness.", "operational_monitor", "read_only", "News feed adapter remains conservative until configured."),
+    AgentCatalogEntry("Fundamental Analysis Agent", "Tracks fundamental-analysis readiness.", "operational_monitor", "read_only", "Uses the configured news/fundamental adapter and fails safe when stale."),
+    AgentCatalogEntry("News Impact Agent", "Tracks economic-calendar/news halt readiness.", "operational_monitor", "read_only", "Economic-calendar adapter supports reviewed JSON file or HTTPS provider and feeds news halt decisions."),
     AgentCatalogEntry("Strategy Agent", "Tracks strategy registry and proposal tasks.", "operational_monitor", "governed", "Strategy proposals remain non-executable."),
     AgentCatalogEntry("Risk Manager", "Monitors account risk and approval gates.", "operational", "governed", "Auto execution remains disabled."),
     AgentCatalogEntry("Signal Reviewer", "Reviews safe signal proposal tasks.", "operational", "governed", "No live setup is under review by default."),
@@ -46,4 +46,3 @@ AGENT_CATALOG: tuple[AgentCatalogEntry, ...] = (
 
 def catalog_as_dicts() -> list[dict]:
     return [asdict(item) for item in AGENT_CATALOG]
-

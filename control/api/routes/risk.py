@@ -15,6 +15,7 @@ from ..db import get_db
 from ..models import Account, KillSwitch, RiskPolicy
 from ..permissions import has_permission
 from execution_guard.control_plane import ExecutionTelemetry, evaluate_control_plane_policy
+from execution_guard.exposure import evaluate_exposure
 from execution_guard.guard import approve_execution
 from execution_guard.schemas import ExecutionRequest
 from risk.kill_switch import active_kill_switch_exists, validate_scope
@@ -125,6 +126,16 @@ def check_execution_guard(
         system_health_score=payload.system_health_score,
         kill_switch_active=payload.kill_switch_active or db_kill_switch_active,
     )
+    exposure = evaluate_exposure(
+        symbol=payload.symbol,
+        side=payload.side,
+        account_id=payload.account_id,
+        strategy_id=payload.strategy_id,
+        open_positions=payload.open_positions,
+        pending_signals=payload.pending_signals,
+        max_same_symbol_positions=payload.max_same_symbol_positions,
+        max_correlated_positions=payload.max_correlated_positions,
+    )
     telemetry = ExecutionTelemetry(
         daily_loss_pct=payload.daily_loss_pct,
         weekly_loss_pct=payload.weekly_loss_pct,
@@ -135,8 +146,8 @@ def check_execution_guard(
         market_data_quality_ok=payload.market_data_quality_ok,
         broker_compatibility_ok=payload.broker_compatibility_ok,
         margin_available=payload.margin_available,
-        duplicate_trade_risk=payload.duplicate_trade_risk,
-        correlation_exposure_ok=payload.correlation_exposure_ok,
+        duplicate_trade_risk=payload.duplicate_trade_risk or exposure.duplicate_trade_risk,
+        correlation_exposure_ok=payload.correlation_exposure_ok and exposure.correlation_exposure_ok,
         news_halt_active=payload.news_halt_active,
     )
     policy = evaluate_control_plane_policy(db, request, telemetry)
@@ -155,12 +166,18 @@ def check_execution_guard(
         "check",
         "execution_guard",
         f"{payload.account_id}:{payload.strategy_id}:{payload.symbol}",
-        {"approved": decision.approved, "reasons": list(decision.reasons), "policy_reasons": list(policy.reasons), "token_issued": bool(decision.token)},
+        {
+            "approved": decision.approved,
+            "reasons": list(decision.reasons),
+            "policy_reasons": list(policy.reasons),
+            "exposure_reasons": list(exposure.reasons),
+            "token_issued": bool(decision.token),
+        },
     )
     db.commit()
     return ExecutionGuardCheckOut(
         approved=decision.approved,
-        reasons=list(dict.fromkeys([*policy.reasons, *decision.reasons])),
+        reasons=list(dict.fromkeys([*exposure.reasons, *policy.reasons, *decision.reasons])),
         token_issued=bool(decision.token),
         checks=policy.checks,
         effective_environment=policy.effective_environment,

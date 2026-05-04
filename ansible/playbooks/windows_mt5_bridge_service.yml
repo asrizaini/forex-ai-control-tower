@@ -25,6 +25,10 @@
     - name: Ensure MT5 bridge task is running
       ansible.windows.win_shell: |
         $ErrorActionPreference = "Stop"
+        Stop-ScheduledTask -TaskName "ForexAI-MT5-Bridge" -ErrorAction SilentlyContinue
+        Get-NetTCPConnection -LocalPort 8501 -State Listen -ErrorAction SilentlyContinue | ForEach-Object {
+          Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue
+        }
         Get-Process python,powershell -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "C:\ForexAI\*" } | Stop-Process -Force -ErrorAction SilentlyContinue
         Start-ScheduledTask -TaskName "ForexAI-MT5-Bridge"
         Start-Sleep -Seconds 5

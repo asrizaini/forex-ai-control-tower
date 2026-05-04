@@ -10,6 +10,10 @@ def market_dialogue(worker_name: str, result: dict[str, Any]) -> list[dict[str, 
     trend = primary.get("trend", "unknown")
     spread = primary.get("spread")
     freshness = primary.get("freshness_seconds")
+    indicators = primary.get("indicators", {}) if isinstance(primary.get("indicators"), dict) else {}
+    rsi_14 = indicators.get("rsi_14")
+    ema_20 = indicators.get("ema_20")
+    ema_50 = indicators.get("ema_50")
     if result.get("bridge_connected") and primary and primary.get("feed_fresh") and primary.get("rates_count", 0) > 0:
         market_summary = (
             f"{symbol} feed is live from MT5 bridge. Latest short-term trend reads {trend}; "
@@ -17,7 +21,9 @@ def market_dialogue(worker_name: str, result: dict[str, Any]) -> list[dict[str, 
         )
         technical_summary = (
             f"{symbol} candle snapshot received with {primary.get('rates_count', 0)} M1 candles. "
-            f"Technical bias is {trend}, but no BUY/SELL signal is authorized because strategy governance is still monitor-only."
+            f"Technical bias is {trend}; EMA20={ema_20 if ema_20 is not None else 'n/a'}, "
+            f"EMA50={ema_50 if ema_50 is not None else 'n/a'}, RSI14={rsi_14 if rsi_14 is not None else 'n/a'}. "
+            "No BUY/SELL signal is authorized because strategy governance is still monitor-only."
         )
         market_result = "mt5_market_data_live"
         adapter_status = "connected"
@@ -40,6 +46,38 @@ def market_dialogue(worker_name: str, result: dict[str, Any]) -> list[dict[str, 
         technical_summary = "Technical Analysis Agent is standing by for validated candle data before producing any setup commentary."
         market_result = result.get("status", "degraded")
         adapter_status = "degraded"
+    news_statuses = result.get("news_statuses", {})
+    news_status = news_statuses.get(symbol, {}) if isinstance(news_statuses, dict) else {}
+    if news_status and news_status.get("provider_enabled") and news_status.get("provider_fresh"):
+        if news_status.get("news_halt_active"):
+            next_event = news_status.get("next_high_impact_event") or {}
+            news_summary = (
+                f"News feed is connected for {symbol}, but I am keeping the halt active. "
+                f"Next high-impact event: {next_event.get('title', 'scheduled event')} in "
+                f"{news_status.get('high_impact_next_minutes', 'unknown')} minutes."
+            )
+            news_result = "high_impact_halt_active"
+            news_confidence = 0.84
+        else:
+            news_summary = (
+                f"News feed is connected for {symbol}. No high-impact event is inside the configured halt window; "
+                "news-sensitive strategies may continue to risk review."
+            )
+            news_result = "news_clear"
+            news_confidence = 0.86
+        news_sources = [f"news provider: {news_status.get('provider_type', 'configured')}"]
+        news_connected = True
+        news_next_action = "Keep feeding news status into Execution Guard inputs before any signal is approved."
+    else:
+        news_summary = (
+            f"News feed is not verified for {symbol}. "
+            "I am keeping news-sensitive strategies halted until the provider is enabled, fresh, and audited."
+        )
+        news_result = "pending_or_stale_adapter"
+        news_confidence = 0.55
+        news_sources = ["news provider status", "safe halt policy"]
+        news_connected = False
+        news_next_action = "Configure NEWS_PROVIDER_TYPE with a reviewed calendar file or HTTPS provider URL, then verify /api/v1/news/status."
     return [
         {
             "agent": "Market Data Agent",
@@ -66,13 +104,18 @@ def market_dialogue(worker_name: str, result: dict[str, Any]) -> list[dict[str, 
         {
             "agent": "News Agent",
             "stream": "Live Chat View",
-            "summary": "News adapter is not connected yet. Until ForexFactory/economic-calendar integration is live, high-impact news status stays conservative.",
-            "input_sources": ["news adapter placeholder"],
-            "result": "pending_adapter",
-            "confidence": 0.5,
-            "risk_status": "news_safe_mode",
-            "next_action": "Wire a news provider and default to blocking news-sensitive strategies when news freshness is unknown.",
-            "metadata": {"worker": worker_name, "message_type": "human_dialogue", "news_feed_connected": False},
+            "summary": news_summary,
+            "input_sources": news_sources,
+            "result": news_result,
+            "confidence": news_confidence,
+            "risk_status": news_status.get("risk_status", "news_safe_mode") if news_status else "news_safe_mode",
+            "next_action": news_next_action,
+            "metadata": {
+                "worker": worker_name,
+                "message_type": "human_dialogue",
+                "news_feed_connected": news_connected,
+                "provider_type": news_status.get("provider_type") if news_status else None,
+            },
         },
     ]
 

@@ -139,6 +139,14 @@
         group: aiops
         mode: preserve
 
+    - name: Copy news feed package
+      ansible.builtin.copy:
+        src: ../../news_feed/
+        dest: /opt/forex-ai-control-tower/app/news_feed/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
     - name: Copy locale files
       ansible.builtin.copy:
         src: ../../locales/
@@ -206,7 +214,7 @@
           Environment=ORCHESTRATOR_GENERAL_CHAT_MODE=ollama
           Environment=OLLAMA_REASON_URL=http://10.10.1.82:11434
           Environment=ORCHESTRATOR_GENERAL_CHAT_MODEL=llama3.1:8b
-          PassEnvironment=JWT_SECRET_KEY POSTGRES_PASSWORD GRAFANA_ADMIN_PASSWORD EXECUTION_GUARD_SIGNING_KEY BRIDGE_API_TOKEN LOCAL_AUTH_BOOTSTRAP_ENABLED LOCAL_ADMIN_BOOTSTRAP_PASSWORD TOTP_ISSUER ALLOW_LIVE_TRADING
+          PassEnvironment=JWT_SECRET_KEY POSTGRES_PASSWORD GRAFANA_ADMIN_PASSWORD EXECUTION_GUARD_SIGNING_KEY BRIDGE_API_TOKEN LOCAL_AUTH_BOOTSTRAP_ENABLED LOCAL_ADMIN_BOOTSTRAP_PASSWORD TOTP_ISSUER ALLOW_LIVE_TRADING NEWS_PROVIDER_ENABLED NEWS_PROVIDER_TYPE NEWS_CALENDAR_FILE NEWS_CALENDAR_URL NEWS_PROVIDER_API_KEY NEWS_HIGH_IMPACT_WINDOW_MINUTES NEWS_STALE_AFTER_MINUTES
           ExecStart=/opt/forex-ai-control-tower/.venv/bin/python -m uvicorn control.api.main:app --host 0.0.0.0 --port 8000
           Restart=always
           RestartSec=5

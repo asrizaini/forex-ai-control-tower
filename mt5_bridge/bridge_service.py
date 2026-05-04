@@ -5,7 +5,7 @@ import time
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from pydantic import BaseModel, Field
 from starlette.responses import Response
 
@@ -25,6 +25,15 @@ REQUIRE_ORDER_CHECK = os.getenv("REQUIRE_ORDER_CHECK", "true").lower() == "true"
 
 checked_orders: dict[str, dict[str, Any]] = {}
 app = FastAPI(title="Forex AI MT5 Bridge", version="0.1.0")
+
+MT5_CONNECTED = Gauge("forex_mt5_bridge_connected", "MT5 terminal connection state, 1 for connected")
+MT5_PROFILE_COUNT = Gauge("forex_mt5_bridge_profile_count", "Configured MT5 account profile count")
+MT5_PROFILE_ENABLED = Gauge("forex_mt5_bridge_profile_enabled", "MT5 account profile enabled state", ["account_id", "environment", "trading_mode"])
+MT5_CHECKED_ORDERS = Gauge("forex_mt5_bridge_checked_orders_total", "In-memory checked order count")
+MT5_ORDER_CHECKS = Counter("forex_mt5_order_check_total", "MT5 order_check calls", ["account_id", "symbol", "retcode"])
+MT5_ORDER_SENDS = Counter("forex_mt5_order_send_total", "MT5 order_send calls", ["account_id", "symbol", "result"])
+MT5_ORDER_CHECK_LATENCY = Histogram("forex_mt5_order_check_latency_seconds", "MT5 order_check latency")
+MT5_ORDER_SEND_LATENCY = Histogram("forex_mt5_order_send_latency_seconds", "MT5 order_send latency")
 
 
 class OrderRequest(BaseModel):
@@ -96,6 +105,20 @@ def require_known_account(account_id: str) -> AccountProfile:
     return profile
 
 
+def refresh_bridge_metrics(connected: bool | None = None) -> None:
+    profiles = load_account_profiles()
+    MT5_PROFILE_COUNT.set(len(profiles))
+    MT5_CHECKED_ORDERS.set(len(checked_orders))
+    if connected is not None:
+        MT5_CONNECTED.set(1 if connected else 0)
+    for profile in profiles:
+        MT5_PROFILE_ENABLED.labels(
+            account_id=profile.account_id,
+            environment=profile.environment,
+            trading_mode=profile.trading_mode,
+        ).set(1 if profile.enabled else 0)
+
+
 @app.get("/health")
 def health() -> dict[str, Any]:
     connected = False
@@ -104,6 +127,7 @@ def health() -> dict[str, Any]:
         connected = client().connect()
     except HTTPException as exc:
         error = exc.detail
+    refresh_bridge_metrics(connected)
     return {
         "status": "ok" if connected else "degraded",
         "bridge_mode": BRIDGE_MODE,
@@ -119,7 +143,31 @@ def health() -> dict[str, Any]:
 
 @app.get("/metrics", dependencies=[Depends(require_bridge_token)])
 def metrics() -> Response:
+    refresh_bridge_metrics()
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
+@app.get("/observability", dependencies=[Depends(require_bridge_token)])
+def observability() -> dict[str, Any]:
+    refresh_bridge_metrics()
+    return {
+        "bridge_mode": BRIDGE_MODE,
+        "allow_live_trading": ALLOW_LIVE_TRADING,
+        "require_order_check": REQUIRE_ORDER_CHECK,
+        "checked_orders_count": len(checked_orders),
+        "profile_count": len(load_account_profiles()),
+        "account_routes": account_route_map(),
+        "metrics": [
+            "forex_mt5_bridge_connected",
+            "forex_mt5_bridge_profile_count",
+            "forex_mt5_bridge_profile_enabled",
+            "forex_mt5_bridge_checked_orders_total",
+            "forex_mt5_order_check_total",
+            "forex_mt5_order_send_total",
+            "forex_mt5_order_check_latency_seconds",
+            "forex_mt5_order_send_latency_seconds",
+        ],
+    }
 
 
 @app.get("/account", dependencies=[Depends(require_bridge_token)])
@@ -196,10 +244,14 @@ def order_check(order: OrderRequest) -> dict[str, Any]:
     if order.live_order and not ALLOW_LIVE_TRADING:
         raise HTTPException(status_code=403, detail="Live trading is disabled")
     try:
+        started = time.time()
         result = client().order_check(mt5_request(order))
+        MT5_ORDER_CHECK_LATENCY.observe(time.time() - started)
     except MT5Unavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     checked_orders[order.client_order_id] = result
+    MT5_CHECKED_ORDERS.set(len(checked_orders))
+    MT5_ORDER_CHECKS.labels(account_id=order.account_id, symbol=order.symbol, retcode=str(result.get("retcode", "unknown"))).inc()
     return {"client_order_id": order.client_order_id, "check_passed": result.get("retcode") == 0, "result": result}
 
 
@@ -213,9 +265,13 @@ def order_send(order: OrderRequest, x_execution_guard_token: str | None = Header
     if not validate_approval_token(x_execution_guard_token):
         raise HTTPException(status_code=403, detail="Execution Guard approval token required")
     try:
+        started = time.time()
         result = client().order_send(mt5_request(order))
+        MT5_ORDER_SEND_LATENCY.observe(time.time() - started)
     except MT5Unavailable as exc:
+        MT5_ORDER_SENDS.labels(account_id=order.account_id, symbol=order.symbol, result="mt5_unavailable").inc()
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    MT5_ORDER_SENDS.labels(account_id=order.account_id, symbol=order.symbol, result=str(result.get("retcode", "sent"))).inc()
     return {"client_order_id": order.client_order_id, "sent": True, "result": result}
 
 

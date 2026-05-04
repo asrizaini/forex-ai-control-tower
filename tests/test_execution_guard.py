@@ -1,6 +1,7 @@
 from execution_guard.guard import approve_execution
 from execution_guard.approval_token import validate_approval_token
 from execution_guard.control_plane import ExecutionTelemetry, evaluate_control_plane_policy
+from execution_guard.exposure import evaluate_exposure
 from execution_guard.schemas import ExecutionRequest
 from control.api.auth import issue_token
 from control.api.db import SessionLocal, configure_database, init_db
@@ -172,6 +173,26 @@ def test_execution_guard_check_endpoint_returns_no_secret_token(monkeypatch, tmp
     assert body["approved"] is True
     assert body["token_issued"] is True
     assert "token" not in body
+
+
+def test_exposure_model_detects_duplicate_and_correlation_limit():
+    decision = evaluate_exposure(
+        symbol="EURUSD",
+        side="BUY",
+        account_id="demo_main",
+        strategy_id="trend_pullback_v1",
+        open_positions=[
+            {"account_id": "demo_main", "strategy_id": "trend_pullback_v1", "symbol": "EURUSD", "side": "BUY"},
+            {"account_id": "demo_main", "strategy_id": "other", "symbol": "GBPUSD", "side": "BUY"},
+            {"account_id": "demo_main", "strategy_id": "other", "symbol": "USDJPY", "side": "SELL"},
+        ],
+        max_same_symbol_positions=1,
+        max_correlated_positions=3,
+    )
+    assert decision.duplicate_trade_risk is True
+    assert decision.correlation_exposure_ok is False
+    assert "duplicate_same_symbol_direction" in decision.reasons
+    assert "correlation_exposure_limit_reached" in decision.reasons
 
 
 def test_persistent_kill_switch_blocks_execution_guard(monkeypatch, tmp_path):

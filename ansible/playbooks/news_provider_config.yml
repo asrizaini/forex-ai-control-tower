@@ -1,0 +1,94 @@
+---
+- name: Configure approved news provider runtime
+  hosts: control
+  become: true
+  gather_facts: false
+  vars:
+    provider_type: "{{ lookup('env', 'NEWS_PROVIDER_TYPE') | default('manual_json', true) }}"
+    runtime_calendar_path: /opt/forex-ai-control-tower/runtime/news_calendar.json
+  tasks:
+    - name: Validate news provider type
+      ansible.builtin.assert:
+        that:
+          - provider_type in ['manual_json', 'https_json']
+        fail_msg: "NEWS_PROVIDER_TYPE must be manual_json or https_json."
+
+    - name: Require reviewed local calendar file for manual_json provider
+      ansible.builtin.assert:
+        that:
+          - lookup('env', 'NEWS_CALENDAR_SOURCE_FILE') | length > 0
+        fail_msg: "Set NEWS_CALENDAR_SOURCE_FILE to a reviewed local calendar JSON file."
+      when: provider_type == 'manual_json'
+
+    - name: Copy reviewed news calendar file
+      ansible.builtin.copy:
+        src: "{{ lookup('env', 'NEWS_CALENDAR_SOURCE_FILE') }}"
+        dest: "{{ runtime_calendar_path }}"
+        owner: aiops
+        group: aiops
+        mode: "0640"
+      when: provider_type == 'manual_json'
+
+    - name: Require approved HTTPS calendar URL for https_json provider
+      ansible.builtin.assert:
+        that:
+          - lookup('env', 'NEWS_CALENDAR_URL') is match('^https://')
+        fail_msg: "Set NEWS_CALENDAR_URL to an approved HTTPS JSON endpoint."
+      when: provider_type == 'https_json'
+
+    - name: Set manual_json news provider runtime environment
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - set-environment
+          - NEWS_PROVIDER_ENABLED=true
+          - NEWS_PROVIDER_TYPE=manual_json
+          - NEWS_CALENDAR_FILE={{ runtime_calendar_path }}
+          - NEWS_HIGH_IMPACT_WINDOW_MINUTES={{ lookup('env', 'NEWS_HIGH_IMPACT_WINDOW_MINUTES') | default('45', true) }}
+          - NEWS_STALE_AFTER_MINUTES={{ lookup('env', 'NEWS_STALE_AFTER_MINUTES') | default('720', true) }}
+      when: provider_type == 'manual_json'
+
+    - name: Set https_json news provider runtime environment
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - set-environment
+          - NEWS_PROVIDER_ENABLED=true
+          - NEWS_PROVIDER_TYPE=https_json
+          - NEWS_CALENDAR_URL={{ lookup('env', 'NEWS_CALENDAR_URL') }}
+          - NEWS_HIGH_IMPACT_WINDOW_MINUTES={{ lookup('env', 'NEWS_HIGH_IMPACT_WINDOW_MINUTES') | default('45', true) }}
+          - NEWS_STALE_AFTER_MINUTES={{ lookup('env', 'NEWS_STALE_AFTER_MINUTES') | default('720', true) }}
+      when: provider_type == 'https_json'
+
+    - name: Set https_json provider API key runtime environment
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - set-environment
+          - NEWS_PROVIDER_API_KEY={{ lookup('env', 'NEWS_PROVIDER_API_KEY') }}
+      no_log: true
+      when:
+        - provider_type == 'https_json'
+        - lookup('env', 'NEWS_PROVIDER_API_KEY') | length > 0
+
+    - name: Restart control API after news provider configuration
+      ansible.builtin.systemd_service:
+        name: forex-control-api
+        state: restarted
+        enabled: true
+
+    - name: Verify news provider status endpoint
+      ansible.builtin.uri:
+        url: http://10.10.1.81:8000/api/v1/news/status?symbol=EURUSD
+        method: GET
+        return_content: true
+      register: news_status
+
+    - name: Show safe news provider status
+      ansible.builtin.debug:
+        msg:
+          provider_enabled: "{{ news_status.json.provider_enabled }}"
+          provider_type: "{{ news_status.json.provider_type }}"
+          provider_fresh: "{{ news_status.json.provider_fresh }}"
+          news_halt_active: "{{ news_status.json.news_halt_active }}"
+          risk_status: "{{ news_status.json.risk_status }}"

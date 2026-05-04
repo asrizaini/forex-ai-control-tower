@@ -247,6 +247,10 @@ class ExecutionGuardCheckRequest(BaseModel):
     margin_available: bool = False
     duplicate_trade_risk: bool = True
     correlation_exposure_ok: bool = False
+    open_positions: list[dict[str, Any]] = Field(default_factory=list)
+    pending_signals: list[dict[str, Any]] = Field(default_factory=list)
+    max_same_symbol_positions: int = Field(default=1, ge=1, le=20)
+    max_correlated_positions: int = Field(default=3, ge=1, le=50)
     news_halt_active: bool = True
 
 

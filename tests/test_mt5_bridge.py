@@ -53,3 +53,12 @@ def test_bridge_account_profile_endpoints_require_token_and_block_live(monkeypat
     route = client.get("/accounts/demo_main/route", headers={"x-bridge-token": "unit-test-bridge-token"})
     assert route.status_code == 200
     assert route.json()["terminal_port"] == 8501
+
+    observability = client.get("/observability", headers={"x-bridge-token": "unit-test-bridge-token"})
+    assert observability.status_code == 200
+    assert observability.json()["profile_count"] == 1
+    assert "forex_mt5_bridge_profile_enabled" in observability.json()["metrics"]
+
+    metrics = client.get("/metrics", headers={"x-bridge-token": "unit-test-bridge-token"})
+    assert metrics.status_code == 200
+    assert "forex_mt5_bridge_profile_count" in metrics.text

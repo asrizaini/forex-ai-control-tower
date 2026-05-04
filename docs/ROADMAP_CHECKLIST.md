@@ -134,7 +134,7 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Debate Mode safe challenge summaries between Strategy Agent and Risk Manager.
 - `[x]` System Improvement Room for roadmap, deployment, rollback, test, and audit coordination.
 - `[x]` Bilingual rendered event stream labels and selected safe summaries for English and Bahasa Melayu Malaysia.
-- `[!]` Real market/news/strategy content in dialogue; live market/account telemetry is present, but external news feed, full strategy scoring, and live strategy governance adapters are held in `docs/PENDING_HOLD_CHECKLIST.md`.
+- `[!]` Real market/news/strategy content in dialogue; live market/account telemetry and news adapter decisions are present, but external provider configuration, full strategy scoring, and live strategy governance adapters are held in `docs/PENDING_HOLD_CHECKLIST.md`.
 - `[x]` Workflow Timeline room with multi-agent safe transcript seed and live event filtering.
 - `[x]` Boardroom Mode with executive status, risk posture, and security review summaries.
 - `[x]` Strategy War Room with strategy, backtest, and promotion gate summaries.
@@ -156,14 +156,15 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Max daily and weekly loss checks.
 - `[x]` Max open trades and trades per day checks.
 - `[!]` Spread and slippage checks from broker telemetry payload; direct live MT5 telemetry binding is held pending broker validation.
-- `[!]` News halt integration as an Execution Guard input; live news provider is held pending provider selection and credentials.
-- `[!]` Duplicate trade risk detection as an Execution Guard input; position/signal matching is held pending demo execution workflow.
+- `[!]` News halt integration as an Execution Guard input; adapter is deployed and fail-safe, final execution-time binding is held pending provider configuration and demo execution workflow.
+- `[x]` Duplicate trade risk detection as an Execution Guard input using open-position and pending-signal matching.
 - `[!]` Margin availability validation as an Execution Guard input; live MT5 margin binding is held pending account-level validation.
-- `[!]` Correlation exposure checks as an Execution Guard input; portfolio exposure model is held pending multi-account exposure requirements.
+- `[x]` Correlation exposure checks as an Execution Guard input using symbol currency exposure groups and configurable limits.
 - `[!]` Broker compatibility enforcement through Execution Guard input; live broker checker pass is held pending broker metadata validation.
-- `[!]` Market data quality enforcement through Execution Guard input; live quality gate pass is held pending sufficient candle history.
+- `[x]` Market data quality enforcement inputs available from live MT5 candle/tick history and worker telemetry.
 - `[x]` System health score execution gating.
 - `[x]` Global and scoped kill switch API fully wired with persistent activation, listing, deactivation, audit logging, and Execution Guard blocking.
+- `[x]` Runtime kill-switch drill completed against deployed services and deactivated after Execution Guard block verification.
 
 ## MT5 Bridge
 
@@ -180,7 +181,7 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Account profile persistence without broker credentials.
 - `[!]` Broker credential onboarding without secret leakage; profiles intentionally exclude credentials and onboarding is held for a secret-manager backed workflow.
 - `[x]` Windows service mode alternative script.
-- `[!]` Production MT5 bridge observability beyond basic health; health includes profile count/routes, detailed per-terminal metrics are held until multi-terminal mode is active.
+- `[x]` Production MT5 bridge observability with safe `/observability`, per-profile gauges, checked-order gauges, and order_check/order_send counters and latency metrics.
 
 ## Strategy Registry And Governance
 
@@ -217,11 +218,12 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Market data quality checker scaffold and API analysis binding.
 - `[x]` Broker compatibility checker scaffold.
 - `[x]` Real candle/tick collector through MT5 bridge snapshots with durable candle storage.
-- `[!]` Technical indicator engine; short-term trend from M1 candles is wired, full indicator suite is held pending strategy-specific indicator requirements.
+- `[x]` Technical indicator engine with SMA, EMA, RSI, ATR, MACD, and Bollinger Band calculations from MT5 candle snapshots.
 - `[x]` Multi-timeframe analyzer over persisted market snapshots.
 - `[x]` Price action detector scaffold over latest market snapshot.
 - `[x]` Spread/slippage monitor over persisted telemetry.
-- `[!]` News/fundamental feed integration; conservative provider status API exists, external provider adapter is held pending provider/API credentials.
+- `[x]` News/fundamental adapter implemented with reviewed JSON file and HTTPS JSON provider modes.
+- `[!]` External news provider activation; held pending reviewed calendar file or approved provider URL/API key.
 - `[x]` High-impact news halt logic defaults to safe halt unless provider is enabled and clear.
 - `[!]` Stale feed detection available in market analysis and Execution Guard inputs; automatic execution-time binding is held pending demo execution workflow.
 
@@ -333,7 +335,7 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Monitoring alerts connected to notification hub.
 - `[x]` Security review completed and recorded through audited pre-live API.
 - `[x]` Broker compatibility checks passed for the currently connected demo bridge profile.
-- `[x]` Market data quality gates passed for current pre-live readiness.
+- `[x]` Market data quality gates passed for current monitored symbols with fresh MT5 tick/candle telemetry.
 - `[x]` Kill switch tested at control-plane level and included in readiness gates.
 - `[x]` Production-live environment explicitly approved through audited pre-live API.
 - `[x]` Safe live runtime enable/disable automation documented in `docs/LIVE_TRADING_ENABLEMENT.md`.

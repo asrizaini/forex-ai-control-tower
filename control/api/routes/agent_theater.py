@@ -308,10 +308,10 @@ def _orchestrator_reply(message: str, language: str) -> tuple[str, str]:
         next_action = "Review the queued agent task and risk policy records in the Control Plane."
     elif any(word in lowered for word in ("news", "calendar", "fundamental")):
         summary = (
-            "News analysis is still conservative because the live economic-calendar adapter is not connected yet. "
-            "Until that integration passes tests, news trading stays blocked by design."
+            "News analysis now uses the configured economic-calendar adapter. If the provider is disabled, stale, or has a high-impact event "
+            "inside the halt window, news-sensitive trading stays blocked by design."
         )
-        next_action = "Connect and verify the approved news provider before enabling news-aware signals."
+        next_action = "Check /api/v1/news/status for provider freshness, upcoming high-impact events, and the current news halt decision."
     else:
         llm_answer = _ask_local_llm(message, language)
         summary = llm_answer or (

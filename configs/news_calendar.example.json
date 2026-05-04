@@ -1,0 +1,18 @@
+{
+  "events": [
+    {
+      "title": "US Non-Farm Payrolls",
+      "event_time": "2026-05-08T12:30:00Z",
+      "impact": "high",
+      "currencies": ["USD"],
+      "source": "approved-calendar-provider"
+    },
+    {
+      "title": "ECB Monetary Policy Statement",
+      "event_time": "2026-05-14T12:15:00Z",
+      "impact": "high",
+      "currencies": ["EUR"],
+      "source": "approved-calendar-provider"
+    }
+  ]
+}
