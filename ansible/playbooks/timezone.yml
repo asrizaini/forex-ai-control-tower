@@ -1,0 +1,58 @@
+---
+- name: Configure Linux nodes for Malaysia time
+  hosts: linux_nodes
+  become: true
+  tasks:
+    - name: Set Linux timezone to Asia/Kuala_Lumpur
+      ansible.builtin.command:
+        argv:
+          - timedatectl
+          - set-timezone
+          - Asia/Kuala_Lumpur
+      changed_when: false
+
+    - name: Enable systemd time synchronization
+      ansible.builtin.command:
+        argv:
+          - timedatectl
+          - set-ntp
+          - "true"
+      changed_when: false
+
+    - name: Read Linux time status
+      ansible.builtin.command:
+        argv:
+          - timedatectl
+      register: timedatectl_status
+      changed_when: false
+
+    - name: Show safe Linux timezone status
+      ansible.builtin.debug:
+        msg: "{{ timedatectl_status.stdout_lines | select('search', 'Time zone|Local time|System clock synchronized') | list }}"
+
+- name: Configure Windows MT5 bridge for Malaysia time
+  hosts: mt5_bridge_windows
+  gather_facts: false
+  tasks:
+    - name: Set Windows timezone to UTC+08 Kuala Lumpur compatible zone
+      ansible.windows.win_timezone:
+        timezone: Singapore Standard Time
+
+    - name: Configure Windows time service
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        Set-Service W32Time -StartupType Automatic
+        Start-Service W32Time -ErrorAction SilentlyContinue
+        w32tm /resync /force | Out-Null
+        Get-TimeZone | Select-Object -ExpandProperty Id
+
+    - name: Read Windows local time
+      ansible.windows.win_shell: |
+        Get-Date -Format "yyyy-MM-dd HH:mm:ss K"
+      register: windows_time
+
+    - name: Show safe Windows timezone status
+      ansible.builtin.debug:
+        msg:
+          timezone: Singapore Standard Time
+          local_time: "{{ windows_time.stdout | trim }}"

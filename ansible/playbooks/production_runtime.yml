@@ -34,6 +34,7 @@
           Type=oneshot
           RemainAfterExit=true
           WorkingDirectory=/opt/forex-ai-control-tower
+          EnvironmentFile=-/etc/forex-ai-control-tower/runtime.env
           PassEnvironment=POSTGRES_PASSWORD GRAFANA_ADMIN_PASSWORD
           ExecStart=/bin/sh -c 'if [ -n "$POSTGRES_PASSWORD" ] && [ -n "$GRAFANA_ADMIN_PASSWORD" ]; then /usr/bin/docker compose -f /opt/forex-ai-control-tower/control-stack.compose.yml up -d; else /usr/bin/docker start forex-ai-control-tower-postgres-1 forex-ai-control-tower-redis-1 forex-ai-control-tower-qdrant-1 forex-ai-control-tower-cadvisor-1 forex-ai-control-tower-prometheus-1 forex-ai-control-tower-alertmanager-1 forex-ai-control-tower-blackbox-1 forex-ai-control-tower-grafana-1 forex-ai-control-tower-loki-1 forex-ai-control-tower-promtail-1; fi'
           ExecStop=/usr/bin/docker stop forex-ai-control-tower-postgres-1 forex-ai-control-tower-redis-1 forex-ai-control-tower-qdrant-1 forex-ai-control-tower-cadvisor-1 forex-ai-control-tower-prometheus-1 forex-ai-control-tower-alertmanager-1 forex-ai-control-tower-blackbox-1 forex-ai-control-tower-grafana-1 forex-ai-control-tower-loki-1 forex-ai-control-tower-promtail-1

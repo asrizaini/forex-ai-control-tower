@@ -2,7 +2,15 @@
 
 The control tower reads secrets from environment variables by default. This is production-safe for the current controller-driven deployment because secrets are not committed, echoed, or written to inventory files.
 
-For reboot-persistent production operations, choose one external provider before enabling live trading:
+For reboot-persistent production operations, the prepared low-friction path is:
+
+- Fill `secrets/control_tower_credentials.env` from `docs/control_tower_credentials.env.template`.
+- Optionally encrypt it with Ansible Vault.
+- Run `scripts/deploy_persistent_secrets.ps1`.
+
+This installs root-only runtime secret files on Linux and machine-level environment variables on Windows. Services then survive reboot without the controller process exporting runtime secrets.
+
+For larger production environments, choose one external provider before enabling unattended production-live operations:
 
 - HashiCorp Vault: set `VAULT_ADDR` and `VAULT_TOKEN`, then map paths under `secret/data/forex-ai-control-tower`.
 - SOPS with age: keep only encrypted files under `secrets/`, which remains ignored by git.

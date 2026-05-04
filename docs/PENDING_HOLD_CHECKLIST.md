@@ -72,6 +72,11 @@ This checklist contains roadmap items that should not be marked complete until e
 
 ## Operations Holds
 
+- `[~]` Unattended reboot persistent secrets.
+  - Status: Paste form, Ansible Vault option, deployment script, Linux root-only environment files, Windows machine-level environment configuration, and systemd `EnvironmentFile` wiring are prepared.
+  - Reason held: The operator must fill `secrets/control_tower_credentials.env` with real values locally; Codex must not paste, print, or store real secrets on the user's behalf.
+  - Solution: Fill the paste form, optionally encrypt it with Ansible Vault, then run `scripts/deploy_persistent_secrets.ps1`.
+
 - `[!]` Automated rollback execution.
   - Reason: Release records and rollback commands exist, but automatic rollback can be destructive.
   - Solution: Create approved rollback runbooks per component, test in staging/demo, require backup verification and explicit approver before execution.

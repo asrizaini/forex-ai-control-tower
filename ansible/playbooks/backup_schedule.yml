@@ -59,6 +59,7 @@
           User=aiops
           Group=aiops
           WorkingDirectory=/opt/forex-ai-control-tower/app/backup
+          EnvironmentFile=-/etc/forex-ai-control-tower/runtime.env
           Environment=POSTGRES_HOST=127.0.0.1
           Environment=POSTGRES_DB=forex_ai
           Environment=POSTGRES_USER=forex_ai
@@ -103,6 +104,7 @@
           User=aiops
           Group=aiops
           WorkingDirectory=/opt/forex-ai-control-tower/app/backup
+          EnvironmentFile=-/etc/forex-ai-control-tower/runtime.env
           Environment=POSTGRES_HOST=127.0.0.1
           Environment=POSTGRES_USER=forex_ai
           Environment=BACKUP_ROOT=/opt/forex-ai-control-tower/backups

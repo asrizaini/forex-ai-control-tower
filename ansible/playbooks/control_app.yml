@@ -206,6 +206,7 @@
           User=aiops
           Group=aiops
           WorkingDirectory=/opt/forex-ai-control-tower/app
+          EnvironmentFile=-/etc/forex-ai-control-tower/runtime.env
           Environment=PYTHONPATH=/opt/forex-ai-control-tower/app
           Environment=AGENT_THEATER_EVENT_LOG=/opt/forex-ai-control-tower/runtime/agent_theater_events.jsonl
           Environment=LOKI_PUSH_URL=http://10.10.1.81:3100/loki/api/v1/push
@@ -243,6 +244,7 @@
           User=aiops
           Group=aiops
           WorkingDirectory=/opt/forex-ai-control-tower/app
+          EnvironmentFile=-/etc/forex-ai-control-tower/runtime.env
           Environment=PYTHONPATH=/opt/forex-ai-control-tower/app
           Environment=AGENT_THEATER_EVENT_LOG=/opt/forex-ai-control-tower/runtime/agent_theater_events.jsonl
           Environment=LOKI_PUSH_URL=http://10.10.1.81:3100/loki/api/v1/push
@@ -272,6 +274,7 @@
           User=aiops
           Group=aiops
           WorkingDirectory=/opt/forex-ai-control-tower/app
+          EnvironmentFile=-/etc/forex-ai-control-tower/runtime.env
           Environment=PYTHONPATH=/opt/forex-ai-control-tower/app
           Environment=AGENT_THEATER_EVENT_LOG=/opt/forex-ai-control-tower/runtime/agent_theater_events.jsonl
           Environment=LOKI_PUSH_URL=http://10.10.1.81:3100/loki/api/v1/push

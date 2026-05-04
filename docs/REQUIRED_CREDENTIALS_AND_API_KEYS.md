@@ -145,7 +145,9 @@ Invoke-RestMethod "http://10.10.1.81:8000/api/v1/notifications/channels/status"
 
 ## Reboot Persistence Note
 
-The current safe deployment model passes secrets through environment variables and avoids committing or writing them to plaintext files. Some `systemctl set-environment` values are runtime-scoped and may need to be re-applied after reboot unless a secret manager is configured.
+The unattended reboot flow is documented in `docs/UNATTENDED_REBOOT_SECRETS.md`. Use `docs/control_tower_credentials.env.template` as the single paste form, then deploy it with `scripts/deploy_persistent_secrets.ps1`.
+
+The deployment avoids committing or logging real secrets. Prefer encrypting the local paste form with Ansible Vault before keeping it long-term.
 
 Before relying on unattended reboot recovery for production-live mode, choose and configure one of:
 
@@ -153,4 +155,3 @@ Before relying on unattended reboot recovery for production-live mode, choose an
 - SOPS with age-encrypted secret files.
 - A cloud secret manager.
 - A dedicated host-level secret injection mechanism approved in `docs/secret_manager_integration.md`.
-
