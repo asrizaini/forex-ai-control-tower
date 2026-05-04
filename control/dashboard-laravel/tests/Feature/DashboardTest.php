@@ -58,4 +58,78 @@ class DashboardTest extends TestCase
             ->assertSee('Secure Login')
             ->assertSee('EURUSD');
     }
+
+    public function test_authenticated_admin_can_request_password_change(): void
+    {
+        config(['control_tower.api_url' => 'http://control-api.test']);
+
+        Http::fake([
+            'control-api.test/api/v1/auth/password' => Http::response(['ok' => true]),
+        ]);
+
+        $this->withSession([
+            'control_tower_token' => 'session-token',
+            'control_tower_user' => 'admin',
+        ])->post('/password', [
+            'password' => 'new-admin-password-123',
+            'password_confirmation' => 'new-admin-password-123',
+        ])->assertRedirect('/');
+
+        Http::assertSent(fn ($request) => $request->url() === 'http://control-api.test/api/v1/auth/password'
+            && $request->hasHeader('Authorization', 'Bearer session-token')
+            && $request['user_id'] === 'admin');
+    }
+
+    public function test_generate_credential_stages_value_before_apply(): void
+    {
+        config(['control_tower.api_url' => 'http://control-api.test']);
+
+        Http::fake([
+            'control-api.test/api/v1/credentials/JWT_SECRET_KEY/generate' => Http::response([
+                'value' => 'generated-review-value',
+            ]),
+            'control-api.test/api/v1/credentials/status' => Http::response([
+                'items' => [[
+                    'name' => 'JWT_SECRET_KEY',
+                    'label' => 'JWT Secret Key',
+                    'category' => 'Core Security',
+                    'configured' => true,
+                    'masked_value' => '************abcd',
+                    'sensitive' => true,
+                ]],
+            ]),
+        ]);
+
+        $this->withSession([
+            'control_tower_token' => 'session-token',
+            'control_tower_user' => 'admin',
+        ])->post('/credentials/JWT_SECRET_KEY/generate')
+            ->assertRedirect('/')
+            ->assertSessionHas('pending_generated_credential.name', 'JWT_SECRET_KEY')
+            ->assertSessionHas('pending_generated_credential.current', '************abcd');
+    }
+
+    public function test_apply_generated_credential_saves_staged_value(): void
+    {
+        config(['control_tower.api_url' => 'http://control-api.test']);
+
+        Http::fake([
+            'control-api.test/api/v1/credentials/JWT_SECRET_KEY' => Http::response(['ok' => true]),
+        ]);
+
+        $this->withSession([
+            'control_tower_token' => 'session-token',
+            'control_tower_user' => 'admin',
+            'pending_generated_credential' => [
+                'name' => 'JWT_SECRET_KEY',
+                'value' => 'generated-review-value',
+            ],
+        ])->post('/credentials/JWT_SECRET_KEY/apply-generated')
+            ->assertRedirect('/')
+            ->assertSessionMissing('pending_generated_credential');
+
+        Http::assertSent(fn ($request) => $request->url() === 'http://control-api.test/api/v1/credentials/JWT_SECRET_KEY'
+            && $request->method() === 'PUT'
+            && $request->hasHeader('Authorization', 'Bearer session-token'));
+    }
 }

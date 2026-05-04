@@ -90,6 +90,25 @@ class DashboardController extends Controller
         return back()->with('status', "{$name} saved. Secret value was not logged.");
     }
 
+    public function updatePassword(Request $request): RedirectResponse
+    {
+        $token = $this->requireToken($request);
+        $validated = $request->validate([
+            'password' => ['required', 'string', 'min:12', 'max:256', 'confirmed'],
+        ]);
+
+        $response = $this->client->post('/api/v1/auth/password', [
+            'user_id' => (string) $request->session()->get('control_tower_user', 'admin'),
+            'password' => $validated['password'],
+        ], $token);
+
+        if (! $response->successful()) {
+            return back()->with('error', $this->errorMessage($response->json() ?? [], 'Password update failed.'));
+        }
+
+        return back()->with('status', 'Admin password updated. Sign out and back in with the new password when ready.');
+    }
+
     public function generateCredential(Request $request, string $name): RedirectResponse
     {
         $token = $this->requireToken($request);
@@ -100,12 +119,46 @@ class DashboardController extends Controller
         }
 
         $body = $response->json() ?? [];
+        $status = $this->client->get('/api/v1/credentials/status', $token, ['items' => []]);
+        $item = $this->findCredential($status['items'] ?? [], $name);
 
-        return back()->with('generated_secret', [
+        return back()->with('pending_generated_credential', [
             'name' => $name,
+            'label' => $item['label'] ?? $name,
+            'category' => $item['category'] ?? 'Credentials',
+            'current' => $item['masked_value'] ?? 'not configured',
             'value' => $body['value'] ?? '',
-            'message' => 'Generated value is shown once. Save it when ready.',
+            'message' => 'Generated value is staged only. Review it, copy it if needed, then apply to save.',
         ]);
+    }
+
+    public function applyGeneratedCredential(Request $request, string $name): RedirectResponse
+    {
+        $token = $this->requireToken($request);
+        $pending = $request->session()->get('pending_generated_credential', []);
+
+        if (($pending['name'] ?? '') !== $name || empty($pending['value'])) {
+            return back()->with('error', 'No staged generated value is available for this credential.');
+        }
+
+        $response = $this->client->put('/api/v1/credentials/' . rawurlencode($name), [
+            'value' => $pending['value'],
+        ], $token);
+
+        if (! $response->successful()) {
+            return back()->with('error', $this->errorMessage($response->json() ?? [], 'Credential update failed.'));
+        }
+
+        $request->session()->forget('pending_generated_credential');
+
+        return back()->with('status', "{$name} generated value applied. Secret value was not logged.");
+    }
+
+    public function discardGeneratedCredential(Request $request): RedirectResponse
+    {
+        $request->session()->forget('pending_generated_credential');
+
+        return back()->with('status', 'Staged generated value discarded.');
     }
 
     public function revealCredential(Request $request, string $name): RedirectResponse
@@ -142,6 +195,17 @@ class DashboardController extends Controller
             $groups[$item['category'] ?? 'Other'][] = $item;
         }
         return $groups;
+    }
+
+    private function findCredential(array $items, string $name): array
+    {
+        foreach ($items as $item) {
+            if (($item['name'] ?? '') === $name) {
+                return $item;
+            }
+        }
+
+        return [];
     }
 
     private function errorMessage(array $body, string $fallback): string
