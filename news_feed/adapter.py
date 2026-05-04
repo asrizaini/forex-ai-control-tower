@@ -83,6 +83,23 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+def _config(name: str, default: str = "") -> str:
+    try:
+        from control.api.credential_store import get_config_value
+        from control.api.db import SessionLocal
+
+        db = SessionLocal()
+        try:
+            value = get_config_value(db, name)
+            if value is not None:
+                return value
+        finally:
+            db.close()
+    except Exception:
+        pass
+    return os.getenv(name, default)
+
+
 def _parse_time(value: Any) -> datetime | None:
     if isinstance(value, (int, float)):
         return datetime.fromtimestamp(float(value), tz=UTC)
@@ -221,8 +238,8 @@ def _load_fmp(api_key: str | None) -> tuple[list[NewsEvent], str | None]:
     if not api_key:
         return [], "NEWS_PROVIDER_API_KEY is not configured"
     today = _utcnow().date()
-    start_date = os.getenv("NEWS_CALENDAR_FROM", today.isoformat())
-    end_date = os.getenv("NEWS_CALENDAR_TO", (today + timedelta(days=7)).isoformat())
+    start_date = _config("NEWS_CALENDAR_FROM", today.isoformat()) or today.isoformat()
+    end_date = _config("NEWS_CALENDAR_TO", (today + timedelta(days=7)).isoformat()) or (today + timedelta(days=7)).isoformat()
     query = urlencode({"from": start_date, "to": end_date, "apikey": api_key})
     url = f"https://financialmodelingprep.com/stable/economic-calendar?{query}"
     headers = {"Accept": "application/json", "User-Agent": "forex-ai-control-tower/0.1"}
@@ -244,26 +261,26 @@ def _currencies_for_symbol(symbol: str | None) -> set[str]:
 
 
 def _load_provider_events() -> tuple[str, list[NewsEvent], str | None]:
-    provider_type = os.getenv("NEWS_PROVIDER_TYPE", "disabled").lower().strip()
-    if os.getenv("NEWS_PROVIDER_ENABLED", "false").lower() != "true":
+    provider_type = _config("NEWS_PROVIDER_TYPE", "disabled").lower().strip()
+    if _config("NEWS_PROVIDER_ENABLED", "false").lower() != "true":
         return provider_type, [], "NEWS_PROVIDER_ENABLED is false"
     if provider_type in {"manual_json", "file"}:
-        path = os.getenv("NEWS_CALENDAR_FILE", "")
+        path = _config("NEWS_CALENDAR_FILE", "")
         if not path:
             return provider_type, [], "NEWS_CALENDAR_FILE is not configured"
         events, error = _load_file(path)
         return provider_type, events, error
     if provider_type in {"http_json", "https_json"}:
-        url = os.getenv("NEWS_CALENDAR_URL", "")
+        url = _config("NEWS_CALENDAR_URL", "")
         if not url:
             return provider_type, [], "NEWS_CALENDAR_URL is not configured"
-        events, error = _load_url(url, os.getenv("NEWS_PROVIDER_API_KEY"))
+        events, error = _load_url(url, _config("NEWS_PROVIDER_API_KEY", ""))
         return provider_type, events, error
     if provider_type in {"fmp", "fmp_economic_calendar", "financial_modeling_prep"}:
-        events, error = _load_fmp(os.getenv("NEWS_PROVIDER_API_KEY"))
+        events, error = _load_fmp(_config("NEWS_PROVIDER_API_KEY", ""))
         return provider_type, events, error
     if provider_type == "env_window":
-        minutes = int(os.getenv("NEWS_HIGH_IMPACT_NEXT_MINUTES", "999"))
+        minutes = int(_config("NEWS_HIGH_IMPACT_NEXT_MINUTES", "999"))
         event_time = _utcnow() + timedelta(minutes=minutes)
         return provider_type, [NewsEvent("Environment high-impact window", event_time, "high", ("EUR", "USD"), "env")], None
     return provider_type, [], f"Unsupported NEWS_PROVIDER_TYPE: {provider_type}"
@@ -272,10 +289,10 @@ def _load_provider_events() -> tuple[str, list[NewsEvent], str | None]:
 def evaluate_news_status(symbol: str | None = None) -> dict[str, Any]:
     provider_type, events, error = _load_provider_events()
     now = _utcnow()
-    high_impact_window = int(os.getenv("NEWS_HIGH_IMPACT_WINDOW_MINUTES", "45"))
-    stale_after_minutes = int(os.getenv("NEWS_STALE_AFTER_MINUTES", "720"))
+    high_impact_window = int(_config("NEWS_HIGH_IMPACT_WINDOW_MINUTES", "45"))
+    stale_after_minutes = int(_config("NEWS_STALE_AFTER_MINUTES", "720"))
     relevant_currencies = _currencies_for_symbol(symbol)
-    provider_enabled = os.getenv("NEWS_PROVIDER_ENABLED", "false").lower() == "true"
+    provider_enabled = _config("NEWS_PROVIDER_ENABLED", "false").lower() == "true"
 
     relevant_events = [
         event

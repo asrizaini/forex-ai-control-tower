@@ -133,6 +133,14 @@ class NotificationOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class CredentialUpdate(BaseModel):
+    value: str = Field(default="", max_length=12000)
+
+
+class CredentialReveal(BaseModel):
+    confirm: bool = False
+
+
 class LlmRouteRequest(BaseModel):
     task_type: str = Field(default="general", max_length=120)
     prompt: str = Field(max_length=4000)

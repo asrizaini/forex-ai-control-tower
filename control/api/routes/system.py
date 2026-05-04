@@ -7,6 +7,7 @@ from pathlib import Path
 
 from fastapi import APIRouter
 from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
 
 from ..db import SessionLocal
 from ..models import AgentTask, AuditLog, KillSwitch, MarketSnapshot, NotificationEvent, RiskPolicy, Strategy, StrategyLabJob, TradeApproval, User, Account
@@ -35,6 +36,38 @@ def runtime_status() -> dict:
 @router.get("/secret-manager/status")
 def get_secret_manager_status() -> dict:
     return secret_manager_status()
+
+
+@router.get("/health/status")
+def full_health_status() -> dict:
+    services = {"api": {"status": "ok", "url": "http://10.10.1.81:8000/health"}}
+    try:
+        db = SessionLocal()
+        try:
+            db.execute(select(1))
+            services["database"] = {"status": "ok"}
+        finally:
+            db.close()
+    except SQLAlchemyError:
+        services["database"] = {"status": "down"}
+    checks = {
+        "grafana": "http://127.0.0.1:3000/api/health",
+        "prometheus": "http://127.0.0.1:9090/-/healthy",
+        "qdrant": "http://127.0.0.1:6333/",
+        "loki": "http://127.0.0.1:3100/ready",
+    }
+    for name, url in checks.items():
+        try:
+            with urllib.request.urlopen(url, timeout=3) as response:
+                services[name] = {"status": "ok" if 200 <= response.status < 300 else "down", "url": url}
+        except (OSError, urllib.error.URLError, TimeoutError):
+            services[name] = {"status": "down", "url": url}
+    credentials = secret_manager_status()
+    services["credentials"] = {
+        "status": "ok" if credentials.get("required_runtime_secrets_present") else "missing_required",
+        "required_runtime_secrets_present": credentials.get("required_runtime_secrets_present"),
+    }
+    return {"healthy": all(item["status"] == "ok" for item in services.values()), "services": services}
 
 
 @router.get("/observability")

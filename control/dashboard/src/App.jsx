@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, MessageCircle, Send, ShieldCheck, Globe2, RadioTower, ServerCog } from 'lucide-react';
+import { Activity, Clipboard, Eye, EyeOff, KeyRound, MessageCircle, RefreshCw, Send, ShieldCheck, Globe2, RadioTower, ServerCog } from 'lucide-react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 
@@ -33,6 +33,9 @@ function App() {
   const [token, setToken] = useState(window.localStorage.getItem('fx_access_token') || '');
   const [login, setLogin] = useState({ user_id: 'admin', password: '', totp_code: '' });
   const [operatorData, setOperatorData] = useState({ users: [], permissions: [], audit: [], tasks: [], serviceKeys: [], states: [], catalog: [] });
+  const [credentialStatus, setCredentialStatus] = useState({ items: [], missing_required: [], invalid: [], healthy: false });
+  const [credentialInputs, setCredentialInputs] = useState({});
+  const [visibleSecrets, setVisibleSecrets] = useState({});
   const [operatorStatus, setOperatorStatus] = useState('Login to unlock admin control-plane panels.');
   const [newUser, setNewUser] = useState({ user_id: '', email: '', role: 'viewer', language: 'en' });
   const [newPermission, setNewPermission] = useState({ user_id: '', permission: 'dashboard:read', account_id: '', strategy_id: '' });
@@ -89,7 +92,7 @@ function App() {
 
   const loadOperatorData = async () => {
     try {
-      const [users, permissions, audit, tasks, serviceKeys, states, catalog] = await Promise.all([
+      const [users, permissions, audit, tasks, serviceKeys, states, catalog, credentials] = await Promise.all([
         fetch(`${apiBase}/api/v1/users/records`, { headers: authHeaders() }).then((r) => r.json()),
         fetch(`${apiBase}/api/v1/permissions`, { headers: authHeaders() }).then((r) => r.json()),
         fetch(`${apiBase}/api/v1/audit/logs`, { headers: authHeaders() }).then((r) => r.ok ? r.json() : []),
@@ -97,12 +100,79 @@ function App() {
         fetch(`${apiBase}/api/v1/service-keys`, { headers: authHeaders() }).then((r) => r.ok ? r.json() : []),
         fetch(`${apiBase}/api/v1/agents/states`, { headers: authHeaders() }).then((r) => r.json()),
         fetch(`${apiBase}/api/v1/agents/catalog`, { headers: authHeaders() }).then((r) => r.json()),
+        fetch(`${apiBase}/api/v1/credentials/status`, { headers: authHeaders() }).then((r) => r.ok ? r.json() : { items: [] }),
       ]);
       setOperatorData({ users, permissions, audit, tasks, serviceKeys, states, catalog: catalog.agents || [] });
+      setCredentialStatus(credentials);
       setOperatorStatus('Control-plane data loaded.');
     } catch (error) {
       setOperatorStatus(error.message || 'Unable to load operator data.');
     }
+  };
+
+  const saveCredential = async (name) => {
+    const value = credentialInputs[name];
+    if (value === undefined) {
+      setOperatorStatus('Enter a value or generate one first.');
+      return;
+    }
+    try {
+      const response = await fetch(`${apiBase}/api/v1/credentials/${encodeURIComponent(name)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ value }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail || 'Credential save failed');
+      setCredentialInputs((current) => ({ ...current, [name]: '' }));
+      setOperatorStatus(`${name} saved without logging the secret value.`);
+      await loadOperatorData();
+    } catch (error) {
+      setOperatorStatus(error.message || 'Credential save failed.');
+    }
+  };
+
+  const generateCredential = async (name) => {
+    try {
+      const response = await fetch(`${apiBase}/api/v1/credentials/${encodeURIComponent(name)}/generate`, {
+        method: 'POST',
+        headers: { ...authHeaders() },
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail || 'Credential generation failed');
+      setCredentialInputs((current) => ({ ...current, [name]: payload.value }));
+      setVisibleSecrets((current) => ({ ...current, [name]: true }));
+      setOperatorStatus(`${name} generated. Save it when ready.`);
+    } catch (error) {
+      setOperatorStatus(error.message || 'Credential generation failed.');
+    }
+  };
+
+  const revealCredential = async (name) => {
+    try {
+      const response = await fetch(`${apiBase}/api/v1/credentials/${encodeURIComponent(name)}/reveal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ confirm: true }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail || 'Credential reveal failed');
+      setCredentialInputs((current) => ({ ...current, [name]: payload.value || '' }));
+      setVisibleSecrets((current) => ({ ...current, [name]: true }));
+      setOperatorStatus(`${name} revealed for this browser session. Audit record created.`);
+    } catch (error) {
+      setOperatorStatus(error.message || 'Credential reveal failed.');
+    }
+  };
+
+  const copyCredential = async (name) => {
+    const value = credentialInputs[name];
+    if (!value) {
+      setOperatorStatus('Nothing to copy. Reveal or generate the value first.');
+      return;
+    }
+    await navigator.clipboard.writeText(value);
+    setOperatorStatus(`${name} copied to clipboard.`);
   };
 
   const doLogin = async (event) => {
@@ -252,6 +322,45 @@ function App() {
         <p className="chat-status">{operatorStatus}</p>
         {token && (
           <div className="admin-grid">
+            <article className="wide-card credentials-center">
+              <div className="credential-heading">
+                <div>
+                  <h2><KeyRound size={18} /> Credentials Center</h2>
+                  <p>{credentialStatus.healthy ? 'All required credentials are configured.' : `${credentialStatus.missing_required?.length || 0} required missing · ${credentialStatus.invalid?.length || 0} invalid`}</p>
+                </div>
+                <button type="button" onClick={loadOperatorData}><RefreshCw size={16} /> Refresh Status</button>
+              </div>
+              <div className="credential-grid">
+                {(credentialStatus.items || []).map((item) => {
+                  const visible = visibleSecrets[item.name];
+                  const inputValue = credentialInputs[item.name] ?? '';
+                  return (
+                    <div className={`credential-row ${item.configured ? 'configured' : 'missing'}`} key={item.name}>
+                      <div className="credential-meta">
+                        <strong>{item.label}</strong>
+                        <span>{item.category} · {item.required ? 'required' : 'optional'} · {item.source}</span>
+                        <small>{item.validation_status}: {item.validation_message}</small>
+                      </div>
+                      <div className="credential-value">
+                        <input
+                          type={item.sensitive && !visible ? 'password' : 'text'}
+                          placeholder={item.configured ? item.masked_value : item.placeholder || item.name}
+                          value={inputValue}
+                          onChange={(event) => setCredentialInputs((current) => ({ ...current, [item.name]: event.target.value }))}
+                        />
+                        <button type="button" title="Show or hide" onClick={() => setVisibleSecrets((current) => ({ ...current, [item.name]: !current[item.name] }))}>
+                          {visible ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                        <button type="button" title="Copy current field value" onClick={() => copyCredential(item.name)}><Clipboard size={15} /></button>
+                        {item.generator && <button type="button" onClick={() => generateCredential(item.name)}>Generate</button>}
+                        {item.configured && <button type="button" onClick={() => revealCredential(item.name)}>Reveal</button>}
+                        <button type="button" onClick={() => saveCredential(item.name)}>Save</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </article>
             <article>
               <h2>Users</h2>
               <form className="compact-form" onSubmit={(event) => {

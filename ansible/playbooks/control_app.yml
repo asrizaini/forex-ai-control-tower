@@ -163,6 +163,39 @@
         group: aiops
         mode: "0750"
 
+    - name: Create protected control tower config directory
+      ansible.builtin.file:
+        path: /etc/forex-ai-control-tower
+        state: directory
+        owner: root
+        group: aiops
+        mode: "0750"
+
+    - name: Create persistent credential store encryption key if missing
+      ansible.builtin.shell: |
+        set -euo pipefail
+        if [ ! -s /etc/forex-ai-control-tower/credential_store.key ]; then
+          python3 - <<'PY'
+        import base64, os
+        print(base64.urlsafe_b64encode(os.urandom(32)).decode())
+        PY
+        fi
+      args:
+        executable: /bin/bash
+        creates: /etc/forex-ai-control-tower/credential_store.key
+      register: credential_store_key
+      no_log: true
+
+    - name: Install credential store key
+      ansible.builtin.copy:
+        dest: /etc/forex-ai-control-tower/credential_store.key
+        content: "{{ credential_store_key.stdout }}\n"
+        owner: root
+        group: aiops
+        mode: "0640"
+      when: credential_store_key.stdout is defined and credential_store_key.stdout | length > 0
+      no_log: true
+
     - name: Create dashboard web directory
       ansible.builtin.file:
         path: /opt/forex-ai-control-tower/dashboard

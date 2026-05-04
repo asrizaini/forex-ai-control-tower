@@ -21,6 +21,11 @@
       - 9115
     llm_tcp_ports:
       - 11434
+    docker_bridge_subnet: "172.16.0.0/12"
+    control_docker_scrape_ports:
+      - 8000
+      - 5173
+      - 9100
   tasks:
     - name: Ensure ufw is installed
       ansible.builtin.apt:
@@ -56,6 +61,13 @@
         argv: [ufw, allow, from, "{{ tower_subnet }}", to, any, port, "{{ item }}", proto, tcp]
       loop: "{{ llm_tcp_ports }}"
       when: inventory_hostname in groups['llm_nodes']
+      changed_when: false
+
+    - name: Allow Docker bridge scrapers to reach host-level control services
+      ansible.builtin.command:
+        argv: [ufw, allow, from, "{{ docker_bridge_subnet }}", to, any, port, "{{ item }}", proto, tcp]
+      loop: "{{ control_docker_scrape_ports }}"
+      when: inventory_hostname in groups['control']
       changed_when: false
 
     - name: Enable ufw

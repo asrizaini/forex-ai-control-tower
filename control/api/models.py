@@ -374,6 +374,23 @@ class MobilePushRegistration(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
 
+class CredentialConfig(Base):
+    __tablename__ = "credential_configs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    category: Mapped[str] = mapped_column(String(80), default="general", index=True)
+    encrypted_value: Mapped[str] = mapped_column(Text, default="")
+    value_hash: Mapped[str] = mapped_column(String(128), default="", index=True)
+    sensitive: Mapped[bool] = mapped_column(Boolean, default=True)
+    configured: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    validation_status: Mapped[str] = mapped_column(String(60), default="missing", index=True)
+    validation_message: Mapped[str] = mapped_column(String(255), default="")
+    updated_by: Mapped[str] = mapped_column(String(120), default="system", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
 class TradeApproval(Base):
     __tablename__ = "trade_approvals"
 

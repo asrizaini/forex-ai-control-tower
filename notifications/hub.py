@@ -26,9 +26,27 @@ def channel_status(env: dict | None = None) -> dict:
     import os
 
     source = env or os.environ
+
+    def configured(name: str) -> bool:
+        if source.get(name):
+            return True
+        if env is not None:
+            return False
+        try:
+            from control.api.credential_store import get_config_value
+            from control.api.db import SessionLocal
+
+            db = SessionLocal()
+            try:
+                return bool(get_config_value(db, name))
+            finally:
+                db.close()
+        except Exception:
+            return False
+
     status = {"dashboard": {"configured": True, "delivery_enabled": True, "missing": []}}
     for channel, required in CHANNEL_ENV.items():
-        missing = [name for name in required if not source.get(name)]
+        missing = [name for name in required if not configured(name)]
         status[channel] = {"configured": not missing, "delivery_enabled": not missing, "missing": missing}
     return status
 

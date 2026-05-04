@@ -12,33 +12,33 @@ alerting:
 scrape_configs:
   - job_name: prometheus
     static_configs:
-      - targets: ["127.0.0.1:9090"]
+      - targets: ["prometheus:9090"]
 
   - job_name: control-api
     static_configs:
-      - targets: ["10.10.1.81:8000"]
+      - targets: ["host.docker.internal:8000"]
 
   - job_name: grafana
     static_configs:
-      - targets: ["10.10.1.81:3000"]
+      - targets: ["grafana:3000"]
 
   - job_name: alertmanager
     static_configs:
-      - targets: ["10.10.1.81:9093"]
+      - targets: ["alertmanager:9093"]
 
   - job_name: qdrant
     metrics_path: /metrics
     static_configs:
-      - targets: ["10.10.1.81:6333"]
+      - targets: ["qdrant:6333"]
 
   - job_name: cadvisor
     static_configs:
-      - targets: ["10.10.1.81:8080"]
+      - targets: ["cadvisor:8080"]
 
   - job_name: loki
     metrics_path: /metrics
     static_configs:
-      - targets: ["10.10.1.81:3100"]
+      - targets: ["loki:3100"]
 
   - job_name: linux-node
     static_configs:
@@ -60,14 +60,14 @@ scrape_configs:
       module: [http_2xx]
     static_configs:
       - targets:
-          - http://10.10.1.81:8000/health
-          - http://10.10.1.81:5173/
-          - http://10.10.1.81:3000/api/health
-          - http://10.10.1.81:9093/-/healthy
-          - http://10.10.1.81:9090/-/healthy
-          - http://10.10.1.81:6333/
-          - http://10.10.1.81:8080/healthz
-          - http://10.10.1.81:3100/ready
+          - http://host.docker.internal:8000/health
+          - http://host.docker.internal:5173/
+          - http://grafana:3000/api/health
+          - http://alertmanager:9093/-/healthy
+          - http://prometheus:9090/-/healthy
+          - http://qdrant:6333/
+          - http://cadvisor:8080/healthz
+          - http://loki:3100/ready
           - http://10.10.1.82:11434/api/tags
           - http://10.10.1.83:11434/api/tags
           - http://10.10.1.86:8501/health

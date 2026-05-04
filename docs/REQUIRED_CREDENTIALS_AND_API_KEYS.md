@@ -2,7 +2,7 @@
 
 This document lists every credential, token, API key, password, and external approval needed to operate the Forex AI Control Tower.
 
-Never paste real secrets into chat, Git, Markdown, inventory files, scripts, Docker Compose files, Grafana dashboards, logs, or screenshots. Set them through environment variables or an approved secret manager only.
+Never paste real secrets into chat, Git, Markdown, inventory files, scripts, Docker Compose files, Grafana dashboards, logs, or screenshots. After deployment, set and update operational values through the fx-control Credentials Center whenever possible. See `docs/CREDENTIALS_DASHBOARD.md`.
 
 ## Current Required Runtime Secrets
 

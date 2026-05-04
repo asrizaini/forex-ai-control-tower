@@ -127,6 +127,18 @@ class JsonAccessLogAndMetricsMiddleware(BaseHTTPMiddleware):
 def collect_database_metrics() -> None:
     db: Session = SessionLocal()
     try:
+        for agent in ("orchestrator", "market_data", "strategy", "risk", "execution", "notification"):
+            for status in ("queued", "running", "completed", "failed"):
+                AGENT_TASKS.labels(agent, status).set(0)
+        for job_type in ("backtest", "forward_test", "tuning", "walk_forward", "demo_validation"):
+            for status in ("queued", "running", "completed", "failed"):
+                STRATEGY_LAB_JOBS.labels(job_type, status).set(0)
+        for level in ("info", "normal", "warning", "critical", "emergency"):
+            for status in ("pending", "sent", "failed", "suppressed"):
+                NOTIFICATION_EVENTS.labels(level, status).set(0)
+        for scope in ("global", "user", "account", "account_group", "strategy", "symbol", "news", "auto_execution"):
+            ACTIVE_KILL_SWITCHES.labels(scope).set(0)
+
         CONTROL_PLANE_RECORDS.labels("users").set(db.scalar(select(func.count()).select_from(User)) or 0)
         CONTROL_PLANE_RECORDS.labels("accounts").set(db.scalar(select(func.count()).select_from(Account)) or 0)
         CONTROL_PLANE_RECORDS.labels("strategies").set(db.scalar(select(func.count()).select_from(Strategy)) or 0)
