@@ -50,7 +50,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "Prometheus"},
           "editorMode": "code",
-          "expr": "sum(probe_success{job=\"blackbox-http\"})",
+          "expr": "sum(probe_success{job=\"blackbox-http\"} and on(job, instance) up{job=\"blackbox-http\"})",
           "legendFormat": "HTTP services online",
           "range": true,
           "refId": "A"
@@ -90,7 +90,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "Prometheus"},
           "editorMode": "code",
-          "expr": "sum(probe_success{job=\"blackbox-tcp\"})",
+          "expr": "sum(probe_success{job=\"blackbox-tcp\"} and on(job, instance) up{job=\"blackbox-tcp\"})",
           "legendFormat": "TCP ports online",
           "range": true,
           "refId": "A"
@@ -187,7 +187,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "Prometheus"},
           "editorMode": "code",
-          "expr": "probe_duration_seconds{job=~\"blackbox-http|blackbox-tcp\"}",
+          "expr": "probe_duration_seconds{job=~\"blackbox-http|blackbox-tcp\"} and on(job, instance) up{job=~\"blackbox-http|blackbox-tcp\"}",
           "legendFormat": "{{ instance }}",
           "range": true,
           "refId": "A"
@@ -236,7 +236,7 @@
         {
           "datasource": {"type": "prometheus", "uid": "Prometheus"},
           "editorMode": "code",
-          "expr": "probe_success{job=~\"blackbox-http|blackbox-tcp\"}",
+          "expr": "probe_success{job=~\"blackbox-http|blackbox-tcp\"} and on(job, instance) up{job=~\"blackbox-http|blackbox-tcp\"}",
           "format": "table",
           "instant": true,
           "legendFormat": "{{ instance }}",

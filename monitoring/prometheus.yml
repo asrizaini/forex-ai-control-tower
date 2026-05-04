@@ -85,7 +85,10 @@ scrape_configs:
       module: [tcp_connect]
     static_configs:
       - targets:
-          - 10.10.1.81:22
+          # Do not probe fx-control SSH from the local Docker blackbox container.
+          # Docker-to-host SSH hairpin checks can time out even while SSH is healthy
+          # and reachable from the controller. fx-control SSH is covered by
+          # deployment preflight and systemd service checks instead.
           - 10.10.1.82:22
           - 10.10.1.83:22
           - 10.10.1.84:22
