@@ -29,6 +29,11 @@ class ControlTowerClient
         return $this->request($token)->put($this->url($path), $payload);
     }
 
+    public function delete(string $path, array $payload = [], ?string $token = null): Response
+    {
+        return $this->request($token)->delete($this->url($path), $payload);
+    }
+
     private function request(?string $token)
     {
         $request = Http::timeout(8)->acceptJson()->asJson();

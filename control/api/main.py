@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketException, status
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from starlette.responses import RedirectResponse
 from starlette.responses import Response
 
 from agent_theater.renderer import render_event
@@ -24,6 +25,7 @@ from .routes import (
     auth,
     backtests,
     credentials,
+    control_center,
     deployments,
     forward_tests,
     llm,
@@ -79,6 +81,7 @@ def create_app() -> FastAPI:
         news.router,
         backtests.router,
         credentials.router,
+        control_center.router,
         deployments.router,
         forward_tests.router,
         llm.router,
@@ -99,6 +102,8 @@ def create_app() -> FastAPI:
     def startup() -> None:
         init_db()
 
+    init_db()
+
     @app.get("/health", tags=["system"])
     def health() -> dict:
         return {
@@ -107,6 +112,30 @@ def create_app() -> FastAPI:
             "trading_mode": "monitor_only",
             "live_auto_trading": False,
         }
+
+    @app.get("/ready", tags=["system"])
+    def ready() -> dict:
+        return {"status": "ready"}
+
+    @app.get("/api/status", tags=["system"])
+    def root_api_status() -> dict:
+        return {"status": "ok", "versioned_status": "/api/v1/api/status", "docs": "/docs", "metrics": "/metrics"}
+
+    @app.get("/api/workers/status", tags=["system"])
+    def root_workers_status() -> RedirectResponse:
+        return RedirectResponse("/api/v1/workers/status")
+
+    @app.get("/api/calendar/status", tags=["system"])
+    def root_calendar_status() -> RedirectResponse:
+        return RedirectResponse("/api/v1/calendar/status")
+
+    @app.get("/api/news/status", tags=["system"])
+    def root_news_status() -> RedirectResponse:
+        return RedirectResponse("/api/v1/news/status")
+
+    @app.get("/api/config/status", tags=["system"])
+    def root_config_status() -> RedirectResponse:
+        return RedirectResponse("/api/v1/config/status")
 
     @app.get("/metrics", tags=["system"])
     def metrics() -> Response:

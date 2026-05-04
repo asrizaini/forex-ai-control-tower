@@ -48,15 +48,20 @@ class DashboardTest extends TestCase
             ]),
             'control-api.test/api/v1/telemetry/accounts/latest?limit=1' => Http::response([]),
             'control-api.test/api/v1/agent-theater/events?limit=8' => Http::response(['events' => []]),
+            'control-api.test/api/v1/api/status' => Http::response(['status' => 'ok', 'services' => ['api' => ['status' => 'ok']]]),
+            'control-api.test/api/v1/calendar/status' => Http::response(['status' => 'needs_configuration', 'events_count' => 0, 'sources' => []]),
+            'control-api.test/api/v1/news/status' => Http::response(['risk_status' => 'news_safe_mode', 'news_halt_active' => true]),
+            'control-api.test/api/v1/workers/status' => Http::response(['workers' => [['name' => 'Calendar Worker', 'worker_type' => 'calendar', 'status' => 'degraded']]]),
+            'control-api.test/api/v1/logs/audit?limit=8' => Http::response(['items' => []]),
         ]);
 
         $this->get('/')
             ->assertOk()
-            ->assertSee('Forex AI Control Tower')
-            ->assertSee('Laravel primary dashboard')
+            ->assertSee('Overview / Home')
+            ->assertSee('fx-control dashboard')
             ->assertSee('blocked')
             ->assertSee('Secure Login')
-            ->assertSee('EURUSD');
+            ->assertSee('Calendar Worker');
     }
 
     public function test_authenticated_admin_can_request_password_change(): void

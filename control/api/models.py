@@ -412,3 +412,177 @@ class TradeApproval(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class DataSourceConfig(Base):
+    __tablename__ = "data_source_configs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_id: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(160))
+    source_type: Mapped[str] = mapped_column(String(60), index=True)
+    provider: Mapped[str] = mapped_column(String(120), index=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    priority: Mapped[int] = mapped_column(Integer, default=100, index=True)
+    refresh_interval_minutes: Mapped[int] = mapped_column(Integer, default=60)
+    timeout_seconds: Mapped[int] = mapped_column(Integer, default=15)
+    retry_count: Mapped[int] = mapped_column(Integer, default=2)
+    backoff_seconds: Mapped[int] = mapped_column(Integer, default=30)
+    allowed_currencies: Mapped[list] = mapped_column(JSON, default=lambda: ["USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD", "XAU"])
+    allowed_impacts: Mapped[list] = mapped_column(JSON, default=lambda: ["high", "medium"])
+    date_range_mode: Mapped[str] = mapped_column(String(40), default="weekly")
+    timezone: Mapped[str] = mapped_column(String(80), default="Asia/Kuala_Lumpur")
+    config_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    last_status: Mapped[str] = mapped_column(String(60), default="never_run", index=True)
+    last_error: Mapped[str] = mapped_column(Text, default="")
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    last_failure_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class CalendarEvent(Base):
+    __tablename__ = "calendar_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_uid: Mapped[str] = mapped_column(String(160), unique=True, index=True)
+    source_id: Mapped[str] = mapped_column(String(120), index=True)
+    source: Mapped[str] = mapped_column(String(120), index=True)
+    event_time_utc: Mapped[datetime] = mapped_column(DateTime, index=True)
+    timezone: Mapped[str] = mapped_column(String(80), default="UTC")
+    currency: Mapped[str] = mapped_column(String(12), index=True)
+    impact: Mapped[str] = mapped_column(String(40), index=True)
+    event_name: Mapped[str] = mapped_column(String(240), index=True)
+    actual: Mapped[str] = mapped_column(String(120), default="")
+    forecast: Mapped[str] = mapped_column(String(120), default="")
+    previous: Mapped[str] = mapped_column(String(120), default="")
+    revised: Mapped[str] = mapped_column(String(120), default="")
+    detail_url: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(40), default="scheduled", index=True)
+    raw_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    normalized_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    snapshot_type: Mapped[str] = mapped_column(String(40), default="latest", index=True)
+    scraped_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class NewsItem(Base):
+    __tablename__ = "news_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    news_uid: Mapped[str] = mapped_column(String(160), unique=True, index=True)
+    source_id: Mapped[str] = mapped_column(String(120), index=True)
+    source: Mapped[str] = mapped_column(String(120), index=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    title: Mapped[str] = mapped_column(String(300), index=True)
+    summary: Mapped[str] = mapped_column(Text, default="")
+    url: Mapped[str] = mapped_column(Text, default="")
+    currencies: Mapped[list] = mapped_column(JSON, default=list)
+    symbols: Mapped[list] = mapped_column(JSON, default=list)
+    sentiment: Mapped[str] = mapped_column(String(40), default="unknown", index=True)
+    related_event_uid: Mapped[str | None] = mapped_column(String(160), nullable=True, index=True)
+    raw_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    normalized_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class AlertRule(Base):
+    __tablename__ = "alert_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    rule_id: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(160))
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    currencies: Mapped[list] = mapped_column(JSON, default=list)
+    impacts: Mapped[list] = mapped_column(JSON, default=list)
+    event_keywords: Mapped[list] = mapped_column(JSON, default=list)
+    exact_event_names: Mapped[list] = mapped_column(JSON, default=list)
+    weekdays: Mapped[list] = mapped_column(JSON, default=list)
+    sources: Mapped[list] = mapped_column(JSON, default=list)
+    trading_pairs: Mapped[list] = mapped_column(JSON, default=list)
+    minutes_before: Mapped[int] = mapped_column(Integer, default=45)
+    delivery_targets: Mapped[list] = mapped_column(JSON, default=lambda: ["dashboard"])
+    severity: Mapped[str] = mapped_column(String(40), default="warning", index=True)
+    fired_state_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_by: Mapped[str] = mapped_column(String(120), default="system", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class AlertDeliveryHistory(Base):
+    __tablename__ = "alert_delivery_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    delivery_id: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    rule_id: Mapped[str] = mapped_column(String(120), index=True)
+    event_uid: Mapped[str | None] = mapped_column(String(160), nullable=True, index=True)
+    target: Mapped[str] = mapped_column(String(120), index=True)
+    severity: Mapped[str] = mapped_column(String(40), index=True)
+    status: Mapped[str] = mapped_column(String(60), default="queued", index=True)
+    message: Mapped[str] = mapped_column(Text, default="")
+    error: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class WorkerStatus(Base):
+    __tablename__ = "worker_statuses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    worker_id: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(160))
+    worker_type: Mapped[str] = mapped_column(String(80), index=True)
+    status: Mapped[str] = mapped_column(String(60), default="stopped", index=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0)
+    error_count: Mapped[int] = mapped_column(Integer, default=0)
+    retry_count: Mapped[int] = mapped_column(Integer, default=0)
+    config_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    health_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class WorkerRun(Base):
+    __tablename__ = "worker_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    worker_id: Mapped[str] = mapped_column(String(120), index=True)
+    status: Mapped[str] = mapped_column(String(60), index=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str] = mapped_column(Text, default="")
+    result_json: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class AnalysisSnapshot(Base):
+    __tablename__ = "analysis_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    snapshot_id: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    analysis_type: Mapped[str] = mapped_column(String(60), index=True)
+    symbol: Mapped[str] = mapped_column(String(40), default="", index=True)
+    timeframe: Mapped[str] = mapped_column(String(20), default="", index=True)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(60), default="ok", index=True)
+    summary: Mapped[str] = mapped_column(Text, default="")
+    inputs_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    output_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    setting_key: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    setting_value: Mapped[str] = mapped_column(Text, default="")
+    value_type: Mapped[str] = mapped_column(String(40), default="string")
+    category: Mapped[str] = mapped_column(String(80), default="general", index=True)
+    updated_by: Mapped[str] = mapped_column(String(120), default="system", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
