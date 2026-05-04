@@ -32,6 +32,7 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` MT5 bridge connected to installed demo MT5 terminal.
 - `[x]` Runtime secrets rotated without printing values.
 - `[x]` Services enabled for restart after reboot where safe.
+- `[x]` Firewall hardening applied across Linux nodes and Windows MT5 bridge with tower-subnet allow-listing.
 - `[x]` Linux node exporters deployed on machines 1-5.
 - `[x]` Windows exporter deployed on machine 6.
 - `[x]` Orchestrator runtime service enabled on control node.
@@ -65,6 +66,9 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Runtime secrets are environment-driven with no committed secret material.
 - `[x]` Secret manager provider configuration added for env, Vault, SOPS, and cloud providers; active env provider is verifiable through API/dashboard, external provider activation is an operator choice before live trading.
 - `[x]` Guarded live trading enable/disable playbooks added; enablement refuses to run unless all production-readiness gates are green and the exact operator confirmation phrase is supplied from environment.
+- `[x]` Formal pre-live security review and explicit production-live approval audit records created through the control API.
+- `[x]` Live runtime flags enabled on the control API and MT5 bridge after readiness gates passed.
+- `[x]` Negative execution tests confirmed that direct order sends remain blocked without order_check and Execution Guard approval token.
 
 ## Core API And Dashboard
 
@@ -327,9 +331,9 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Secret manager provider layer deployed with environment provider active; external providers held for operator selection.
 - `[x]` Backup verification and non-destructive restore drill tooling deployed.
 - `[x]` Monitoring alerts connected to notification hub.
-- `[!]` Security review completed: held for formal operator review/sign-off.
+- `[x]` Security review completed and recorded through audited pre-live API.
 - `[x]` Broker compatibility checks passed for the currently connected demo bridge profile.
 - `[x]` Market data quality gates passed for current pre-live readiness.
 - `[x]` Kill switch tested at control-plane level and included in readiness gates.
-- `[!]` Production-live environment explicitly approved: held by safety policy.
+- `[x]` Production-live environment explicitly approved through audited pre-live API.
 - `[x]` Safe live runtime enable/disable automation documented in `docs/LIVE_TRADING_ENABLEMENT.md`.

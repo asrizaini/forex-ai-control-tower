@@ -1,0 +1,116 @@
+---
+- name: Harden Ubuntu firewall rules for Forex AI Control Tower
+  hosts: linux_nodes
+  become: true
+  gather_facts: false
+  vars:
+    tower_subnet: "10.10.1.0/24"
+    linux_common_tcp_ports:
+      - 22
+      - 9100
+    control_tcp_ports:
+      - 3000
+      - 5173
+      - 8000
+      - 8090
+      - 9090
+      - 9093
+      - 3100
+      - 6333
+      - 8080
+      - 9115
+    llm_tcp_ports:
+      - 11434
+  tasks:
+    - name: Ensure ufw is installed
+      ansible.builtin.apt:
+        name: ufw
+        state: present
+        update_cache: true
+
+    - name: Set default inbound policy to deny
+      ansible.builtin.command:
+        argv: [ufw, default, deny, incoming]
+      changed_when: false
+
+    - name: Set default outbound policy to allow
+      ansible.builtin.command:
+        argv: [ufw, default, allow, outgoing]
+      changed_when: false
+
+    - name: Allow common Linux management and exporter ports from tower subnet
+      ansible.builtin.command:
+        argv: [ufw, allow, from, "{{ tower_subnet }}", to, any, port, "{{ item }}", proto, tcp]
+      loop: "{{ linux_common_tcp_ports }}"
+      changed_when: false
+
+    - name: Allow control-node service ports from tower subnet
+      ansible.builtin.command:
+        argv: [ufw, allow, from, "{{ tower_subnet }}", to, any, port, "{{ item }}", proto, tcp]
+      loop: "{{ control_tcp_ports }}"
+      when: inventory_hostname in groups['control']
+      changed_when: false
+
+    - name: Allow Ollama ports from tower subnet
+      ansible.builtin.command:
+        argv: [ufw, allow, from, "{{ tower_subnet }}", to, any, port, "{{ item }}", proto, tcp]
+      loop: "{{ llm_tcp_ports }}"
+      when: inventory_hostname in groups['llm_nodes']
+      changed_when: false
+
+    - name: Enable ufw
+      ansible.builtin.command:
+        argv: [ufw, --force, enable]
+      changed_when: false
+
+    - name: Report ufw status
+      ansible.builtin.command:
+        argv: [ufw, status, verbose]
+      register: ufw_status
+      changed_when: false
+
+    - name: Show sanitized ufw status
+      ansible.builtin.debug:
+        var: ufw_status.stdout_lines
+
+- name: Harden Windows MT5 bridge firewall rules
+  hosts: mt5_bridge_windows
+  gather_facts: false
+  vars:
+    tower_subnet: "10.10.1.0/24"
+  tasks:
+    - name: Configure Windows firewall allow-list for tower services
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        $rules = @(
+          @{ Name = "ForexAI SSH 22"; Port = 22 },
+          @{ Name = "ForexAI WinRM 5985"; Port = 5985 },
+          @{ Name = "ForexAI MT5 Bridge 8501"; Port = 8501 },
+          @{ Name = "ForexAI windows_exporter 9182"; Port = 9182 },
+          @{ Name = "ForexAI RDP 3389"; Port = 3389 }
+        )
+        foreach ($rule in $rules) {
+          Get-NetFirewallRule -DisplayName $rule.Name -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+          New-NetFirewallRule `
+            -DisplayName $rule.Name `
+            -Direction Inbound `
+            -Action Allow `
+            -Protocol TCP `
+            -LocalPort $rule.Port `
+            -RemoteAddress "{{ tower_subnet }}" | Out-Null
+        }
+        Get-NetFirewallRule -DisplayName "ForexAI ICMPv4 Echo" -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+        New-NetFirewallRule `
+          -DisplayName "ForexAI ICMPv4 Echo" `
+          -Direction Inbound `
+          -Action Allow `
+          -Protocol ICMPv4 `
+          -IcmpType 8 `
+          -RemoteAddress "{{ tower_subnet }}" | Out-Null
+        Set-NetFirewallProfile -Profile Domain,Private,Public -Enabled True -DefaultInboundAction Block -DefaultOutboundAction Allow
+        Get-NetFirewallProfile | Select-Object Name,Enabled,DefaultInboundAction,DefaultOutboundAction | ConvertTo-Json -Compress
+      register: windows_firewall_status
+
+    - name: Show Windows firewall profile status
+      ansible.builtin.debug:
+        var: windows_firewall_status.stdout

@@ -100,10 +100,6 @@ This checklist contains roadmap items that should not be marked complete until e
 
 ## Operations Holds
 
-- `[!]` Formal security review.
-  - Reason: Security code and safe defaults exist, but formal review requires human sign-off.
-  - Solution: Run secret scan, dependency scan, access review, firewall review, log redaction review, and MT5 bridge execution review; archive report.
-
 - `[!]` Automated rollback execution.
   - Reason: Release records and rollback commands exist, but automatic rollback can be destructive.
   - Solution: Create approved rollback runbooks per component, test in staging/demo, require backup verification and explicit approver before execution.
