@@ -12,6 +12,7 @@ Route::get('/news', [DashboardController::class, 'news'])->name('dashboard.news'
 Route::get('/alert-rules', [DashboardController::class, 'alertRules'])->name('dashboard.alert-rules');
 Route::get('/workers', [DashboardController::class, 'workers'])->name('dashboard.workers');
 Route::get('/agent-theater', [DashboardController::class, 'agentTheater'])->name('dashboard.agent-theater');
+Route::get('/orchestrator-console', [DashboardController::class, 'orchestratorConsole'])->name('dashboard.orchestrator-console');
 Route::get('/technical-analysis', [DashboardController::class, 'technical'])->name('dashboard.technical');
 Route::get('/fundamental-analysis', [DashboardController::class, 'fundamental'])->name('dashboard.fundamental');
 Route::get('/monitoring', [DashboardController::class, 'monitoring'])->name('dashboard.monitoring');

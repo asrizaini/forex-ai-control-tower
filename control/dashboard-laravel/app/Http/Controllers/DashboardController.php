@@ -101,9 +101,27 @@ class DashboardController extends Controller
 
     public function agentTheater(Request $request): View
     {
+        $query = http_build_query(array_filter([
+            'limit' => $request->query('limit', 100),
+            'stream' => $request->query('stream'),
+            'language' => $request->query('language', 'en'),
+        ], fn ($value) => $value !== null && $value !== ''));
+        foreach ((array) $request->query('agent', []) as $agent) {
+            if ($agent !== '') {
+                $query .= ($query ? '&' : '') . 'agent=' . rawurlencode((string) $agent);
+            }
+        }
         return $this->render($request, 'pages.agent-theater', 'agent-theater', [
-            'events' => $this->client->get('/api/v1/agent-theater/events?limit=80', null, ['events' => [], 'modes' => []]),
+            'events' => $this->client->get('/api/v1/agent-theater/events' . ($query ? '?' . $query : ''), null, ['events' => [], 'modes' => [], 'agents' => [], 'streams' => []]),
             'modes' => $this->client->get('/api/v1/agent-theater/modes', null, ['modes' => []]),
+            'filters' => $request->query(),
+        ]);
+    }
+
+    public function orchestratorConsole(Request $request): View
+    {
+        return $this->render($request, 'pages.orchestrator-console', 'orchestrator-console', [
+            'events' => $this->client->get('/api/v1/agent-theater/events?limit=80&stream=Orchestrator%20Console&agent=Operator&agent=Orchestrator%20Agent', null, ['events' => []]),
         ]);
     }
 
@@ -348,9 +366,10 @@ class DashboardController extends Controller
             'message' => $validated['message'],
             'language' => $validated['language'],
             'session_id' => 'laravel-orchestrator-console',
+            'orchestrator_only' => true,
         ], $token);
 
-        return $this->redirectResponse($response, 'Orchestrator replied. The Agent Theater feed has been updated.', 'Orchestrator chat failed.');
+        return $this->redirectResponse($response, 'Orchestrator replied. The dedicated console feed has been updated.', 'Orchestrator chat failed.');
     }
 
     public function updateSetting(Request $request, string $settingKey): RedirectResponse

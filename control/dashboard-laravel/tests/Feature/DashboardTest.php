@@ -143,16 +143,18 @@ class DashboardTest extends TestCase
         config(['control_tower.api_url' => 'http://control-api.test']);
 
         Http::fake([
-            'control-api.test/api/v1/agent-theater/events?limit=80' => Http::response([
+            'control-api.test/api/v1/agent-theater/events?limit=100&language=en' => Http::response([
                 'events' => [[
                     'agent' => 'Orchestrator Agent',
-                    'stream' => 'Orchestrator Chat',
+                    'stream' => 'Boardroom Mode',
                     'summary' => 'The current fx-control time is 2026-05-04 23:18:25 Asia/Kuala_Lumpur.',
                     'timestamp' => '2026-05-04 23:18:25 Asia/Kuala_Lumpur',
                     'risk_status' => 'read_only_no_trade_execution',
                     'result' => 'safe_reply',
                 ]],
                 'modes' => ['Live Chat View'],
+                'agents' => ['Orchestrator Agent', 'Risk Manager'],
+                'streams' => ['Boardroom Mode'],
             ]),
             'control-api.test/api/v1/agent-theater/modes' => Http::response([
                 'modes' => [['name' => 'Live Chat View', 'description' => 'Human-readable room feed']],
@@ -161,9 +163,34 @@ class DashboardTest extends TestCase
 
         $this->get('/agent-theater')
             ->assertOk()
-            ->assertSee('Agent Theater / Orchestrator Console')
-            ->assertSee('Talk To Orchestrator')
+            ->assertSee('Agent Theater')
+            ->assertSee('Feed Filters')
+            ->assertSee('Open Orchestrator Console')
             ->assertSee('Asia/Kuala_Lumpur');
+    }
+
+    public function test_orchestrator_console_page_contains_dedicated_chat(): void
+    {
+        config(['control_tower.api_url' => 'http://control-api.test']);
+
+        Http::fake([
+            'control-api.test/api/v1/agent-theater/events?limit=80&stream=Orchestrator%20Console&agent=Operator&agent=Orchestrator%20Agent' => Http::response([
+                'events' => [[
+                    'agent' => 'Orchestrator Agent',
+                    'stream' => 'Orchestrator Console',
+                    'summary' => 'The current fx-control time is 2026-05-04 23:18:25 Asia/Kuala_Lumpur.',
+                    'timestamp' => '2026-05-04 23:18:25 Asia/Kuala_Lumpur',
+                    'risk_status' => 'read_only_no_trade_execution',
+                    'result' => 'safe_reply',
+                ]],
+            ]),
+        ]);
+
+        $this->get('/orchestrator-console')
+            ->assertOk()
+            ->assertSee('Orchestrator Console')
+            ->assertSee('Talk To Orchestrator')
+            ->assertSee('Operator Conversation');
     }
 
     public function test_authenticated_admin_can_send_orchestrator_chat(): void
@@ -185,6 +212,7 @@ class DashboardTest extends TestCase
         Http::assertSent(fn ($request) => $request->url() === 'http://control-api.test/api/v1/agent-theater/chat'
             && $request->method() === 'POST'
             && $request->hasHeader('Authorization', 'Bearer session-token')
-            && $request['session_id'] === 'laravel-orchestrator-console');
+            && $request['session_id'] === 'laravel-orchestrator-console'
+            && $request['orchestrator_only'] === true);
     }
 }

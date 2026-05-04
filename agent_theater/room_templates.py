@@ -1,11 +1,19 @@
 from __future__ import annotations
 
-import time
+from datetime import datetime
+import os
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 def _timestamp() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    timezone_name = os.getenv("APP_TIMEZONE") or os.getenv("TZ") or "Asia/Kuala_Lumpur"
+    try:
+        timezone = ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        timezone = ZoneInfo("Asia/Kuala_Lumpur")
+        timezone_name = "Asia/Kuala_Lumpur"
+    return f"{datetime.now(timezone).strftime('%Y-%m-%d %H:%M:%S')} {timezone_name}"
 
 
 def room_seed_events(room_name: str, session_id: str = "room-seed") -> list[dict[str, Any]]:

@@ -10,7 +10,7 @@ from ipaddress import ip_address, ip_network
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Header, HTTPException, Request, status
+from fastapi import APIRouter, Header, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -60,6 +60,7 @@ class OrchestratorChatIn(BaseModel):
     message: str = Field(min_length=1, max_length=800)
     language: str = Field(default="en", pattern="^(en|ms-MY|auto)$")
     session_id: str = Field(default="operator-console", max_length=80)
+    orchestrator_only: bool = False
 
 
 @router.get("")
@@ -392,21 +393,42 @@ def _queue_agent_task(session_id: str, message: str, language: str) -> str:
 
 
 @router.get("/events")
-def list_events(limit: int = 50, language: str = "en", stream: str | None = None) -> dict:
+def list_events(
+    limit: int = 50,
+    language: str = "en",
+    stream: str | None = None,
+    agent: list[str] | None = Query(default=None),
+) -> dict:
     event_log = _event_log_path()
     if not event_log.exists():
-        return {"events": [], "source": str(event_log), "modes": mode_names()}
-    lines = event_log.read_text(encoding="utf-8").splitlines()[-max(1, min(limit, 200)) :]
+        return {"events": [], "source": str(event_log), "modes": mode_names(), "agents": [], "streams": []}
+    lines = event_log.read_text(encoding="utf-8").splitlines()[-500:]
     events = []
+    agents = set()
+    streams = set()
+    selected_agents = set(agent or [])
     for line in lines:
         try:
             event = json.loads(line)
         except json.JSONDecodeError:
             continue
+        if event.get("agent"):
+            agents.add(str(event["agent"]))
+        if event.get("stream"):
+            streams.add(str(event["stream"]))
         if stream and event.get("stream") != stream:
             continue
+        if selected_agents and event.get("agent") not in selected_agents:
+            continue
         events.append(event)
-    return {"events": render_events(events, language), "source": str(event_log), "modes": mode_names()}
+    events = events[-max(1, min(limit, 200)) :]
+    return {
+        "events": render_events(events, language),
+        "source": str(event_log),
+        "modes": mode_names(),
+        "agents": sorted(agents),
+        "streams": sorted(streams),
+    }
 
 
 @router.get("/console", response_class=HTMLResponse)
@@ -494,7 +516,7 @@ def orchestrator_console() -> HTMLResponse:
     }
 
     async function loadEvents() {
-      const response = await fetch(`${apiBase}/api/v1/agent-theater/events?limit=40`);
+      const response = await fetch(`${apiBase}/api/v1/agent-theater/events?limit=40&stream=Orchestrator%20Console&agent=Operator&agent=Orchestrator%20Agent`);
       const body = await response.json();
       events = body.events || [];
       render();
@@ -505,7 +527,7 @@ def orchestrator_console() -> HTMLResponse:
       const response = await fetch(`${apiBase}/api/v1/agent-theater/chat`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({message, language: languageEl.value, session_id: 'grafana-orchestrator-console'})
+        body: JSON.stringify({message, language: languageEl.value, session_id: 'standalone-orchestrator-console', orchestrator_only: true})
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.detail || 'Chat failed');
@@ -547,9 +569,10 @@ def chat_with_orchestrator(
 
     safe_message = _safe_chat_text(payload.message)
     task_id = _queue_agent_task(payload.session_id, payload.message, payload.language)
+    stream_name = "Orchestrator Console" if payload.orchestrator_only else "Orchestrator Chat"
     operator_event = {
         "agent": "Operator",
-        "stream": "Orchestrator Chat",
+        "stream": stream_name,
         "summary": safe_message,
         "input_sources": ["Dashboard chat"],
         "result": "operator_message_received",
@@ -563,11 +586,12 @@ def chat_with_orchestrator(
     _append_event(redact(operator_event))
 
     reply, next_action = _orchestrator_reply(payload.message, payload.language)
-    for agent_event in _supporting_agent_events(payload.message, payload.language, payload.session_id):
-        _append_event(redact(agent_event))
+    if not payload.orchestrator_only:
+        for agent_event in _supporting_agent_events(payload.message, payload.language, payload.session_id):
+            _append_event(redact(agent_event))
     orchestrator_event = {
         "agent": "Orchestrator Agent",
-        "stream": "Orchestrator Chat",
+        "stream": stream_name,
         "summary": reply,
         "input_sources": ["Control plane status", "Execution Guard policy", "Agent Theater"],
         "result": "safe_reply",
@@ -582,7 +606,11 @@ def chat_with_orchestrator(
     _audit_chat(
         "orchestrator_chat",
         payload.session_id,
-        {"language": payload.language, "message_redacted": safe_message != " ".join(payload.message.strip().split())},
+        {
+            "language": payload.language,
+            "message_redacted": safe_message != " ".join(payload.message.strip().split()),
+            "orchestrator_only": payload.orchestrator_only,
+        },
     )
     return {"accepted": True, "reply": reply, "next_action": next_action, "task_id": task_id}
 

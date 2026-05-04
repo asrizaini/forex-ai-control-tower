@@ -65,6 +65,51 @@ def test_orchestrator_chat_reports_kuala_lumpur_time(monkeypatch, tmp_path):
     assert all("Asia/Kuala_Lumpur" in event["timestamp"] for event in events)
 
 
+def test_agent_theater_converts_legacy_z_timestamps_and_filters_agents(monkeypatch, tmp_path):
+    event_log = tmp_path / "events.jsonl"
+    event_log.write_text(
+        '{"agent":"Orchestrator Agent","stream":"Boardroom Mode","summary":"Legacy","timestamp":"2026-05-04T15:46:22Z"}\n'
+        '{"agent":"Risk Manager","stream":"Boardroom Mode","summary":"Risk","timestamp":"2026-05-04T15:47:22Z"}\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AGENT_THEATER_EVENT_LOG", str(event_log))
+    app = create_app()
+    client = TestClient(app)
+
+    response = client.get("/api/v1/agent-theater/events?stream=Boardroom%20Mode&agent=Orchestrator%20Agent")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["agents"] == ["Orchestrator Agent", "Risk Manager"]
+    assert len(body["events"]) == 1
+    assert body["events"][0]["agent"] == "Orchestrator Agent"
+    assert body["events"][0]["timestamp"] == "2026-05-04 23:46:22 Asia/Kuala_Lumpur"
+
+
+def test_orchestrator_only_chat_does_not_publish_supporting_agent_events(monkeypatch, tmp_path):
+    event_log = tmp_path / "events.jsonl"
+    monkeypatch.setenv("AGENT_THEATER_EVENT_LOG", str(event_log))
+    configure_database(f"sqlite:///{tmp_path / 'control_orchestrator_only.db'}")
+    init_db()
+    app = create_app()
+    client = TestClient(app, client=("10.10.1.50", 12345))
+
+    response = client.post(
+        "/api/v1/agent-theater/chat",
+        json={
+            "message": "Debate the next roadmap improvement step.",
+            "language": "en",
+            "session_id": "console-only",
+            "orchestrator_only": True,
+        },
+    )
+
+    assert response.status_code == 202
+    events = client.get("/api/v1/agent-theater/events?stream=Orchestrator%20Console").json()["events"]
+    assert [event["agent"] for event in events] == ["Operator", "Orchestrator Agent"]
+    assert {event["stream"] for event in events} == {"Orchestrator Console"}
+
+
 def test_orchestrator_chat_redacts_secret_like_text(monkeypatch, tmp_path):
     event_log = tmp_path / "events.jsonl"
     monkeypatch.setenv("AGENT_THEATER_EVENT_LOG", str(event_log))

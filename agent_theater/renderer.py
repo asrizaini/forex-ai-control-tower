@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from datetime import UTC, datetime
+import os
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from localization.locale_manager import normalize_language
 
@@ -55,12 +58,40 @@ STATUS_MAP_MS_MY = {
 }
 
 
+def _app_timezone() -> ZoneInfo:
+    try:
+        return ZoneInfo(os.getenv("APP_TIMEZONE") or os.getenv("TZ") or "Asia/Kuala_Lumpur")
+    except ZoneInfoNotFoundError:
+        return ZoneInfo("Asia/Kuala_Lumpur")
+
+
+def _display_timestamp(value: Any) -> str:
+    text = str(value or "")
+    if not text:
+        return text
+    if text.endswith("Z"):
+        try:
+            parsed = datetime.fromisoformat(text[:-1] + "+00:00")
+        except ValueError:
+            return text
+        return parsed.astimezone(_app_timezone()).strftime("%Y-%m-%d %H:%M:%S Asia/Kuala_Lumpur")
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return text
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(_app_timezone()).strftime("%Y-%m-%d %H:%M:%S Asia/Kuala_Lumpur")
+
+
 def render_event(event: dict[str, Any], language: str = "en") -> dict[str, Any]:
     normalized = normalize_language(language)
     if normalized == "auto":
         normalized = "en"
     labels = LABELS.get(normalized, LABELS["en"])
     rendered = deepcopy(event)
+    if "timestamp" in rendered:
+        rendered["timestamp"] = _display_timestamp(rendered["timestamp"])
     summary = str(event.get("summary", ""))
     next_action = str(event.get("next_action", ""))
     risk_status = str(event.get("risk_status", ""))
