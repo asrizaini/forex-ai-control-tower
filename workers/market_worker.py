@@ -89,15 +89,25 @@ def _news_status(symbol: str) -> dict[str, Any]:
     }
 
 
+def _enabled_symbols_from_control_plane() -> list[str]:
+    response = request_json("http://10.10.1.81:8000/api/v1/trading-pairs/enabled")
+    if not response.get("ok"):
+        return []
+    symbols = response.get("body", {}).get("symbols", [])
+    if not isinstance(symbols, list):
+        return []
+    return [str(symbol).upper().strip() for symbol in symbols if str(symbol).strip()]
+
+
 def run_market_worker_once() -> dict[str, Any]:
     health = bridge_health()
     symbols_response = bridge_symbols()
     available_symbols = symbols_response.get("body", {}).get("symbols", []) if symbols_response.get("ok") else []
-    watchlist = configured_watchlist()
-    selected_symbols = [symbol for symbol in watchlist if symbol in available_symbols]
-    if not selected_symbols and available_symbols:
-        selected_symbols = [str(available_symbols[0])]
-    snapshots = [_symbol_snapshot(symbol) for symbol in selected_symbols[:4]]
+    watchlist = _enabled_symbols_from_control_plane() or configured_watchlist()
+    available_lookup = {str(symbol).upper(): str(symbol) for symbol in available_symbols}
+    selected_symbols = [available_lookup[symbol] for symbol in watchlist if symbol in available_lookup]
+    skipped_symbols = [symbol for symbol in watchlist if symbol not in available_lookup]
+    snapshots = [_symbol_snapshot(symbol) for symbol in selected_symbols]
     news_statuses = {symbol: _news_status(symbol) for symbol in [item["symbol"] for item in snapshots]}
     data_quality = "fresh" if snapshots and all(item["feed_fresh"] for item in snapshots if item["tick_ok"]) else "limited"
     bridge_connected = bool(health.get("body", {}).get("mt5_connected")) if health.get("ok") else False
@@ -109,6 +119,10 @@ def run_market_worker_once() -> dict[str, Any]:
         "symbols_available_count": len(available_symbols),
         "watchlist": watchlist,
         "symbols_monitored": [item["symbol"] for item in snapshots],
+        "symbols_skipped": skipped_symbols,
+        "pairs_processed": len(snapshots),
+        "stale_pairs": sum(1 for item in snapshots if not item.get("feed_fresh")),
+        "failed_pairs": skipped_symbols,
         "snapshots": snapshots,
         "news_statuses": news_statuses,
         "data_quality": data_quality,

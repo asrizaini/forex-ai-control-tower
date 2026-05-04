@@ -3,8 +3,16 @@
 use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', [DashboardController::class, 'overview'])->name('dashboard');
+Route::get('/', [DashboardController::class, 'loginPage'])->name('dashboard');
 Route::get('/overview', [DashboardController::class, 'overview'])->name('dashboard.overview');
+Route::get('/trading-pairs', [DashboardController::class, 'tradingPairs'])->name('dashboard.trading-pairs');
+Route::get('/pair-summary', [DashboardController::class, 'pairSummary'])->name('dashboard.pair-summary');
+Route::get('/signals', [DashboardController::class, 'signals'])->name('dashboard.signals');
+Route::get('/strategy', [DashboardController::class, 'strategy'])->name('dashboard.strategy');
+Route::get('/candle-analysis', [DashboardController::class, 'candleAnalysis'])->name('dashboard.candle-analysis');
+Route::get('/trend-analysis', [DashboardController::class, 'trendAnalysis'])->name('dashboard.trend-analysis');
+Route::get('/risk-validation', [DashboardController::class, 'riskValidation'])->name('dashboard.risk-validation');
+Route::get('/testing', [DashboardController::class, 'testing'])->name('dashboard.testing');
 Route::get('/credentials', [DashboardController::class, 'credentials'])->name('dashboard.credentials');
 Route::get('/data-sources', [DashboardController::class, 'dataSources'])->name('dashboard.data-sources');
 Route::get('/calendar', [DashboardController::class, 'calendar'])->name('dashboard.calendar');
@@ -25,6 +33,10 @@ Route::get('/settings', [DashboardController::class, 'settings'])->name('dashboa
 Route::post('/login', [DashboardController::class, 'login'])->name('login');
 Route::post('/logout', [DashboardController::class, 'logout'])->name('logout');
 Route::post('/password', [DashboardController::class, 'updatePassword'])->name('password.update');
+Route::post('/trading-pairs', [DashboardController::class, 'createTradingPair'])->name('trading-pairs.create');
+Route::post('/trading-pairs/{symbol}', [DashboardController::class, 'updateTradingPair'])->name('trading-pairs.update');
+Route::post('/analysis/run', [DashboardController::class, 'runAnalysis'])->name('analysis.run');
+Route::post('/testing/backtests/run', [DashboardController::class, 'runBacktest'])->name('testing.backtests.run');
 Route::post('/credentials/discard-generated', [DashboardController::class, 'discardGeneratedCredential'])->name('credentials.discard-generated');
 Route::post('/credentials/{name}', [DashboardController::class, 'updateCredential'])->name('credentials.update');
 Route::post('/credentials/{name}/generate', [DashboardController::class, 'generateCredential'])->name('credentials.generate');

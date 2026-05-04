@@ -27,9 +27,9 @@
     .room-strip button{background:#162233;border-color:#2d4058;color:#cfdae8;font-size:12px;min-height:30px;padding:5px 8px}
     .feed-status{align-items:center;color:#90a3b8;display:flex;font-size:12px;gap:10px;justify-content:space-between}
     .compact-feed{background:#0b1119;border:1px solid #233044;border-radius:8px;display:grid;max-height:calc(100vh - 360px);min-height:480px;overflow:auto}
-    .feed-row{border-bottom:1px solid #1c2a3a;display:grid;gap:10px;grid-template-columns:170px minmax(0,1fr) 180px;padding:9px 12px}
+    .feed-row{border-bottom:1px solid #1c2a3a;display:grid;gap:14px;grid-template-columns:230px minmax(0,1fr) 190px;padding:9px 12px}
     .feed-row:hover{background:#111a26}
-    .feed-agent{color:#76e1cd;font-weight:850;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .feed-agent{color:#76e1cd;font-weight:850;line-height:1.2;white-space:normal}
     .feed-room{color:#8fa3ba;font-size:12px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .feed-summary{color:#e6edf6;font-size:13px;line-height:1.35}
     .feed-next{color:#9fb0c4;font-size:12px;line-height:1.35;margin-top:3px}

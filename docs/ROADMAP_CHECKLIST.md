@@ -89,7 +89,13 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Refresh token flow.
 - `[x]` Service API key management.
 - `[x]` Laravel operator dashboard scaffold deployed for readiness, account/market status, and pre-live gate visibility.
-- `[!]` Laravel write-side approval forms; dashboard is intentionally read-first until authenticated audited POST workflows are expanded through FastAPI.
+- `[x]` Login-first Laravel dashboard shell; unauthenticated users only see secure login.
+- `[x]` Protected multi-page dashboard navigation for Overview, Trading Pairs, Pair Summary, Signals, Strategy, Technical Analysis, Fundamental Analysis, Candle Analysis, Trend Analysis, Risk Validation, Testing/Backtesting, Workers/Agents, Logs, and Settings.
+- `[x]` Trading pair enable/disable, timeframe, and strategy assignment UI.
+- `[x]` Pair summary dashboard with freshness, candle, trend, bias, signal, fundamental, and risk summaries.
+- `[x]` Signal dashboard with monitor-only generated signal records across all enabled pairs.
+- `[x]` Testing/backtesting dashboard with pair, timeframe, strategy, and date-range inputs.
+- `[~]` Laravel write-side approval forms; pair management, analysis run, backtest run, worker actions, credentials, and data-source saves are wired; trade approval UX remains held until notification and demo approval workflow finalization.
 
 ## Main Orchestrator And Agents
 
@@ -118,6 +124,8 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Agent state persistence.
 - `[x]` Agent permissions and tool policy enforcement.
 - `[x]` Production orchestrator decision loop for health, task routing, and safe agent workflow orchestration; executable trading remains approval-gated under Execution Guard/Risk sections.
+- `[x]` Signal, Strategy, Technical Analysis, Fundamental Analysis, Market Analysis, Pair Summary, Candle Analysis, Trend Detection, Risk Validation, and Testing/Backtesting agents now expose running/ready state through worker status and dashboard/API summaries.
+- `[x]` Notification Agent remains clearly marked `waiting_channels` until notification credentials and delivery tests are configured.
 
 ## Agent Theater / AI Trading Room
 
@@ -190,7 +198,8 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Governance modules scaffolded.
 - `[x]` Real JSON strategy plugin loader.
 - `[x]` Strategy database.
-- `[!]` Strategy approval workflow UI; API workflow and audit records are wired, richer dashboard controls are held for the next dashboard UX pass.
+- `[x]` Strategy summary UI showing enabled state, lifecycle, assigned pairs, validation status, and performance summary.
+- `[~]` Strategy approval workflow UI; API workflow, audit records, summary, and pair assignment are wired, but full promotion forms remain held for governance-specific workflow design.
 - `[x]` User/account/environment strategy permissions.
 - `[x]` Backtest status gate defined in promotion workflow and demo validation report.
 - `[x]` Forward test status gate defined in promotion workflow and demo validation report.
@@ -202,7 +211,8 @@ This checklist tracks the original full-system prompt. The current deployment is
 
 - `[x]` Backtest, forward-test, and tuning route skeletons with persistent job records.
 - `[x]` Agent skeletons.
-- `[!]` Backtest engine; deterministic mock-safe scoring and historical candle storage are wired, full historical execution engine is held pending data depth and strategy rules.
+- `[x]` Dashboard-triggered backtest run with pair, timeframe, strategy, and date range.
+- `[~]` Backtest engine; deterministic monitor-safe scoring and historical candle storage are wired, full historical execution engine remains held pending deeper broker-quality historical data and strategy rule implementation.
 - `[x]` Historical candle storage from market telemetry.
 - `[x]` Forward-test scheduler records.
 - `[!]` Walk-forward validation placeholder; validation execution is held pending historical data depth.
@@ -218,12 +228,19 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Market data quality checker scaffold and API analysis binding.
 - `[x]` Broker compatibility checker scaffold.
 - `[x]` Real candle/tick collector through MT5 bridge snapshots with durable candle storage.
+- `[x]` Control-plane trading-pair registry; market worker now reads enabled pairs from API/database instead of hardcoded EURUSD/default fallback.
+- `[x]` Multi-pair processing verified for EURUSD, GBPUSD, USDJPY, and XAUUSD.
+- `[x]` Disabled pairs are visible and skipped instead of silently missing.
+- `[x]` Stale candle, stale trend, stale signal, missing candle, and missing data indicators exposed through pair summaries.
+- `[x]` Candle analysis includes direction, body, upper/lower wick, doji/indecision, rejection, engulfing, momentum, breakout, missing, stale, and age checks.
+- `[x]` Bullish/bearish/neutral/conflicting/stale/blocked/missing pair buckets exposed through API and dashboard.
 - `[x]` Technical indicator engine with SMA, EMA, RSI, ATR, MACD, and Bollinger Band calculations from MT5 candle snapshots.
 - `[x]` Multi-timeframe analyzer over persisted market snapshots.
 - `[x]` Price action detector scaffold over latest market snapshot.
 - `[x]` Spread/slippage monitor over persisted telemetry.
 - `[x]` News/fundamental adapter implemented with reviewed JSON file and HTTPS JSON provider modes.
 - `[x]` External news provider activation through FMP economic calendar with `NEWS_PROVIDER_API_KEY`.
+- `[x]` Free Forex Factory JSON/XML/CSV fallback keeps News Agent operational when FMP is rate-limited.
 - `[x]` High-impact news halt logic defaults to safe halt unless provider is enabled and clear.
 - `[!]` Stale feed detection available in market analysis and Execution Guard inputs; automatic execution-time binding is held pending demo execution workflow.
 

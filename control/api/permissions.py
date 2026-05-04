@@ -8,6 +8,7 @@ ROLE_PERMISSIONS = {
         "trades:approve",
         "risk:write",
         "system:halt",
+        "system:write",
         "audit:read",
         "agents:write",
         "deployment:write",

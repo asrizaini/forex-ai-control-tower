@@ -57,10 +57,17 @@ class DashboardTest extends TestCase
 
         $this->get('/')
             ->assertOk()
+            ->assertSee('Secure Login')
+            ->assertDontSee('Calendar Worker');
+
+        $this->withSession([
+            'control_tower_token' => 'session-token',
+            'control_tower_user' => 'admin',
+        ])->get('/overview')
+            ->assertOk()
             ->assertSee('Overview / Home')
             ->assertSee('fx-control dashboard')
             ->assertSee('blocked')
-            ->assertSee('Secure Login')
             ->assertSee('Calendar Worker');
     }
 
@@ -161,7 +168,10 @@ class DashboardTest extends TestCase
             ]),
         ]);
 
-        $this->get('/agent-theater')
+        $this->withSession([
+            'control_tower_token' => 'session-token',
+            'control_tower_user' => 'admin',
+        ])->get('/agent-theater')
             ->assertOk()
             ->assertSee('Agent Theater')
             ->assertSee('Refresh')
@@ -203,7 +213,10 @@ class DashboardTest extends TestCase
             ]),
         ]);
 
-        $this->get('/orchestrator-console')
+        $this->withSession([
+            'control_tower_token' => 'session-token',
+            'control_tower_user' => 'admin',
+        ])->get('/orchestrator-console')
             ->assertOk()
             ->assertSee('Orchestrator Console')
             ->assertSee('Talk To Orchestrator')

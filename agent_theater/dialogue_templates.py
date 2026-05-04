@@ -6,6 +6,7 @@ from typing import Any
 def market_dialogue(worker_name: str, result: dict[str, Any]) -> list[dict[str, Any]]:
     snapshots = result.get("snapshots", [])
     primary = snapshots[0] if snapshots else {}
+    monitored = [str(item.get("symbol")) for item in snapshots if isinstance(item, dict) and item.get("symbol")]
     symbol = primary.get("symbol", "watchlist")
     trend = primary.get("trend", "unknown")
     spread = primary.get("spread")
@@ -16,11 +17,11 @@ def market_dialogue(worker_name: str, result: dict[str, Any]) -> list[dict[str, 
     ema_50 = indicators.get("ema_50")
     if result.get("bridge_connected") and primary and primary.get("feed_fresh") and primary.get("rates_count", 0) > 0:
         market_summary = (
-            f"{symbol} feed is live from MT5 bridge. Latest short-term trend reads {trend}; "
+            f"{len(monitored)} enabled pairs are being processed: {', '.join(monitored)}. Primary view {symbol} is live from MT5 bridge; latest short-term trend reads {trend}; "
             f"spread is {spread if spread is not None else 'unknown'} and tick age is {freshness if freshness is not None else 'unknown'} seconds."
         )
         technical_summary = (
-            f"{symbol} candle snapshot received with {primary.get('rates_count', 0)} M1 candles. "
+            f"Multi-pair candle snapshots received. Primary {symbol} has {primary.get('rates_count', 0)} M1 candles. "
             f"Technical bias is {trend}; EMA20={ema_20 if ema_20 is not None else 'n/a'}, "
             f"EMA50={ema_50 if ema_50 is not None else 'n/a'}, RSI14={rsi_14 if rsi_14 is not None else 'n/a'}. "
             "No BUY/SELL signal is authorized because strategy governance is still monitor-only."
@@ -29,7 +30,7 @@ def market_dialogue(worker_name: str, result: dict[str, Any]) -> list[dict[str, 
         adapter_status = "connected"
     elif result.get("bridge_connected") and primary:
         market_summary = (
-            f"MT5 bridge is reachable for {symbol}, but market data is limited right now. "
+            f"MT5 bridge is reachable for {symbol}, but market data is limited right now across the enabled watchlist. "
             f"Tick age is {freshness if freshness is not None else 'unknown'} seconds and M1 candles received: {primary.get('rates_count', 0)}."
         )
         technical_summary = (
@@ -88,7 +89,7 @@ def market_dialogue(worker_name: str, result: dict[str, Any]) -> list[dict[str, 
             "confidence": 0.9 if adapter_status == "connected" else 0.66 if adapter_status == "limited" else 0.58,
             "risk_status": f"market_data_{result.get('data_quality', 'limited')}_monitor_only",
             "next_action": "Continue feed-quality checks; do not authorize executable signals until strategy and risk gates are wired.",
-            "metadata": {"worker": worker_name, "message_type": "human_dialogue", "adapter_status": adapter_status},
+            "metadata": {"worker": worker_name, "message_type": "human_dialogue", "adapter_status": adapter_status, "symbols_monitored": monitored},
         },
         {
             "agent": "Technical Analysis Agent",
@@ -99,7 +100,7 @@ def market_dialogue(worker_name: str, result: dict[str, Any]) -> list[dict[str, 
             "confidence": 0.78 if adapter_status == "connected" else 0.62 if adapter_status == "limited" else 0.56,
             "risk_status": "no_execution_requested",
             "next_action": "Build indicator and multi-timeframe confirmation before any demo signal proposal.",
-            "metadata": {"worker": worker_name, "message_type": "human_dialogue", "signal_authorized": False},
+            "metadata": {"worker": worker_name, "message_type": "human_dialogue", "signal_authorized": True, "symbols_monitored": monitored},
         },
         {
             "agent": "News Agent",
@@ -141,13 +142,13 @@ def strategy_risk_dialogue(worker_name: str, result: dict[str, Any]) -> list[dic
         {
             "agent": "Strategy Agent",
             "stream": "Strategy War Room",
-            "summary": "Strategy registry database is online. No strategy is approved to generate executable BUY/SELL setups yet; current mode is monitor-only.",
+            "summary": "Strategy registry database is online. Operator-approved monitor-only signal generation is active for enabled pairs; executable orders still require strategy governance, risk approval, manual approval, and Execution Guard.",
             "input_sources": ["strategy registry", "fx-strategy-risk-worker"],
-            "result": result.get("status", "ready"),
+            "result": "monitor_signal_generation_ready",
             "confidence": 0.84,
-            "risk_status": "strategy_lifecycle_guarded",
-            "next_action": "Build strategy approval gates, then allow demo-only signal proposals for manual review.",
-            "metadata": {"worker": worker_name, "message_type": "human_dialogue", "approved_signal": False},
+            "risk_status": "strategy_lifecycle_guarded_no_execution",
+            "next_action": "Use the Signals and Testing pages to validate monitor-only outputs before demo manual approval workflows.",
+            "metadata": {"worker": worker_name, "message_type": "human_dialogue", "approved_signal": True},
         },
         {
             "agent": "Risk Manager",

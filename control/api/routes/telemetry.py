@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 from ..control_schemas import AccountSnapshotOut, HistoricalCandleOut, MarketSnapshotOut, WorkerTelemetryIn
 from ..db import get_db
-from ..models import AccountSnapshot, HistoricalCandle, MarketSnapshot
+from ..models import AccountSnapshot, HistoricalCandle, MarketSnapshot, TradingPair
 from market_data_quality.analysis import multi_timeframe_summary, price_action_summary, spread_slippage_summary
 
 router = APIRouter(prefix="/telemetry", tags=["telemetry"])
@@ -130,6 +130,11 @@ def _persist_market_snapshots(db: Session, worker: str, result: dict[str, Any]) 
                 payload_json=item,
             )
         )
+        pair = db.scalar(select(TradingPair).where(TradingPair.symbol == symbol))
+        if pair:
+            pair.last_processed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            pair.status = "processed" if item.get("feed_fresh", False) else "processed_stale"
+            pair.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         count += 1
         candle_count += _persist_historical_candles(db, symbol, item)
     return count, candle_count

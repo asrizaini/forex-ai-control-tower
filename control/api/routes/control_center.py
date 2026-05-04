@@ -21,6 +21,8 @@ from ..models import (
     DataSourceConfig,
     NewsItem,
     SystemSetting,
+    TradingPair,
+    SignalRecord,
     WorkerRun,
     WorkerStatus,
 )
@@ -224,6 +226,9 @@ def _refresh_worker_runtime_status(db: Session) -> None:
         news = {"provider_enabled": False, "provider_error": type(exc).__name__, "events_count": 0, "risk_status": "news_safe_mode"}
 
     news_ready = bool(news.get("provider_enabled")) and not news.get("provider_error") and int(news.get("events_count") or 0) > 0
+    enabled_pairs = db.scalar(select(func.count()).select_from(TradingPair).where(TradingPair.enabled.is_(True))) or 0
+    latest_signals = db.scalar(select(func.count()).select_from(SignalRecord)) or 0
+    stale_pairs = db.scalar(select(func.count()).select_from(TradingPair).where(TradingPair.enabled.is_(True), TradingPair.status.ilike("%stale%"))) or 0
     status_updates = {
         "news_worker": (
             "running" if news_ready else "degraded",
@@ -250,12 +255,15 @@ def _refresh_worker_runtime_status(db: Session) -> None:
             },
         ),
         "technical_analysis_worker": (
-            "ready",
-            {"note": "Technical analysis runtime is ready; market worker supplies candle context and news risk overlay."},
+            "running" if enabled_pairs else "waiting_pairs",
+            {"note": "Technical analysis runtime processes enabled pairs with candle, trend, and news risk overlay.", "enabled_pairs": enabled_pairs, "stale_pairs": stale_pairs},
         ),
         "risk_analysis_worker": ("ready", {"note": "Risk analysis rules are active in monitor-only mode."}),
         "data_validation_worker": ("ready", {"note": "Data validation gates are active for market/news quality checks."}),
-        "signal_generation_worker": ("blocked_by_governance", {"note": "Signal generation remains blocked until strategy governance and demo validation are complete."}),
+        "signal_generation_worker": (
+            "running" if enabled_pairs else "waiting_pairs",
+            {"note": "Operator approved demo signal generation. Signals remain monitor-only and cannot execute without approval and Execution Guard.", "enabled_pairs": enabled_pairs, "signal_records": latest_signals},
+        ),
         "notification_worker": ("waiting_channels", {"note": "Notification worker requires configured Telegram/WhatsApp/email/mobile credentials before delivery."}),
     }
     for worker_id, (status, health) in status_updates.items():

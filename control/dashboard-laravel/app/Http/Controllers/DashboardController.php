@@ -14,6 +14,15 @@ class DashboardController extends Controller
     {
     }
 
+    public function loginPage(Request $request): View|RedirectResponse
+    {
+        if ($request->session()->get('control_tower_token')) {
+            return redirect()->route('dashboard.overview');
+        }
+
+        return $this->render($request, 'pages.login', 'login');
+    }
+
     public function overview(Request $request): View
     {
         return $this->render($request, 'pages.overview', 'overview', [
@@ -23,8 +32,75 @@ class DashboardController extends Controller
             'calendarStatus' => $this->client->get('/api/v1/calendar/status', null, ['status' => 'unavailable', 'sources' => []]),
             'newsStatus' => $this->client->get('/api/v1/news/status', null, ['risk_status' => 'unavailable']),
             'workers' => $this->client->get('/api/v1/workers/status', null, ['workers' => []]),
+            'pairSummaries' => $this->client->get('/api/v1/pair-summaries', null, ['items' => [], 'summary' => []]),
+            'signals' => $this->client->get('/api/v1/signals/summary', null, ['items' => [], 'summary' => []]),
             'readiness' => $this->client->get('/api/v1/system/production-readiness', null, []),
             'auditLogs' => $this->client->get('/api/v1/logs/audit?limit=8', null, ['items' => []]),
+        ]);
+    }
+
+    public function tradingPairs(Request $request): View
+    {
+        return $this->render($request, 'pages.trading-pairs', 'trading-pairs', [
+            'pairs' => $this->client->get('/api/v1/trading-pairs', null, ['items' => []]),
+            'strategies' => $this->client->get('/api/v1/strategies/summary', null, ['items' => []]),
+        ]);
+    }
+
+    public function pairSummary(Request $request): View
+    {
+        return $this->render($request, 'pages.pair-summary', 'pair-summary', [
+            'summaries' => $this->client->get('/api/v1/pair-summaries', null, ['items' => [], 'summary' => []]),
+        ]);
+    }
+
+    public function signals(Request $request): View
+    {
+        return $this->render($request, 'pages.signals', 'signals', [
+            'signals' => $this->client->get('/api/v1/signals/summary', null, ['items' => [], 'summary' => []]),
+            'records' => $this->client->get('/api/v1/signals/records?limit=100', null, ['items' => []]),
+        ]);
+    }
+
+    public function strategy(Request $request): View
+    {
+        return $this->render($request, 'pages.strategy', 'strategy', [
+            'strategies' => $this->client->get('/api/v1/strategies/summary', null, ['items' => []]),
+            'plugins' => $this->client->get('/api/v1/strategies/plugins', null, ['plugins' => []]),
+        ]);
+    }
+
+    public function candleAnalysis(Request $request): View
+    {
+        return $this->render($request, 'pages.pair-analysis', 'candle-analysis', [
+            'title' => 'Candle Analysis',
+            'analysisKey' => 'candle_analysis',
+            'summaries' => $this->client->get('/api/v1/pair-summaries', null, ['items' => [], 'summary' => []]),
+        ]);
+    }
+
+    public function trendAnalysis(Request $request): View
+    {
+        return $this->render($request, 'pages.pair-analysis', 'trend-analysis', [
+            'title' => 'Trend Analysis',
+            'analysisKey' => 'trend_analysis',
+            'summaries' => $this->client->get('/api/v1/pair-summaries', null, ['items' => [], 'summary' => []]),
+        ]);
+    }
+
+    public function riskValidation(Request $request): View
+    {
+        return $this->render($request, 'pages.risk-validation', 'risk-validation', [
+            'summaries' => $this->client->get('/api/v1/pair-summaries', null, ['items' => [], 'summary' => []]),
+        ]);
+    }
+
+    public function testing(Request $request): View
+    {
+        return $this->render($request, 'pages.testing', 'testing', [
+            'pairs' => $this->client->get('/api/v1/trading-pairs', null, ['items' => []]),
+            'strategies' => $this->client->get('/api/v1/strategies/summary', null, ['items' => []]),
+            'backtests' => $this->client->get('/api/v1/testing/backtests', null, ['items' => []]),
         ]);
     }
 
@@ -229,6 +305,45 @@ class DashboardController extends Controller
         return $this->redirectResponse($response, 'Admin password updated. Sign out and back in with the new password when ready.', 'Password update failed.');
     }
 
+    public function createTradingPair(Request $request): RedirectResponse
+    {
+        $token = $this->requireToken($request);
+        $payload = $this->tradingPairPayload($request);
+        $response = $this->client->post('/api/v1/trading-pairs', $payload, $token);
+
+        return $this->redirectResponse($response, 'Trading pair added.', 'Trading pair create failed.');
+    }
+
+    public function updateTradingPair(Request $request, string $symbol): RedirectResponse
+    {
+        $token = $this->requireToken($request);
+        $payload = $this->tradingPairPayload($request);
+        $response = $this->client->put('/api/v1/trading-pairs/' . rawurlencode($symbol), $payload, $token);
+
+        return $this->redirectResponse($response, 'Trading pair saved.', 'Trading pair update failed.');
+    }
+
+    public function runAnalysis(Request $request): RedirectResponse
+    {
+        $response = $this->client->post('/api/v1/analysis/run', [], $this->requireToken($request));
+        return $this->redirectResponse($response, 'Analysis and monitor-only signal generation completed.', 'Analysis run failed.');
+    }
+
+    public function runBacktest(Request $request): RedirectResponse
+    {
+        $token = $this->requireToken($request);
+        $payload = $request->validate([
+            'symbol' => ['required', 'string', 'max:40'],
+            'timeframe' => ['required', 'string', 'max:20'],
+            'strategy_id' => ['required', 'string', 'max:100'],
+            'date_from' => ['nullable', 'string', 'max:40'],
+            'date_to' => ['nullable', 'string', 'max:40'],
+        ]);
+        $response = $this->client->post('/api/v1/testing/backtests/run', $payload, $token);
+
+        return $this->redirectResponse($response, 'Backtest completed.', 'Backtest failed.');
+    }
+
     public function updateCredential(Request $request, string $name): RedirectResponse
     {
         $token = $this->requireToken($request);
@@ -409,9 +524,16 @@ class DashboardController extends Controller
 
     private function render(Request $request, string $view, string $active, array $data = []): View
     {
+        $authenticated = (bool) $request->session()->get('control_tower_token');
+        if (! $authenticated && $active !== 'login') {
+            $view = 'pages.login';
+            $active = 'login';
+            $data = [];
+        }
+
         return view($view, array_merge($data, [
             'active' => $active,
-            'authenticated' => (bool) $request->session()->get('control_tower_token'),
+            'authenticated' => $authenticated,
             'userId' => $request->session()->get('control_tower_user'),
             'links' => [
                 'api' => config('control_tower.api_url'),
@@ -419,6 +541,26 @@ class DashboardController extends Controller
                 'grafana' => config('control_tower.grafana_url'),
             ],
         ]));
+    }
+
+    private function tradingPairPayload(Request $request): array
+    {
+        $validated = $request->validate([
+            'symbol' => ['required', 'string', 'max:40'],
+            'display_name' => ['nullable', 'string', 'max:80'],
+            'enabled' => ['nullable', 'string'],
+            'default_timeframe' => ['required', 'string', 'max:20'],
+            'assigned_strategy_id' => ['nullable', 'string', 'max:100'],
+        ]);
+        return [
+            'symbol' => strtoupper(trim($validated['symbol'])),
+            'display_name' => $validated['display_name'] ?: strtoupper(trim($validated['symbol'])),
+            'enabled' => $request->boolean('enabled'),
+            'default_timeframe' => strtoupper($validated['default_timeframe']),
+            'assigned_strategy_id' => $validated['assigned_strategy_id'] ?: null,
+            'status' => $request->boolean('enabled') ? 'enabled' : 'disabled',
+            'metadata_json' => [],
+        ];
     }
 
     private function agentTheaterQuery(Request $request): string

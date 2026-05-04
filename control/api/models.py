@@ -224,6 +224,44 @@ class HistoricalCandle(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
 
+class TradingPair(Base):
+    __tablename__ = "trading_pairs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    symbol: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    display_name: Mapped[str] = mapped_column(String(80), default="")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    default_timeframe: Mapped[str] = mapped_column(String(20), default="M1", index=True)
+    assigned_strategy_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(60), default="configured", index=True)
+    last_processed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class SignalRecord(Base):
+    __tablename__ = "signal_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    signal_id: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    symbol: Mapped[str] = mapped_column(String(40), index=True)
+    timeframe: Mapped[str] = mapped_column(String(20), default="M1", index=True)
+    direction: Mapped[str] = mapped_column(String(20), default="hold", index=True)
+    confidence: Mapped[float] = mapped_column(Float, default=0.0, index=True)
+    signal_status: Mapped[str] = mapped_column(String(60), default="no_signal", index=True)
+    freshness_status: Mapped[str] = mapped_column(String(60), default="unknown", index=True)
+    strategy_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    entry_idea: Mapped[str] = mapped_column(Text, default="")
+    stop_loss_idea: Mapped[str] = mapped_column(Text, default="")
+    take_profit_idea: Mapped[str] = mapped_column(Text, default="")
+    reason: Mapped[str] = mapped_column(Text, default="")
+    blockers: Mapped[list] = mapped_column(JSON, default=list)
+    risk_notes: Mapped[str] = mapped_column(Text, default="")
+    analysis_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
 class AccountSnapshot(Base):
     __tablename__ = "account_snapshots"
 
