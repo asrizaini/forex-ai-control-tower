@@ -99,6 +99,14 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function agentTheater(Request $request): View
+    {
+        return $this->render($request, 'pages.agent-theater', 'agent-theater', [
+            'events' => $this->client->get('/api/v1/agent-theater/events?limit=80', null, ['events' => [], 'modes' => []]),
+            'modes' => $this->client->get('/api/v1/agent-theater/modes', null, ['modes' => []]),
+        ]);
+    }
+
     public function technical(Request $request): View
     {
         return $this->render($request, 'pages.analysis', 'technical', [
@@ -327,6 +335,22 @@ class DashboardController extends Controller
     {
         $response = $this->client->post('/api/v1/workers/' . rawurlencode($workerId) . '/' . rawurlencode($action), [], $this->requireToken($request));
         return $this->redirectResponse($response, 'Worker action queued.', 'Worker action failed.');
+    }
+
+    public function sendOrchestratorChat(Request $request): RedirectResponse
+    {
+        $token = $this->requireToken($request);
+        $validated = $request->validate([
+            'message' => ['required', 'string', 'min:1', 'max:800'],
+            'language' => ['required', 'string', 'in:en,ms-MY,auto'],
+        ]);
+        $response = $this->client->post('/api/v1/agent-theater/chat', [
+            'message' => $validated['message'],
+            'language' => $validated['language'],
+            'session_id' => 'laravel-orchestrator-console',
+        ], $token);
+
+        return $this->redirectResponse($response, 'Orchestrator replied. The Agent Theater feed has been updated.', 'Orchestrator chat failed.');
     }
 
     public function updateSetting(Request $request, string $settingKey): RedirectResponse

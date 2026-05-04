@@ -11,6 +11,7 @@ Route::get('/calendar', [DashboardController::class, 'calendar'])->name('dashboa
 Route::get('/news', [DashboardController::class, 'news'])->name('dashboard.news');
 Route::get('/alert-rules', [DashboardController::class, 'alertRules'])->name('dashboard.alert-rules');
 Route::get('/workers', [DashboardController::class, 'workers'])->name('dashboard.workers');
+Route::get('/agent-theater', [DashboardController::class, 'agentTheater'])->name('dashboard.agent-theater');
 Route::get('/technical-analysis', [DashboardController::class, 'technical'])->name('dashboard.technical');
 Route::get('/fundamental-analysis', [DashboardController::class, 'fundamental'])->name('dashboard.fundamental');
 Route::get('/monitoring', [DashboardController::class, 'monitoring'])->name('dashboard.monitoring');
@@ -32,5 +33,6 @@ Route::post('/calendar/scrape', [DashboardController::class, 'scrapeCalendar'])-
 Route::post('/alert-rules/{ruleId}', [DashboardController::class, 'updateAlertRule'])->name('alert-rules.update');
 Route::post('/alert-rules/{ruleId}/test', [DashboardController::class, 'testAlertRule'])->name('alert-rules.test');
 Route::post('/workers/{workerId}/{action}', [DashboardController::class, 'workerAction'])->name('workers.action');
+Route::post('/agent-theater/chat', [DashboardController::class, 'sendOrchestratorChat'])->name('agent-theater.chat');
 Route::post('/settings/{settingKey}', [DashboardController::class, 'updateSetting'])->name('settings.update');
 Route::post('/analysis/{analysisType}/seed', [DashboardController::class, 'seedAnalysis'])->name('analysis.seed');

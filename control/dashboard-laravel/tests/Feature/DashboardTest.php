@@ -137,4 +137,54 @@ class DashboardTest extends TestCase
             && $request->method() === 'PUT'
             && $request->hasHeader('Authorization', 'Bearer session-token'));
     }
+
+    public function test_agent_theater_page_renders_chatroom(): void
+    {
+        config(['control_tower.api_url' => 'http://control-api.test']);
+
+        Http::fake([
+            'control-api.test/api/v1/agent-theater/events?limit=80' => Http::response([
+                'events' => [[
+                    'agent' => 'Orchestrator Agent',
+                    'stream' => 'Orchestrator Chat',
+                    'summary' => 'The current fx-control time is 2026-05-04 23:18:25 Asia/Kuala_Lumpur.',
+                    'timestamp' => '2026-05-04 23:18:25 Asia/Kuala_Lumpur',
+                    'risk_status' => 'read_only_no_trade_execution',
+                    'result' => 'safe_reply',
+                ]],
+                'modes' => ['Live Chat View'],
+            ]),
+            'control-api.test/api/v1/agent-theater/modes' => Http::response([
+                'modes' => [['name' => 'Live Chat View', 'description' => 'Human-readable room feed']],
+            ]),
+        ]);
+
+        $this->get('/agent-theater')
+            ->assertOk()
+            ->assertSee('Agent Theater / Orchestrator Console')
+            ->assertSee('Talk To Orchestrator')
+            ->assertSee('Asia/Kuala_Lumpur');
+    }
+
+    public function test_authenticated_admin_can_send_orchestrator_chat(): void
+    {
+        config(['control_tower.api_url' => 'http://control-api.test']);
+
+        Http::fake([
+            'control-api.test/api/v1/agent-theater/chat' => Http::response(['accepted' => true]),
+        ]);
+
+        $this->withSession([
+            'control_tower_token' => 'session-token',
+            'control_tower_user' => 'admin',
+        ])->post('/agent-theater/chat', [
+            'message' => 'What is the current time and date?',
+            'language' => 'en',
+        ])->assertRedirect('/');
+
+        Http::assertSent(fn ($request) => $request->url() === 'http://control-api.test/api/v1/agent-theater/chat'
+            && $request->method() === 'POST'
+            && $request->hasHeader('Authorization', 'Bearer session-token')
+            && $request['session_id'] === 'laravel-orchestrator-console');
+    }
 }

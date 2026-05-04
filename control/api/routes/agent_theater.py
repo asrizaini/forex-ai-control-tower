@@ -4,7 +4,6 @@ import json
 import os
 import re
 import secrets
-import time
 import urllib.error
 import urllib.request
 from ipaddress import ip_address, ip_network
@@ -20,6 +19,7 @@ from ..auth import decode_token
 from ..crud import audit
 from ..db import SessionLocal
 from ..models import AgentTask
+from ..time_utils import format_local
 from agent_theater.loki import push_event
 from agent_theater.modes import mode_names, modes_as_dicts
 from agent_theater.redaction import redact
@@ -77,7 +77,7 @@ def _event_log_path() -> Path:
 
 
 def _timestamp() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    return format_local()
 
 
 def _ingest_allowed(request: Request, x_agent_event_token: str | None) -> bool:
@@ -281,7 +281,25 @@ def _supporting_agent_events(message: str, language: str, session_id: str) -> li
 
 def _orchestrator_reply(message: str, language: str) -> tuple[str, str]:
     lowered = message.lower()
-    if any(word in lowered for word in ("buy", "sell", "order", "trade", "execute", "live", "lot")):
+    is_ms = language == "ms-MY"
+    is_time_question = any(
+        word in lowered
+        for word in ("time", "date", "today", "now", "current time", "current date", "masa", "tarikh", "hari ini", "sekarang")
+    )
+    if is_time_question:
+        if is_ms:
+            summary = (
+                f"Masa fx-control sekarang ialah {format_local()}. "
+                "Semua paparan operator dan Agent Theater akan menggunakan zon masa Asia/Kuala_Lumpur."
+            )
+            next_action = "Gunakan halaman Agent Theater dalam dashboard untuk bertanya status masa, sistem, risiko, atau agen."
+        else:
+            summary = (
+                f"The current fx-control time is {format_local()}. "
+                "Operator-facing API and Agent Theater messages are displayed in Asia/Kuala_Lumpur time."
+            )
+            next_action = "Use the Agent Theater page in the dashboard for time, system, risk, and agent questions."
+    elif any(word in lowered for word in ("buy", "sell", "order", "trade", "execute", "live", "lot")):
         summary = (
             "I understand the trading request and I can coordinate the required agents, but chat is not a direct execution channel. "
             "The proper flow is Signal -> Strategy validation -> Risk Manager -> Account Router -> Execution Guard -> MT5 Bridge "
@@ -319,7 +337,7 @@ def _orchestrator_reply(message: str, language: str) -> tuple[str, str]:
             "For trading or infrastructure actions, I will coordinate the relevant agent and keep governance, audit, and approval gates in place."
         )
         next_action = "Ask a general question, request a system task, or ask me to route work to a specific agent."
-    if language == "ms-MY":
+    if is_ms and not is_time_question:
         summary = (
             "Saya terima mesej anda. Saya boleh bantu semak status sistem, risiko, agen, dan langkah seterusnya "
             "dalam bentuk ringkasan selamat. Saya tidak akan melangkaui kelulusan admin, Risk Manager, atau Execution Guard."

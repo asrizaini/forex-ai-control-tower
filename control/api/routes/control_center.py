@@ -26,6 +26,8 @@ from ..models import (
 )
 from news_feed.providers import PROVIDERS
 
+from ..time_utils import iso_local
+
 router = APIRouter(tags=["control-center"])
 
 
@@ -160,7 +162,7 @@ def _event_uid(source_id: str, currency: str, event_name: str, event_time: datet
 
 
 def _serialize_dt(value: datetime | None) -> str | None:
-    return value.isoformat() + "Z" if value else None
+    return iso_local(value) if value else None
 
 
 def _source_dict(row: DataSourceConfig) -> dict[str, Any]:

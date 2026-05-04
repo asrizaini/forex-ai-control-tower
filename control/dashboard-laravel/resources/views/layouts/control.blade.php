@@ -19,7 +19,7 @@
     $nav = [
         ['overview','Overview','dashboard.overview'], ['credentials','Credentials','dashboard.credentials'], ['data-sources','Data Sources','dashboard.data-sources'],
         ['calendar','Economic Calendar','dashboard.calendar'], ['news','News','dashboard.news'], ['alert-rules','Alert Rules','dashboard.alert-rules'],
-        ['workers','Workers / Agents','dashboard.workers'], ['technical','Technical Analysis','dashboard.technical'], ['fundamental','Fundamental Analysis','dashboard.fundamental'],
+        ['workers','Workers / Agents','dashboard.workers'], ['agent-theater','Agent Theater','dashboard.agent-theater'], ['technical','Technical Analysis','dashboard.technical'], ['fundamental','Fundamental Analysis','dashboard.fundamental'],
         ['monitoring','Grafana / Monitoring','dashboard.monitoring'], ['api-status','API Status','dashboard.api-status'], ['logs','Logs & Audit','dashboard.logs'], ['settings','Settings','dashboard.settings'],
     ];
 @endphp

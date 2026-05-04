@@ -45,6 +45,26 @@ def test_orchestrator_chat_publishes_safe_reply(monkeypatch, tmp_path):
     assert body["events"][1]["risk_status"] == "read_only_no_trade_execution"
 
 
+def test_orchestrator_chat_reports_kuala_lumpur_time(monkeypatch, tmp_path):
+    event_log = tmp_path / "events.jsonl"
+    monkeypatch.setenv("AGENT_THEATER_EVENT_LOG", str(event_log))
+    monkeypatch.setenv("APP_TIMEZONE", "Asia/Kuala_Lumpur")
+    configure_database(f"sqlite:///{tmp_path / 'control_time.db'}")
+    init_db()
+    app = create_app()
+    client = TestClient(app, client=("10.10.1.50", 12345))
+
+    response = client.post(
+        "/api/v1/agent-theater/chat",
+        json={"message": "What is the current time and date?", "language": "en", "session_id": "time-session"},
+    )
+
+    assert response.status_code == 202
+    assert "Asia/Kuala_Lumpur" in response.json()["reply"]
+    events = client.get("/api/v1/agent-theater/events").json()["events"]
+    assert all("Asia/Kuala_Lumpur" in event["timestamp"] for event in events)
+
+
 def test_orchestrator_chat_redacts_secret_like_text(monkeypatch, tmp_path):
     event_log = tmp_path / "events.jsonl"
     monkeypatch.setenv("AGENT_THEATER_EVENT_LOG", str(event_log))

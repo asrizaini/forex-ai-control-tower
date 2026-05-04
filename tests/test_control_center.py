@@ -7,6 +7,7 @@ from control.api.main import create_app
 
 def test_control_center_sources_workers_and_settings(monkeypatch, tmp_path):
     monkeypatch.setenv("JWT_SECRET_KEY", "test-secret")
+    monkeypatch.setenv("APP_TIMEZONE", "Asia/Kuala_Lumpur")
     configure_database(f"sqlite:///{tmp_path / 'control_center.db'}")
     init_db()
     client = TestClient(create_app())
@@ -26,6 +27,10 @@ def test_control_center_sources_workers_and_settings(monkeypatch, tmp_path):
     settings = client.get("/api/v1/config/status")
     assert settings.status_code == 200
     assert any(item["setting_key"] == "global_timezone" for item in settings.json()["settings"])
+    assert any(item["setting_value"] == "Asia/Kuala_Lumpur" for item in settings.json()["settings"])
+
+    worker_time = workers.json()["workers"][0]["next_run_at"]
+    assert worker_time.endswith("+08:00")
 
 
 def test_control_center_writes_are_admin_and_audited(monkeypatch, tmp_path):
