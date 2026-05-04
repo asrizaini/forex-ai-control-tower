@@ -15,6 +15,7 @@ Required runtime secrets:
 - `JWT_SECRET_KEY`
 - `EXECUTION_GUARD_SIGNING_KEY`
 - `BRIDGE_API_TOKEN`
+- `NEWS_PROVIDER_API_KEY` when using `NEWS_PROVIDER_TYPE=fmp_economic_calendar`
 
 Optional local-auth bootstrap:
 
@@ -22,3 +23,5 @@ Optional local-auth bootstrap:
 - `LOCAL_ADMIN_BOOTSTRAP_PASSWORD=<temporary-admin-password>`
 
 After bootstrap, unset `LOCAL_AUTH_BOOTSTRAP_ENABLED` and rotate/remove the temporary password.
+
+See `docs/REQUIRED_CREDENTIALS_AND_API_KEYS.md` for the full credential inventory and recommended setup order.

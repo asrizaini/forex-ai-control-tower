@@ -24,9 +24,9 @@ This checklist contains roadmap items that should not be marked complete until e
 
 ## Market Data And Strategy Holds
 
-- `[!]` External news/fundamental provider configuration.
-  - Reason: The adapter is implemented and deployed, but no approved calendar file or HTTPS provider URL is configured yet.
-  - Solution: Provide a reviewed `NEWS_CALENDAR_SOURCE_FILE` for `manual_json`, or set an approved `NEWS_CALENDAR_URL` and optional `NEWS_PROVIDER_API_KEY` for `https_json`, then run `ansible/playbooks/news_provider_config.yml`.
+- `[x]` External news/fundamental provider configuration.
+  - Status: FMP economic calendar provider is deployed with `NEWS_PROVIDER_TYPE=fmp_economic_calendar`; the key is supplied through `NEWS_PROVIDER_API_KEY`; the News Agent is reporting live provider status in Agent Theater.
+  - Follow-up: Review FMP impact classification quality after several trading days and move `NEWS_PROVIDER_API_KEY` into the selected secret manager before relying on unattended reboot recovery.
 
 - `[!]` Full historical backtest execution engine.
   - Reason: Historical candle storage now exists, but enough history and strategy-specific execution rules are required.

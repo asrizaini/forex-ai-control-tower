@@ -110,6 +110,13 @@
         state: restarted
         enabled: true
 
+    - name: Wait for control API to accept connections after restart
+      ansible.builtin.wait_for:
+        host: 10.10.1.81
+        port: 8000
+        timeout: 45
+        delay: 2
+
     - name: Verify news provider status endpoint
       ansible.builtin.uri:
         url: http://10.10.1.81:8000/api/v1/news/status?symbol=EURUSD

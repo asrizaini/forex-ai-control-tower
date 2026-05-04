@@ -134,7 +134,7 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Debate Mode safe challenge summaries between Strategy Agent and Risk Manager.
 - `[x]` System Improvement Room for roadmap, deployment, rollback, test, and audit coordination.
 - `[x]` Bilingual rendered event stream labels and selected safe summaries for English and Bahasa Melayu Malaysia.
-- `[!]` Real market/news/strategy content in dialogue; live market/account telemetry and news adapter decisions are present, but external provider configuration, full strategy scoring, and live strategy governance adapters are held in `docs/PENDING_HOLD_CHECKLIST.md`.
+- `[!]` Real market/news/strategy content in dialogue; live market/account telemetry and FMP news adapter decisions are present, but full strategy scoring and live strategy governance adapters are held in `docs/PENDING_HOLD_CHECKLIST.md`.
 - `[x]` Workflow Timeline room with multi-agent safe transcript seed and live event filtering.
 - `[x]` Boardroom Mode with executive status, risk posture, and security review summaries.
 - `[x]` Strategy War Room with strategy, backtest, and promotion gate summaries.
@@ -223,7 +223,7 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Price action detector scaffold over latest market snapshot.
 - `[x]` Spread/slippage monitor over persisted telemetry.
 - `[x]` News/fundamental adapter implemented with reviewed JSON file and HTTPS JSON provider modes.
-- `[!]` External news provider activation; held pending reviewed calendar file or approved provider URL/API key.
+- `[x]` External news provider activation through FMP economic calendar with `NEWS_PROVIDER_API_KEY`.
 - `[x]` High-impact news halt logic defaults to safe halt unless provider is enabled and clear.
 - `[!]` Stale feed detection available in market analysis and Execution Guard inputs; automatic execution-time binding is held pending demo execution workflow.
 

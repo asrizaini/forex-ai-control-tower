@@ -12,10 +12,10 @@ def channels_for(level: str) -> list[str]:
 
 
 CHANNEL_ENV = {
-    "telegram": ("TELEGRAM_BOT_TOKEN",),
+    "telegram": ("TELEGRAM_BOT_TOKEN", "TELEGRAM_ADMIN_CHAT_ID"),
     "whatsapp": ("WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID"),
     "mobile_push": ("FCM_SERVER_KEY", "FCM_PROJECT_ID"),
-    "email": ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD"),
+    "email": ("SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM"),
     "browser_push": ("VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"),
     "discord": ("DISCORD_WEBHOOK_URL",),
     "sms": ("SMS_PROVIDER_TOKEN",),

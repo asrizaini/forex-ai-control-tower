@@ -7,11 +7,15 @@ from notifications.hub import channel_status, route_notification
 
 
 def test_notification_routing_and_quiet_hours():
-    routed = route_notification("warning", quiet_hours_enabled=False, env={"TELEGRAM_BOT_TOKEN": "set", "FCM_SERVER_KEY": "set", "FCM_PROJECT_ID": "set"})
+    routed = route_notification(
+        "warning",
+        quiet_hours_enabled=False,
+        env={"TELEGRAM_BOT_TOKEN": "set", "TELEGRAM_ADMIN_CHAT_ID": "set", "FCM_SERVER_KEY": "set", "FCM_PROJECT_ID": "set"},
+    )
     assert routed["routed_channels"] == ["telegram", "mobile_push"]
-    quiet = route_notification("normal", quiet_hours_enabled=True, env={"TELEGRAM_BOT_TOKEN": "set"})
+    quiet = route_notification("normal", quiet_hours_enabled=True, env={"TELEGRAM_BOT_TOKEN": "set", "TELEGRAM_ADMIN_CHAT_ID": "set"})
     assert quiet["routed_channels"] == []
-    emergency = route_notification("emergency", quiet_hours_enabled=True, env={"TELEGRAM_BOT_TOKEN": "set"})
+    emergency = route_notification("emergency", quiet_hours_enabled=True, env={"TELEGRAM_BOT_TOKEN": "set", "TELEGRAM_ADMIN_CHAT_ID": "set"})
     assert "dashboard" in emergency["routed_channels"]
     assert channel_status({})["dashboard"]["configured"] is True
 
