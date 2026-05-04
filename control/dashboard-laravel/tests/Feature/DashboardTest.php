@@ -164,9 +164,26 @@ class DashboardTest extends TestCase
         $this->get('/agent-theater')
             ->assertOk()
             ->assertSee('Agent Theater')
-            ->assertSee('Feed Filters')
-            ->assertSee('Open Orchestrator Console')
-            ->assertSee('Asia/Kuala_Lumpur');
+            ->assertSee('Refresh')
+            ->assertSee('Orchestrator Console')
+            ->assertSee('Asia\/Kuala_Lumpur', false);
+    }
+
+    public function test_agent_theater_feed_returns_json(): void
+    {
+        config(['control_tower.api_url' => 'http://control-api.test']);
+
+        Http::fake([
+            'control-api.test/api/v1/agent-theater/events?limit=50&language=en&agent=Risk%20Manager' => Http::response([
+                'events' => [['agent' => 'Risk Manager', 'summary' => 'Risk visible.']],
+                'agents' => ['Risk Manager'],
+                'streams' => [],
+            ]),
+        ]);
+
+        $this->getJson('/agent-theater/feed?limit=50&language=en&agent[]=Risk%20Manager')
+            ->assertOk()
+            ->assertJsonPath('events.0.agent', 'Risk Manager');
     }
 
     public function test_orchestrator_console_page_contains_dedicated_chat(): void
@@ -190,7 +207,22 @@ class DashboardTest extends TestCase
             ->assertOk()
             ->assertSee('Orchestrator Console')
             ->assertSee('Talk To Orchestrator')
-            ->assertSee('Operator Conversation');
+            ->assertSee('Refresh');
+    }
+
+    public function test_orchestrator_console_feed_returns_json(): void
+    {
+        config(['control_tower.api_url' => 'http://control-api.test']);
+
+        Http::fake([
+            'control-api.test/api/v1/agent-theater/events?limit=80&stream=Orchestrator%20Console&agent=Operator&agent=Orchestrator%20Agent' => Http::response([
+                'events' => [['agent' => 'Orchestrator Agent', 'summary' => 'Ready.']],
+            ]),
+        ]);
+
+        $this->getJson('/orchestrator-console/feed')
+            ->assertOk()
+            ->assertJsonPath('events.0.agent', 'Orchestrator Agent');
     }
 
     public function test_authenticated_admin_can_send_orchestrator_chat(): void
@@ -204,10 +236,11 @@ class DashboardTest extends TestCase
         $this->withSession([
             'control_tower_token' => 'session-token',
             'control_tower_user' => 'admin',
-        ])->post('/agent-theater/chat', [
+        ])->postJson('/agent-theater/chat', [
             'message' => 'What is the current time and date?',
             'language' => 'en',
-        ])->assertRedirect('/');
+        ])->assertOk()
+            ->assertJsonPath('ok', true);
 
         Http::assertSent(fn ($request) => $request->url() === 'http://control-api.test/api/v1/agent-theater/chat'
             && $request->method() === 'POST'

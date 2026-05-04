@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\ControlTowerClient;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -101,16 +102,7 @@ class DashboardController extends Controller
 
     public function agentTheater(Request $request): View
     {
-        $query = http_build_query(array_filter([
-            'limit' => $request->query('limit', 100),
-            'stream' => $request->query('stream'),
-            'language' => $request->query('language', 'en'),
-        ], fn ($value) => $value !== null && $value !== ''));
-        foreach ((array) $request->query('agent', []) as $agent) {
-            if ($agent !== '') {
-                $query .= ($query ? '&' : '') . 'agent=' . rawurlencode((string) $agent);
-            }
-        }
+        $query = $this->agentTheaterQuery($request);
         return $this->render($request, 'pages.agent-theater', 'agent-theater', [
             'events' => $this->client->get('/api/v1/agent-theater/events' . ($query ? '?' . $query : ''), null, ['events' => [], 'modes' => [], 'agents' => [], 'streams' => []]),
             'modes' => $this->client->get('/api/v1/agent-theater/modes', null, ['modes' => []]),
@@ -118,11 +110,22 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function agentTheaterFeed(Request $request): JsonResponse
+    {
+        $query = $this->agentTheaterQuery($request);
+        return response()->json($this->client->get('/api/v1/agent-theater/events' . ($query ? '?' . $query : ''), null, ['events' => [], 'modes' => [], 'agents' => [], 'streams' => []]));
+    }
+
     public function orchestratorConsole(Request $request): View
     {
         return $this->render($request, 'pages.orchestrator-console', 'orchestrator-console', [
             'events' => $this->client->get('/api/v1/agent-theater/events?limit=80&stream=Orchestrator%20Console&agent=Operator&agent=Orchestrator%20Agent', null, ['events' => []]),
         ]);
+    }
+
+    public function orchestratorConsoleFeed(): JsonResponse
+    {
+        return response()->json($this->client->get('/api/v1/agent-theater/events?limit=80&stream=Orchestrator%20Console&agent=Operator&agent=Orchestrator%20Agent', null, ['events' => []]));
     }
 
     public function technical(Request $request): View
@@ -355,7 +358,7 @@ class DashboardController extends Controller
         return $this->redirectResponse($response, 'Worker action queued.', 'Worker action failed.');
     }
 
-    public function sendOrchestratorChat(Request $request): RedirectResponse
+    public function sendOrchestratorChat(Request $request): RedirectResponse|JsonResponse
     {
         $token = $this->requireToken($request);
         $validated = $request->validate([
@@ -368,6 +371,13 @@ class DashboardController extends Controller
             'session_id' => 'laravel-orchestrator-console',
             'orchestrator_only' => true,
         ], $token);
+
+        if ($request->expectsJson()) {
+            if (! $response->successful()) {
+                return response()->json(['ok' => false, 'message' => $this->errorMessage($response->json() ?? [], 'Orchestrator chat failed.')], 422);
+            }
+            return response()->json(['ok' => true, 'message' => 'Orchestrator replied.']);
+        }
 
         return $this->redirectResponse($response, 'Orchestrator replied. The dedicated console feed has been updated.', 'Orchestrator chat failed.');
     }
@@ -403,6 +413,21 @@ class DashboardController extends Controller
                 'grafana' => config('control_tower.grafana_url'),
             ],
         ]));
+    }
+
+    private function agentTheaterQuery(Request $request): string
+    {
+        $query = http_build_query(array_filter([
+            'limit' => $request->query('limit', 100),
+            'stream' => $request->query('stream'),
+            'language' => $request->query('language', 'en'),
+        ], fn ($value) => $value !== null && $value !== ''));
+        foreach ((array) $request->query('agent', []) as $agent) {
+            if ($agent !== '') {
+                $query .= ($query ? '&' : '') . 'agent=' . rawurlencode((string) $agent);
+            }
+        }
+        return $query;
     }
 
     private function optionalToken(Request $request): ?string

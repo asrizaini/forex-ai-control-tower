@@ -1,6 +1,6 @@
 @extends('layouts.control', [
     'title' => 'Orchestrator Console',
-    'description' => 'Dedicated operator-to-orchestrator chat. This lane only displays Operator and Orchestrator Agent messages.',
+    'description' => 'Compact real-time operator-to-orchestrator chat. This lane only shows Operator and Orchestrator Agent messages.',
     'eyebrow' => 'Operator Console',
 ])
 
@@ -16,35 +16,57 @@
     ];
 @endphp
 <style>
-    .console-layout{display:grid;gap:14px;grid-template-columns:360px minmax(0,1fr)}
-    .console-feed{background:#101820;border:1px solid #243244;border-radius:8px;display:grid;gap:10px;max-height:760px;overflow:auto;padding:14px}
-    .console-bubble{border:1px solid #304155;border-radius:8px;padding:12px}
-    .console-bubble.operator{background:#17352f;color:#f2fffb}
-    .console-bubble.orchestrator{background:#111b26;color:#eef6ff}
-    .console-top{align-items:center;display:flex;gap:10px;justify-content:space-between;margin-bottom:6px}
-    .console-agent{color:#7ee2ce;font-weight:860}
-    .console-time{color:#aab8c8;font-size:12px;white-space:nowrap}
-    .console-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-    .console-meta span{border:1px solid #34465a;border-radius:999px;color:#b8c5d3;font-size:12px;padding:4px 8px}
-    .prompt-list{display:grid;gap:8px}
-    .prompt-button{justify-content:flex-start;text-align:left;white-space:normal}
-    @media(max-width:1050px){.console-layout{grid-template-columns:1fr}.console-feed{max-height:none}}
+    .console-shell{background:#0f1720;border:1px solid #233044;border-radius:8px;color:#d9e5f2;display:grid;gap:12px;padding:14px}
+    .console-topline{align-items:center;display:flex;gap:10px;justify-content:space-between}
+    .console-controls{align-items:center;display:flex;flex-wrap:wrap;gap:8px}
+    .console-controls select{background:#111c29;border-color:#304158;color:#e7eef7;width:auto}
+    .console-grid{display:grid;gap:12px;grid-template-columns:minmax(280px,380px) minmax(0,1fr)}
+    .composer-dark{background:#111c29;border:1px solid #304158;border-radius:8px;display:grid;gap:10px;padding:12px}
+    .composer-dark label{color:#96a6ba}
+    .composer-dark select,.composer-dark textarea{background:#0b1119;border-color:#304158;color:#e7eef7}
+    .prompt-strip{display:flex;flex-wrap:wrap;gap:6px}
+    .prompt-strip button{background:#162233;border-color:#2d4058;color:#cfdae8;font-size:12px;min-height:30px;padding:5px 8px;white-space:normal}
+    .console-feed{background:#0b1119;border:1px solid #233044;border-radius:8px;display:grid;max-height:calc(100vh - 350px);min-height:500px;overflow:auto}
+    .console-row{border-bottom:1px solid #1c2a3a;display:grid;gap:10px;grid-template-columns:150px minmax(0,1fr) 170px;padding:9px 12px}
+    .console-row.operator{background:#10221f}
+    .console-row.orchestrator{background:#101822}
+    .console-row:hover{background:#132031}
+    .console-agent{color:#76e1cd;font-weight:850;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .console-room{color:#8fa3ba;font-size:12px;margin-top:2px}
+    .console-summary{color:#e6edf6;font-size:13px;line-height:1.35}
+    .console-next{color:#9fb0c4;font-size:12px;line-height:1.35;margin-top:3px}
+    .console-time{color:#91a4b8;font-size:11px;text-align:right;white-space:nowrap}
+    .console-tags{display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end;margin-top:5px}
+    .console-tags span{background:#121f2d;border:1px solid #293b52;border-radius:999px;color:#a9b8ca;font-size:10px;padding:3px 6px}
+    .empty-dark{color:#91a4b8;padding:28px;text-align:center}
+    @media(max-width:1050px){.console-grid{grid-template-columns:1fr}.console-row{grid-template-columns:1fr}.console-time{text-align:left}.console-tags{justify-content:flex-start}.console-feed{max-height:none}}
 </style>
 
-<section class="grid-3">
-    <div class="metric"><span class="eyebrow">Conversation</span><strong>1:1</strong><p>Operator and Orchestrator Agent only.</p></div>
-    <div class="metric"><span class="eyebrow">Timezone</span><strong>MYT</strong><p>Replies use Asia/Kuala_Lumpur time.</p></div>
-    <div class="metric"><span class="eyebrow">Safety</span><strong>Read Only</strong><p>Chat cannot execute trades or bypass approvals.</p></div>
-</section>
+<section class="console-shell" data-feed-url="{{ route('orchestrator-console.feed') }}">
+    <div class="console-topline">
+        <div><strong id="visibleCount">{{ count($consoleEvents) }}</strong> messages · <span id="lastUpdated">loaded</span></div>
+        <div class="console-controls">
+            <label>Refresh
+                <select id="refreshRate">
+                    <option value="1000">1 second</option>
+                    <option value="2000" selected>2 seconds</option>
+                    <option value="5000">5 seconds</option>
+                    <option value="10000">10 seconds</option>
+                    <option value="0">Paused</option>
+                </select>
+            </label>
+            <button class="secondary small" type="button" id="refreshNow">Refresh</button>
+            <a class="button secondary small" href="{{ route('dashboard.agent-theater') }}">Agent Theater</a>
+        </div>
+    </div>
 
-<section class="console-layout">
-    <aside class="stack">
-        <section class="panel">
-            <div class="panel-head">
-                <div><h2>Talk To Orchestrator</h2><p>Ask general questions or request safe task routing.</p></div>
-                <span class="badge {{ $authenticated ? 'ok' : 'warn' }}">{{ $authenticated ? 'ready' : 'login required' }}</span>
+    <section class="console-grid">
+        <aside class="composer-dark">
+            <div>
+                <h2>Talk To Orchestrator</h2>
+                <p>Read-only governed chat. No trade execution or approval bypass.</p>
             </div>
-            <form class="stack" method="POST" action="{{ route('agent-theater.chat') }}">
+            <form id="orchestratorForm" class="stack" method="POST" action="{{ route('agent-theater.chat') }}">
                 @csrf
                 <label>Language
                     <select name="language">
@@ -54,55 +76,68 @@
                     </select>
                 </label>
                 <label>Message
-                    <textarea id="orchestrator-message" name="message" placeholder="Ask about current time, system status, risk, MT5 bridge, strategies, deployment, or general questions."></textarea>
+                    <textarea id="orchestrator-message" name="message" placeholder="Ask about time, system status, risk, MT5 bridge, strategies, deployment, or general questions."></textarea>
                 </label>
-                <button type="submit" {{ $authenticated ? '' : 'disabled' }}>Send To Orchestrator</button>
+                <button type="submit" {{ $authenticated ? '' : 'disabled' }}>Send</button>
             </form>
-        </section>
-
-        <section class="panel">
-            <div class="panel-head"><div><h2>Quick Prompts</h2><p>Click one, then send.</p></div></div>
-            <div class="prompt-list">
+            <div class="prompt-strip">
                 @foreach($quickPrompts as $prompt)
                     <button type="button" class="secondary prompt-button" data-prompt="{{ $prompt }}">{{ $prompt }}</button>
                 @endforeach
             </div>
-        </section>
-    </aside>
+            <p class="muted" id="chatStatus">{{ $authenticated ? 'Ready.' : 'Login required to send messages.' }}</p>
+        </aside>
 
-    <section class="panel">
-        <div class="panel-head">
-            <div><h2>Operator Conversation</h2><p>Isolated from the multi-agent broadcast feed.</p></div>
-            <a class="button secondary" href="{{ route('dashboard.agent-theater') }}">Open Agent Theater</a>
-        </div>
-        <div class="console-feed">
-            @forelse($consoleEvents as $event)
-                @php
-                    $agent = $event['agent'] ?? 'Agent';
-                    $bubbleClass = $agent === 'Operator' ? 'operator' : 'orchestrator';
-                @endphp
-                <article class="console-bubble {{ $bubbleClass }}">
-                    <div class="console-top">
-                        <span class="console-agent">{{ $agent }}</span>
-                        <span class="console-time">{{ $event['timestamp'] ?? 'time pending' }}</span>
-                    </div>
-                    <p>{{ $event['summary'] ?? 'No summary available.' }}</p>
-                    <div class="console-meta">
-                        <span>{{ $event['risk_status'] ?? 'read_only_no_trade_execution' }}</span>
-                        <span>{{ $event['result'] ?? 'safe_reply' }}</span>
-                    </div>
-                    @if(!empty($event['next_action']))
-                        <p class="muted" style="margin-top:8px">{{ $event['next_action'] }}</p>
-                    @endif
-                </article>
-            @empty
-                <p class="empty">No dedicated orchestrator messages yet. Send a message after login.</p>
-            @endforelse
-        </div>
+        <div id="consoleFeed" class="console-feed"></div>
     </section>
 </section>
 
 <script>
+    const initialEvents = @json($consoleEvents);
+    const feedUrl = document.querySelector('.console-shell').dataset.feedUrl;
+    const feedEl = document.getElementById('consoleFeed');
+    const refreshRateEl = document.getElementById('refreshRate');
+    const countEl = document.getElementById('visibleCount');
+    const lastUpdatedEl = document.getElementById('lastUpdated');
+    const chatStatusEl = document.getElementById('chatStatus');
+    let refreshTimer = null;
+
+    function escapeHtml(value) {
+        return String(value || '').replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    }
+
+    function renderFeed(events) {
+        countEl.textContent = events.length;
+        if (!events.length) {
+            feedEl.innerHTML = '<div class="empty-dark">No orchestrator messages yet.</div>';
+            return;
+        }
+        feedEl.innerHTML = events.map((event) => {
+            const isOperator = event.agent === 'Operator';
+            return `
+                <article class="console-row ${isOperator ? 'operator' : 'orchestrator'}">
+                    <div><div class="console-agent">${escapeHtml(event.agent || 'Agent')}</div><div class="console-room">${escapeHtml(event.stream || 'Orchestrator Console')}</div></div>
+                    <div><div class="console-summary">${escapeHtml(event.display?.summary || event.summary || 'No summary available.')}</div>${event.next_action ? `<div class="console-next">${escapeHtml(event.next_action)}</div>` : ''}</div>
+                    <div><div class="console-time">${escapeHtml(event.timestamp || '')}</div><div class="console-tags"><span>${escapeHtml(event.display?.risk_status || event.risk_status || 'read_only')}</span><span>${escapeHtml(event.result || 'safe_reply')}</span></div></div>
+                </article>
+            `;
+        }).join('');
+    }
+
+    async function refreshFeed() {
+        const response = await fetch(feedUrl, {headers: {'Accept': 'application/json'}});
+        if (!response.ok) throw new Error('Feed refresh failed');
+        const body = await response.json();
+        renderFeed([...(body.events || [])].reverse());
+        lastUpdatedEl.textContent = `updated ${new Date().toLocaleTimeString()}`;
+    }
+
+    function scheduleRefresh() {
+        if (refreshTimer) clearInterval(refreshTimer);
+        const interval = Number(refreshRateEl.value);
+        if (interval > 0) refreshTimer = setInterval(() => refreshFeed().catch(() => { lastUpdatedEl.textContent = 'refresh failed'; }), interval);
+    }
+
     document.querySelectorAll('[data-prompt]').forEach((button) => {
         button.addEventListener('click', () => {
             const box = document.getElementById('orchestrator-message');
@@ -110,5 +145,25 @@
             box.focus();
         });
     });
+    document.getElementById('refreshNow').addEventListener('click', () => refreshFeed().catch(() => { lastUpdatedEl.textContent = 'refresh failed'; }));
+    refreshRateEl.addEventListener('change', scheduleRefresh);
+    document.getElementById('orchestratorForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        chatStatusEl.textContent = 'Sending...';
+        const response = await fetch(event.currentTarget.action, {
+            method: 'POST',
+            headers: {'Accept':'application/json', 'X-Requested-With':'XMLHttpRequest'},
+            body: new FormData(event.currentTarget),
+        });
+        if (!response.ok) {
+            chatStatusEl.textContent = 'Send failed.';
+            return;
+        }
+        event.currentTarget.reset();
+        chatStatusEl.textContent = 'Orchestrator replied.';
+        await refreshFeed();
+    });
+    renderFeed(initialEvents);
+    scheduleRefresh();
 </script>
 @endsection

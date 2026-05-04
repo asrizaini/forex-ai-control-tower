@@ -1,6 +1,6 @@
 @extends('layouts.control', [
     'title' => 'Agent Theater',
-    'description' => 'Filtered live room for human-readable agent and worker communication. Use Orchestrator Console for direct operator chat.',
+    'description' => 'Compact real-time broadcast feed for agent and worker communication. Use Orchestrator Console for direct operator chat.',
     'eyebrow' => 'AI Trading Room',
 ])
 
@@ -13,104 +13,152 @@
     $selectedStream = $filters['stream'] ?? '';
 @endphp
 <style>
-    .theater-layout{display:grid;gap:14px;grid-template-columns:320px minmax(0,1fr)}
-    .chat-feed{background:#101820;border:1px solid #243244;border-radius:8px;display:grid;gap:10px;max-height:760px;overflow:auto;padding:14px}
-    .chat-bubble{background:#f8fafc;border:1px solid #dfe7f0;border-radius:8px;padding:12px}
-    .chat-bubble.orchestrator{background:#101820;border-color:#324256;color:#eef6ff}
-    .chat-bubble.orchestrator p,.chat-bubble.orchestrator .muted{color:#aab8c8}
-    .chat-top{align-items:center;display:flex;gap:10px;justify-content:space-between;margin-bottom:6px}
-    .chat-agent{font-weight:860}
-    .chat-time{color:#718096;font-size:12px;white-space:nowrap}
-    .chat-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-    .chat-meta span{border:1px solid #d8e1eb;border-radius:999px;color:#53657b;font-size:12px;padding:4px 8px}
-    .chat-bubble.orchestrator .chat-meta span{border-color:#34465a;color:#b8c5d3}
-    .check-list{display:grid;gap:8px;max-height:380px;overflow:auto}
-    .check-line{align-items:center;display:flex;gap:8px}
-    .check-line input{width:auto}
-    @media(max-width:1050px){.theater-layout{grid-template-columns:1fr}.chat-feed{max-height:none}}
+    .feed-shell{background:#0f1720;border:1px solid #233044;border-radius:8px;color:#d9e5f2;display:grid;gap:12px;padding:14px}
+    .feed-toolbar{align-items:end;display:grid;gap:10px;grid-template-columns:1.1fr .9fr .7fr .7fr auto}
+    .feed-toolbar label{color:#96a6ba}
+    .feed-toolbar select{background:#111c29;border-color:#304158;color:#e7eef7}
+    .feed-actions{display:flex;gap:8px}
+    .agent-picker{background:#111c29;border:1px solid #304158;border-radius:8px;display:flex;flex-wrap:wrap;gap:6px;max-height:86px;overflow:auto;padding:8px}
+    .agent-chip{align-items:center;background:#162233;border:1px solid #2d4058;border-radius:999px;color:#cfdae8;display:flex;font-size:12px;font-weight:700;gap:5px;padding:5px 8px}
+    .agent-chip input{accent-color:#15a388;width:auto}
+    .feed-status{align-items:center;color:#90a3b8;display:flex;font-size:12px;gap:10px;justify-content:space-between}
+    .compact-feed{background:#0b1119;border:1px solid #233044;border-radius:8px;display:grid;max-height:calc(100vh - 360px);min-height:480px;overflow:auto}
+    .feed-row{border-bottom:1px solid #1c2a3a;display:grid;gap:10px;grid-template-columns:170px minmax(0,1fr) 180px;padding:9px 12px}
+    .feed-row:hover{background:#111a26}
+    .feed-agent{color:#76e1cd;font-weight:850;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .feed-room{color:#8fa3ba;font-size:12px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .feed-summary{color:#e6edf6;font-size:13px;line-height:1.35}
+    .feed-next{color:#9fb0c4;font-size:12px;line-height:1.35;margin-top:3px}
+    .feed-time{color:#91a4b8;font-size:11px;text-align:right;white-space:nowrap}
+    .feed-tags{display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end;margin-top:5px}
+    .feed-tags span{background:#121f2d;border:1px solid #293b52;border-radius:999px;color:#a9b8ca;font-size:10px;padding:3px 6px}
+    .empty-dark{color:#91a4b8;padding:28px;text-align:center}
+    .theater-links{display:flex;gap:8px;justify-content:flex-end}
+    @media(max-width:1150px){.feed-toolbar{grid-template-columns:1fr 1fr}.feed-actions,.theater-links{justify-content:flex-start}.feed-row{grid-template-columns:1fr}.feed-time{text-align:left}.feed-tags{justify-content:flex-start}.compact-feed{max-height:none}}
 </style>
 
-<section class="grid-3">
-    <div class="metric"><span class="eyebrow">Feed Type</span><strong>Broadcast</strong><p>Agent-to-agent and worker summaries only.</p></div>
-    <div class="metric"><span class="eyebrow">Timezone</span><strong>MYT</strong><p>Timestamps render in Asia/Kuala_Lumpur.</p></div>
-    <div class="metric"><span class="eyebrow">Direct Chat</span><strong>Separate</strong><p>Use the Orchestrator Console page for operator messages.</p></div>
-</section>
-
-<section class="theater-layout">
-    <aside class="stack">
-        <section class="panel">
-            <div class="panel-head">
-                <div><h2>Feed Filters</h2><p>Choose which room and agents are visible.</p></div>
+<section class="feed-shell" data-feed-url="{{ route('agent-theater.feed') }}">
+    <form id="feedFilters" class="feed-toolbar" method="GET" action="{{ route('dashboard.agent-theater') }}">
+        <label>Room
+            <select name="stream">
+                <option value="">All rooms</option>
+                @foreach($availableStreams as $stream)
+                    <option value="{{ $stream }}" @selected($selectedStream === $stream)>{{ $stream }}</option>
+                @endforeach
+            </select>
+        </label>
+        <label>Language
+            <select name="language">
+                <option value="en" @selected(($filters['language'] ?? 'en') === 'en')>English</option>
+                <option value="ms-MY" @selected(($filters['language'] ?? '') === 'ms-MY')>Bahasa Melayu Malaysia</option>
+            </select>
+        </label>
+        <label>Limit
+            <select name="limit">
+                @foreach([50,100,150,200] as $limit)
+                    <option value="{{ $limit }}" @selected((int)($filters['limit'] ?? 100) === $limit)>{{ $limit }}</option>
+                @endforeach
+            </select>
+        </label>
+        <label>Refresh
+            <select id="refreshRate">
+                <option value="2000">2 seconds</option>
+                <option value="5000" selected>5 seconds</option>
+                <option value="10000">10 seconds</option>
+                <option value="30000">30 seconds</option>
+                <option value="0">Paused</option>
+            </select>
+        </label>
+        <div class="feed-actions">
+            <button type="submit">Filter</button>
+            <button class="secondary" type="button" id="refreshNow">Refresh</button>
+        </div>
+        <div style="grid-column:1/-1">
+            <div class="agent-picker">
+                @forelse($availableAgents as $agent)
+                    <label class="agent-chip"><input type="checkbox" name="agent[]" value="{{ $agent }}" @checked(in_array($agent, $selectedAgents, true))>{{ $agent }}</label>
+                @empty
+                    <span class="muted">No agent names have been seen yet.</span>
+                @endforelse
             </div>
-            <form class="stack" method="GET" action="{{ route('dashboard.agent-theater') }}">
-                <label>Room / Stream
-                    <select name="stream">
-                        <option value="">All rooms</option>
-                        @foreach($availableStreams as $stream)
-                            <option value="{{ $stream }}" @selected($selectedStream === $stream)>{{ $stream }}</option>
-                        @endforeach
-                    </select>
-                </label>
-                <label>Language
-                    <select name="language">
-                        <option value="en" @selected(($filters['language'] ?? 'en') === 'en')>English</option>
-                        <option value="ms-MY" @selected(($filters['language'] ?? '') === 'ms-MY')>Bahasa Melayu Malaysia</option>
-                    </select>
-                </label>
-                <label>Visible Agents</label>
-                <div class="check-list">
-                    @forelse($availableAgents as $agent)
-                        <label class="check-line">
-                            <input type="checkbox" name="agent[]" value="{{ $agent }}" @checked(in_array($agent, $selectedAgents, true))>
-                            <span>{{ $agent }}</span>
-                        </label>
-                    @empty
-                        <p class="empty">No agent names have been seen yet.</p>
-                    @endforelse
-                </div>
-                <div class="actions">
-                    <button type="submit">Apply Filter</button>
-                    <a class="button secondary" href="{{ route('dashboard.agent-theater') }}">Clear</a>
-                </div>
-            </form>
-        </section>
-
-        <section class="panel">
-            <div class="panel-head"><div><h2>Operator Chat</h2><p>Direct messages are isolated from this broadcast view.</p></div></div>
-            <a class="button" href="{{ route('dashboard.orchestrator-console') }}">Open Orchestrator Console</a>
-        </section>
-    </aside>
-
-    <section class="panel">
-        <div class="panel-head">
-            <div><h2>Live Agent Feed</h2><p>Recent filtered events. This page has no chat input by design.</p></div>
-            <span class="badge ok">{{ count($theaterEvents) }} visible</span>
         </div>
-        <div class="chat-feed">
-            @forelse($theaterEvents as $event)
-                @php
-                    $agent = $event['agent'] ?? 'Agent';
-                    $bubbleClass = str_contains($agent, 'Orchestrator') ? 'orchestrator' : '';
-                @endphp
-                <article class="chat-bubble {{ $bubbleClass }}">
-                    <div class="chat-top">
-                        <span class="chat-agent">{{ $agent }}</span>
-                        <span class="chat-time">{{ $event['timestamp'] ?? 'time pending' }}</span>
-                    </div>
-                    <p>{{ $event['summary'] ?? 'No summary available.' }}</p>
-                    <div class="chat-meta">
-                        <span>{{ $event['stream'] ?? 'Live Chat View' }}</span>
-                        <span>{{ $event['risk_status'] ?? 'guarded' }}</span>
-                        <span>{{ $event['result'] ?? 'observed' }}</span>
-                    </div>
-                    @if(!empty($event['next_action']))
-                        <p class="muted" style="margin-top:8px">{{ $event['next_action'] }}</p>
-                    @endif
-                </article>
-            @empty
-                <p class="empty">No events match the current filters.</p>
-            @endforelse
+    </form>
+    <div class="feed-status">
+        <span><strong id="visibleCount">{{ count($theaterEvents) }}</strong> visible · <span id="lastUpdated">loaded</span></span>
+        <div class="theater-links">
+            <a class="button secondary small" href="{{ route('dashboard.orchestrator-console') }}">Orchestrator Console</a>
+            <a class="button secondary small" href="{{ route('dashboard.agent-theater') }}">Clear Filters</a>
         </div>
-    </section>
+    </div>
+    <div id="agentFeed" class="compact-feed"></div>
 </section>
+
+<script>
+    const initialEvents = @json($theaterEvents);
+    const feedUrl = document.querySelector('.feed-shell').dataset.feedUrl;
+    const feedEl = document.getElementById('agentFeed');
+    const refreshRateEl = document.getElementById('refreshRate');
+    const countEl = document.getElementById('visibleCount');
+    const lastUpdatedEl = document.getElementById('lastUpdated');
+    let refreshTimer = null;
+
+    function escapeHtml(value) {
+        return String(value || '').replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    }
+
+    function eventSummary(event) {
+        return event.display?.summary || event.summary || 'No summary available.';
+    }
+
+    function eventRisk(event) {
+        return event.display?.risk_status || event.risk_status || 'guarded';
+    }
+
+    function renderFeed(events) {
+        countEl.textContent = events.length;
+        if (!events.length) {
+            feedEl.innerHTML = '<div class="empty-dark">No events match the current filters.</div>';
+            return;
+        }
+        feedEl.innerHTML = events.map((event) => `
+            <article class="feed-row">
+                <div>
+                    <div class="feed-agent">${escapeHtml(event.agent || 'Agent')}</div>
+                    <div class="feed-room">${escapeHtml(event.stream || 'Live Chat View')}</div>
+                </div>
+                <div>
+                    <div class="feed-summary">${escapeHtml(eventSummary(event))}</div>
+                    ${event.next_action ? `<div class="feed-next">${escapeHtml(event.next_action)}</div>` : ''}
+                </div>
+                <div>
+                    <div class="feed-time">${escapeHtml(event.timestamp || '')}</div>
+                    <div class="feed-tags"><span>${escapeHtml(eventRisk(event))}</span><span>${escapeHtml(event.result || 'observed')}</span></div>
+                </div>
+            </article>
+        `).join('');
+    }
+
+    function queryFromFilters() {
+        return new URLSearchParams(new FormData(document.getElementById('feedFilters'))).toString();
+    }
+
+    async function refreshFeed() {
+        const response = await fetch(`${feedUrl}?${queryFromFilters()}`, {headers: {'Accept': 'application/json'}});
+        if (!response.ok) throw new Error('Feed refresh failed');
+        const body = await response.json();
+        renderFeed([...(body.events || [])].reverse());
+        lastUpdatedEl.textContent = `updated ${new Date().toLocaleTimeString()}`;
+    }
+
+    function scheduleRefresh() {
+        if (refreshTimer) clearInterval(refreshTimer);
+        const interval = Number(refreshRateEl.value);
+        if (interval > 0) refreshTimer = setInterval(() => refreshFeed().catch(() => { lastUpdatedEl.textContent = 'refresh failed'; }), interval);
+    }
+
+    document.getElementById('refreshNow').addEventListener('click', () => refreshFeed().catch(() => { lastUpdatedEl.textContent = 'refresh failed'; }));
+    refreshRateEl.addEventListener('change', scheduleRefresh);
+    renderFeed(initialEvents);
+    scheduleRefresh();
+</script>
 @endsection
