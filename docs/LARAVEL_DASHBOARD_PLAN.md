@@ -12,8 +12,8 @@ Laravel is a good fit for the operator/admin dashboard, especially for forms, ap
 
 ## Migration Path
 
-1. Keep the existing React/Vite dashboard running on port `5173`.
-2. Build Laravel dashboard in parallel under `control/dashboard-laravel`.
+1. Promote Laravel as the primary operator dashboard on port `5173`.
+2. Keep the React/Vite dashboard source only as rollback history while Laravel owns the live operator UI.
 3. Add Laravel read-only panels first: readiness, health, market feed, Agent Theater links.
 4. Add authenticated Laravel login against FastAPI `/api/v1/auth/login`.
 5. Add audited pre-live forms for security review and production-live approval.

@@ -18,6 +18,8 @@ class CredentialDefinition:
     pattern: str | None = None
     restart_hint: str = "control-api"
     description: str = ""
+    field_type: str = "text"
+    options: tuple[str, ...] = ()
 
     def public_dict(self) -> dict:
         payload = asdict(self)
@@ -32,26 +34,26 @@ DEFINITIONS: tuple[CredentialDefinition, ...] = (
     CredentialDefinition("EXECUTION_GUARD_SIGNING_KEY", "Execution Guard signing key", "Core Runtime", True, True, "token64", min_length=32),
     CredentialDefinition("BRIDGE_API_TOKEN", "MT5 bridge API token", "Core Runtime", True, True, "token64", min_length=32),
     CredentialDefinition("TELEMETRY_INGEST_TOKEN", "Telemetry ingest token", "Core Runtime", False, True, "token64", min_length=32),
-    CredentialDefinition("RECOVERY_EMAIL", "Recovery email", "Auth And Recovery", False, False, None, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$", placeholder="m.asri.kamaruddin@gmail.com"),
+    CredentialDefinition("RECOVERY_EMAIL", "Recovery email", "Auth And Recovery", False, False, None, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$", placeholder="m.asri.kamaruddin@gmail.com", field_type="email"),
     CredentialDefinition("TOTP_ISSUER", "2FA issuer", "Auth And Recovery", False, False, None, placeholder="Forex AI Control Tower"),
-    CredentialDefinition("LOCAL_AUTH_BOOTSTRAP_ENABLED", "Local bootstrap enabled", "Auth And Recovery", False, False, None, placeholder="false"),
+    CredentialDefinition("LOCAL_AUTH_BOOTSTRAP_ENABLED", "Local bootstrap enabled", "Auth And Recovery", False, False, None, placeholder="false", field_type="boolean", options=("true", "false")),
     CredentialDefinition("LOCAL_ADMIN_BOOTSTRAP_PASSWORD", "Temporary admin password", "Auth And Recovery", False, True, "password24", min_length=12),
-    CredentialDefinition("ALLOW_LIVE_TRADING", "Live trading runtime flag", "Trading Safety", False, False, None, placeholder="false"),
-    CredentialDefinition("BRIDGE_MODE", "MT5 bridge mode", "Trading Safety", False, False, None, placeholder="demo"),
-    CredentialDefinition("REQUIRE_ORDER_CHECK", "Require order_check", "Trading Safety", False, False, None, placeholder="true"),
-    CredentialDefinition("NEWS_PROVIDER_ENABLED", "News provider enabled", "News", False, False, None, placeholder="true"),
-    CredentialDefinition("NEWS_PROVIDER_TYPE", "News provider type", "News", False, False, None, placeholder="fmp_economic_calendar"),
+    CredentialDefinition("ALLOW_LIVE_TRADING", "Live trading runtime flag", "Trading Safety", False, False, None, placeholder="false", field_type="boolean", options=("true", "false")),
+    CredentialDefinition("BRIDGE_MODE", "MT5 bridge mode", "Trading Safety", False, False, None, placeholder="demo", field_type="select", options=("demo", "live")),
+    CredentialDefinition("REQUIRE_ORDER_CHECK", "Require order_check", "Trading Safety", False, False, None, placeholder="true", field_type="boolean", options=("true", "false")),
+    CredentialDefinition("NEWS_PROVIDER_ENABLED", "News provider enabled", "News", False, False, None, placeholder="true", field_type="boolean", options=("true", "false")),
+    CredentialDefinition("NEWS_PROVIDER_TYPE", "News provider type", "News", False, False, None, placeholder="fmp_economic_calendar", field_type="select", options=("fmp_economic_calendar", "manual_json", "https_json", "disabled")),
     CredentialDefinition("NEWS_PROVIDER_API_KEY", "FMP/news API key", "News", True, True, None, min_length=8),
-    CredentialDefinition("NEWS_HIGH_IMPACT_WINDOW_MINUTES", "News halt window minutes", "News", False, False, None, placeholder="45", pattern=r"^\d+$"),
-    CredentialDefinition("NEWS_STALE_AFTER_MINUTES", "News stale after minutes", "News", False, False, None, placeholder="720", pattern=r"^\d+$"),
-    CredentialDefinition("NEWS_CALENDAR_FROM", "News calendar from", "News", False, False, None, placeholder="YYYY-MM-DD"),
-    CredentialDefinition("NEWS_CALENDAR_TO", "News calendar to", "News", False, False, None, placeholder="YYYY-MM-DD"),
+    CredentialDefinition("NEWS_HIGH_IMPACT_WINDOW_MINUTES", "News halt window minutes", "News", False, False, None, placeholder="45", pattern=r"^\d+$", field_type="number"),
+    CredentialDefinition("NEWS_STALE_AFTER_MINUTES", "News stale after minutes", "News", False, False, None, placeholder="720", pattern=r"^\d+$", field_type="number"),
+    CredentialDefinition("NEWS_CALENDAR_FROM", "News calendar from", "News", False, False, None, placeholder="YYYY-MM-DD", field_type="date"),
+    CredentialDefinition("NEWS_CALENDAR_TO", "News calendar to", "News", False, False, None, placeholder="YYYY-MM-DD", field_type="date"),
     CredentialDefinition("TELEGRAM_BOT_TOKEN", "Telegram bot token", "Notifications", False, True, None, min_length=10),
     CredentialDefinition("TELEGRAM_ADMIN_CHAT_ID", "Telegram admin chat ID", "Notifications", False, True, None, min_length=3),
     CredentialDefinition("WHATSAPP_TOKEN", "WhatsApp token", "Notifications", False, True, None),
     CredentialDefinition("WHATSAPP_PHONE_NUMBER_ID", "WhatsApp phone number ID", "Notifications", False, True, None),
     CredentialDefinition("SMTP_HOST", "SMTP host", "Notifications", False, False, None),
-    CredentialDefinition("SMTP_PORT", "SMTP port", "Notifications", False, False, None, placeholder="587", pattern=r"^\d+$"),
+    CredentialDefinition("SMTP_PORT", "SMTP port", "Notifications", False, False, None, placeholder="587", pattern=r"^\d+$", field_type="number"),
     CredentialDefinition("SMTP_USER", "SMTP user", "Notifications", False, True, None),
     CredentialDefinition("SMTP_PASSWORD", "SMTP password", "Notifications", False, True, None),
     CredentialDefinition("SMTP_FROM", "SMTP from address", "Notifications", False, False, None, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$"),
@@ -62,10 +64,10 @@ DEFINITIONS: tuple[CredentialDefinition, ...] = (
     CredentialDefinition("VAPID_PRIVATE_KEY", "Browser push private key", "Browser Push", False, True, None),
     CredentialDefinition("OPENAI_API_KEY", "OpenAI API key", "Paid LLM", False, True, None),
     CredentialDefinition("GEMINI_API_KEY", "Gemini API key", "Paid LLM", False, True, None),
-    CredentialDefinition("LLM_DAILY_BUDGET_USD", "Daily LLM budget USD", "Paid LLM", False, False, None, placeholder="0", pattern=r"^\d+(\.\d+)?$"),
-    CredentialDefinition("LLM_MONTHLY_BUDGET_USD", "Monthly LLM budget USD", "Paid LLM", False, False, None, placeholder="0", pattern=r"^\d+(\.\d+)?$"),
-    CredentialDefinition("PAID_LLM_APPROVAL_REQUIRED", "Paid LLM approval required", "Paid LLM", False, False, None, placeholder="true"),
-    CredentialDefinition("OPENCLAW_ENABLED", "OpenClaw enabled", "OpenClaw", False, False, None, placeholder="false"),
+    CredentialDefinition("LLM_DAILY_BUDGET_USD", "Daily LLM budget USD", "Paid LLM", False, False, None, placeholder="0", pattern=r"^\d+(\.\d+)?$", field_type="number"),
+    CredentialDefinition("LLM_MONTHLY_BUDGET_USD", "Monthly LLM budget USD", "Paid LLM", False, False, None, placeholder="0", pattern=r"^\d+(\.\d+)?$", field_type="number"),
+    CredentialDefinition("PAID_LLM_APPROVAL_REQUIRED", "Paid LLM approval required", "Paid LLM", False, False, None, placeholder="true", field_type="boolean", options=("true", "false")),
+    CredentialDefinition("OPENCLAW_ENABLED", "OpenClaw enabled", "OpenClaw", False, False, None, placeholder="false", field_type="boolean", options=("true", "false")),
     CredentialDefinition("OPENCLAW_API_URL", "OpenClaw API URL", "OpenClaw", False, False, None),
     CredentialDefinition("OPENCLAW_API_TOKEN", "OpenClaw API token", "OpenClaw", False, True, None),
     CredentialDefinition("GITHUB_OWNER", "GitHub owner", "Deployment Maintenance", False, False, None),
@@ -77,7 +79,7 @@ DEFINITIONS: tuple[CredentialDefinition, ...] = (
     CredentialDefinition("WINDOWS_MT5_PASSWORD", "Windows WinRM password", "Deployment Maintenance", False, True, None),
     CredentialDefinition("WINDOWS_MT5_SSH_PASSWORD", "Windows SSH password", "Deployment Maintenance", False, True, None),
     CredentialDefinition("MT5_DEFAULT_ACCOUNT_ID", "MT5 default account ID", "MT5 Bridge", False, False, None, placeholder="demo_main"),
-    CredentialDefinition("MT5_DEFAULT_BRIDGE_PORT", "MT5 default bridge port", "MT5 Bridge", False, False, None, placeholder="8501", pattern=r"^\d+$"),
+    CredentialDefinition("MT5_DEFAULT_BRIDGE_PORT", "MT5 default bridge port", "MT5 Bridge", False, False, None, placeholder="8501", pattern=r"^\d+$", field_type="number"),
     CredentialDefinition("MT5_ACCOUNT_PROFILES_FILE", "MT5 account profiles file", "MT5 Bridge", False, False, None, placeholder=r"C:\ForexAI\mt5_bridge\account_profiles.json"),
 )
 
@@ -92,6 +94,8 @@ def validate_value(name: str, value: str) -> tuple[str, str]:
         return ("missing", "Required value is missing") if definition.required else ("optional_missing", "Optional value is not configured")
     if len(value) < definition.min_length:
         return "invalid", f"Minimum length is {definition.min_length}"
+    if definition.options and value not in definition.options:
+        return "invalid", f"Allowed values: {', '.join(definition.options)}"
     if definition.pattern and not re.match(definition.pattern, value):
         return "invalid", "Value format is invalid"
     return "valid", "Configured"

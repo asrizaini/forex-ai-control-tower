@@ -8,12 +8,14 @@ from control.api.main import create_app
 from control.api.models import AgentState, AgentToolPolicy, AuditLog
 
 
-def test_secret_manager_status_does_not_expose_secret_values(monkeypatch):
+def test_secret_manager_status_does_not_expose_secret_values(monkeypatch, tmp_path):
     monkeypatch.setenv("POSTGRES_PASSWORD", "example-postgres")
     monkeypatch.setenv("GRAFANA_ADMIN_PASSWORD", "example-grafana")
     monkeypatch.setenv("JWT_SECRET_KEY", "example-jwt")
     monkeypatch.setenv("EXECUTION_GUARD_SIGNING_KEY", "example-guard")
     monkeypatch.setenv("BRIDGE_API_TOKEN", "example-bridge")
+    configure_database(f"sqlite:///{tmp_path / 'secret_status.db'}")
+    init_db()
     client = TestClient(create_app())
 
     response = client.get("/api/v1/system/secret-manager/status")

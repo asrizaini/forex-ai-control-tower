@@ -4,7 +4,7 @@ The fx-control dashboard now owns ongoing credential and runtime configuration m
 
 ## Access
 
-Open the control dashboard:
+Open the primary Laravel control dashboard:
 
 `http://10.10.1.81:5173`
 

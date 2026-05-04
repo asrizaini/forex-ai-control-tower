@@ -23,8 +23,8 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Grafana overview dashboard provisioned.
 - `[x]` Blackbox exporter reachability monitoring.
 - `[x]` Control API running on `10.10.1.81:8000`.
-- `[x]` Dashboard running on `10.10.1.81:5173`.
-- `[x]` Laravel operator dashboard running on `10.10.1.81:8090` as an operations console over the FastAPI control plane.
+- `[x]` Primary Laravel operator dashboard running on `10.10.1.81:5173` as an operations console over the FastAPI control plane.
+- `[x]` Legacy React/Vite dashboard service disabled in favor of Laravel.
 - `[x]` Ollama installed on LLM nodes.
 - `[x]` Market worker service enabled on machine 4.
 - `[x]` Strategy/risk worker service enabled on machine 5.

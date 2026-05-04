@@ -3,6 +3,13 @@
   hosts: control
   become: true
   tasks:
+    - name: Stop and disable legacy React dashboard service
+      ansible.builtin.systemd_service:
+        name: forex-dashboard
+        state: stopped
+        enabled: false
+      failed_when: false
+
     - name: Install PHP and Composer packages for Laravel dashboard
       ansible.builtin.apt:
         name:
@@ -15,7 +22,7 @@
           - unzip
           - composer
         state: present
-        update_cache: true
+        update_cache: false
 
     - name: Create Laravel dashboard directory
       ansible.builtin.file:
@@ -143,7 +150,7 @@
           APP_ENV=production
           APP_KEY={{ lookup('env', 'LARAVEL_DASHBOARD_APP_KEY') }}
           APP_DEBUG=false
-          APP_URL=http://10.10.1.81:8090
+          APP_URL=http://10.10.1.81:5173
           APP_LOCALE=en
           APP_FALLBACK_LOCALE=en
           LOG_CHANNEL=stack
@@ -174,7 +181,7 @@
           User=aiops
           Group=aiops
           WorkingDirectory=/opt/forex-ai-control-tower/dashboard-laravel
-          ExecStart=/usr/bin/php artisan serve --host=0.0.0.0 --port=8090
+          ExecStart=/usr/bin/php artisan serve --host=0.0.0.0 --port=5173
           Restart=always
           RestartSec=5
           NoNewPrivileges=true

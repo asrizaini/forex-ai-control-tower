@@ -356,11 +356,11 @@
         state: restarted
         enabled: true
 
-    - name: Start and enable dashboard
+    - name: Stop and disable legacy React dashboard
       ansible.builtin.systemd_service:
         name: forex-dashboard
-        state: restarted
-        enabled: true
+        state: stopped
+        enabled: false
 
     - name: Start and enable orchestrator runtime
       ansible.builtin.systemd_service:

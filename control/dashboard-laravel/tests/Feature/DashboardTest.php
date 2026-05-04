@@ -39,13 +39,23 @@ class DashboardTest extends TestCase
                     'rates_count' => 100,
                 ],
             ]),
+            'control-api.test/api/v1/system/health/status' => Http::response([
+                'healthy' => true,
+                'services' => [
+                    'api' => ['status' => 'ok'],
+                    'credentials' => ['status' => 'ok', 'required_runtime_secrets_present' => true],
+                ],
+            ]),
+            'control-api.test/api/v1/telemetry/accounts/latest?limit=1' => Http::response([]),
+            'control-api.test/api/v1/agent-theater/events?limit=8' => Http::response(['events' => []]),
         ]);
 
         $this->get('/')
             ->assertOk()
             ->assertSee('Forex AI Control Tower')
-            ->assertSee('live blocked')
-            ->assertSee('security review completed')
+            ->assertSee('Laravel primary dashboard')
+            ->assertSee('blocked')
+            ->assertSee('Secure Login')
             ->assertSee('EURUSD');
     }
 }
