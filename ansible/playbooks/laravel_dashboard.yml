@@ -25,20 +25,112 @@
         group: aiops
         mode: "0750"
 
-    - name: Copy Laravel dashboard source
+    - name: Copy Laravel dashboard app source
       ansible.builtin.copy:
-        src: ../../control/dashboard-laravel/
-        dest: /opt/forex-ai-control-tower/dashboard-laravel/
+        src: ../../control/dashboard-laravel/app/
+        dest: /opt/forex-ai-control-tower/dashboard-laravel/app/
         owner: aiops
         group: aiops
         mode: preserve
+
+    - name: Copy Laravel dashboard config source
+      ansible.builtin.copy:
+        src: ../../control/dashboard-laravel/config/
+        dest: /opt/forex-ai-control-tower/dashboard-laravel/config/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
+    - name: Copy Laravel dashboard bootstrap source
+      ansible.builtin.copy:
+        src: ../../control/dashboard-laravel/bootstrap/
+        dest: /opt/forex-ai-control-tower/dashboard-laravel/bootstrap/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
+    - name: Copy Laravel dashboard database source
+      ansible.builtin.copy:
+        src: ../../control/dashboard-laravel/database/
+        dest: /opt/forex-ai-control-tower/dashboard-laravel/database/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
+    - name: Copy Laravel dashboard public source
+      ansible.builtin.copy:
+        src: ../../control/dashboard-laravel/public/
+        dest: /opt/forex-ai-control-tower/dashboard-laravel/public/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
+    - name: Copy Laravel dashboard resources source
+      ansible.builtin.copy:
+        src: ../../control/dashboard-laravel/resources/
+        dest: /opt/forex-ai-control-tower/dashboard-laravel/resources/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
+    - name: Copy Laravel dashboard routes source
+      ansible.builtin.copy:
+        src: ../../control/dashboard-laravel/routes/
+        dest: /opt/forex-ai-control-tower/dashboard-laravel/routes/
+        owner: aiops
+        group: aiops
+        mode: preserve
+
+    - name: Copy Laravel dashboard project files
+      ansible.builtin.copy:
+        src: "../../control/dashboard-laravel/{{ item }}"
+        dest: "/opt/forex-ai-control-tower/dashboard-laravel/{{ item }}"
+        owner: aiops
+        group: aiops
+        mode: preserve
+      loop:
+        - artisan
+        - composer.json
+        - composer.lock
+        - package.json
+        - phpunit.xml
+        - vite.config.js
+        - README.md
+        - .env.example
+
+    - name: Create Laravel dashboard writable directories
+      ansible.builtin.file:
+        path: "/opt/forex-ai-control-tower/dashboard-laravel/{{ item }}"
+        state: directory
+        owner: aiops
+        group: aiops
+        mode: "0750"
+      loop:
+        - storage/app
+        - storage/app/private
+        - storage/app/public
+        - storage/framework/cache/data
+        - storage/framework/sessions
+        - storage/framework/testing
+        - storage/framework/views
+        - storage/logs
+        - bootstrap/cache
 
     - name: Install Laravel Composer dependencies
       ansible.builtin.command:
         cmd: composer install --no-dev --no-interaction --optimize-autoloader
         chdir: /opt/forex-ai-control-tower/dashboard-laravel
-      become_user: aiops
+      environment:
+        COMPOSER_ALLOW_SUPERUSER: "1"
       changed_when: false
+
+    - name: Restore Laravel dashboard ownership after dependency install
+      ansible.builtin.file:
+        path: /opt/forex-ai-control-tower/dashboard-laravel
+        state: directory
+        owner: aiops
+        group: aiops
+        recurse: true
 
     - name: Install Laravel dashboard environment file
       ansible.builtin.copy:

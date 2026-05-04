@@ -29,7 +29,7 @@ Laravel is a good fit for the operator/admin dashboard, especially for forms, ap
 
 ## Current Scaffold
 
-The first Laravel scaffold is read-only. It displays:
+The first Laravel scaffold is deployed on `10.10.1.81:8090` as a read-first operator console. It displays:
 
 - API health.
 - Production readiness gates.
@@ -37,4 +37,4 @@ The first Laravel scaffold is read-only. It displays:
 - Recent market feed snapshots.
 - Links to FastAPI docs and Grafana.
 
-The live action buttons are intentionally disabled until Laravel authentication and audited POST workflows are implemented.
+The live action buttons are intentionally disabled until Laravel authentication and audited POST workflows are implemented. Production-live remains controlled by the FastAPI readiness gates and the guarded Ansible enablement playbook.

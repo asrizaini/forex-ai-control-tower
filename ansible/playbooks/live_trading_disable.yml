@@ -1,0 +1,38 @@
+---
+- name: Disable live trading runtime on control node
+  hosts: control
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Set live trading runtime flag off on control node
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - set-environment
+          - ALLOW_LIVE_TRADING=false
+
+    - name: Restart control API with live runtime disabled
+      ansible.builtin.systemd_service:
+        name: forex-control-api
+        state: restarted
+        enabled: true
+
+- name: Disable live trading runtime on Windows MT5 bridge
+  hosts: mt5_bridge_windows
+  gather_facts: false
+  tasks:
+    - name: Set Windows MT5 bridge live trading runtime flag off
+      ansible.windows.win_environment:
+        state: present
+        level: machine
+        name: ALLOW_LIVE_TRADING
+        value: "false"
+
+    - name: Restart MT5 bridge scheduled task after live disablement
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        Stop-ScheduledTask -TaskName "ForexAI-MT5-Bridge" -ErrorAction SilentlyContinue
+        Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "C:\ForexAI\*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-ScheduledTask -TaskName "ForexAI-MT5-Bridge"
+        Start-Sleep -Seconds 8
+        (Invoke-WebRequest -Uri "http://127.0.0.1:8501/health" -UseBasicParsing -TimeoutSec 10).StatusCode

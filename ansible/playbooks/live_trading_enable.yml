@@ -1,0 +1,86 @@
+---
+- name: Enable live trading runtime only after all pre-live gates pass
+  hosts: control
+  become: true
+  gather_facts: false
+  vars:
+    required_confirmation: "I explicitly approve production-live after demo validation"
+  tasks:
+    - name: Require exact operator confirmation from environment
+      ansible.builtin.assert:
+        that:
+          - lookup('env', 'LIVE_TRADING_EXPLICIT_CONFIRMATION') == required_confirmation
+        fail_msg: "LIVE_TRADING_EXPLICIT_CONFIRMATION must exactly match the required approval phrase."
+      no_log: true
+
+    - name: Fetch production readiness from control API
+      ansible.builtin.uri:
+        url: http://10.10.1.81:8000/api/v1/system/production-readiness
+        method: GET
+        return_content: true
+      register: readiness
+
+    - name: Block live enablement if any readiness gate is still blocking
+      ansible.builtin.assert:
+        that:
+          - readiness.json.blocking_gates | length == 0
+        fail_msg: "Live trading cannot be enabled while readiness gates are blocking."
+
+    - name: Set live trading runtime flag on control node
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - set-environment
+          - ALLOW_LIVE_TRADING=true
+
+    - name: Restart control API with live runtime flag
+      ansible.builtin.systemd_service:
+        name: forex-control-api
+        state: restarted
+        enabled: true
+
+- name: Enable live trading runtime flag on Windows MT5 bridge
+  hosts: mt5_bridge_windows
+  gather_facts: false
+  vars:
+    required_confirmation: "I explicitly approve production-live after demo validation"
+  tasks:
+    - name: Require exact operator confirmation from environment
+      ansible.builtin.assert:
+        that:
+          - lookup('env', 'LIVE_TRADING_EXPLICIT_CONFIRMATION') == required_confirmation
+        fail_msg: "LIVE_TRADING_EXPLICIT_CONFIRMATION must exactly match the required approval phrase."
+      no_log: true
+
+    - name: Fetch production readiness from control API before Windows bridge enablement
+      ansible.windows.win_uri:
+        url: http://10.10.1.81:8000/api/v1/system/production-readiness
+        method: GET
+        return_content: true
+      register: windows_readiness
+
+    - name: Parse Windows readiness response
+      ansible.builtin.set_fact:
+        windows_readiness_json: "{{ windows_readiness.content | from_json }}"
+
+    - name: Block Windows bridge live enablement if any readiness gate is still blocking
+      ansible.builtin.assert:
+        that:
+          - windows_readiness_json.blocking_gates | length == 0
+        fail_msg: "Windows MT5 bridge live trading cannot be enabled while readiness gates are blocking."
+
+    - name: Set Windows MT5 bridge live trading runtime flag
+      ansible.windows.win_environment:
+        state: present
+        level: machine
+        name: ALLOW_LIVE_TRADING
+        value: "true"
+
+    - name: Restart MT5 bridge scheduled task after live enablement
+      ansible.windows.win_shell: |
+        $ErrorActionPreference = "Stop"
+        Stop-ScheduledTask -TaskName "ForexAI-MT5-Bridge" -ErrorAction SilentlyContinue
+        Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "C:\ForexAI\*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-ScheduledTask -TaskName "ForexAI-MT5-Bridge"
+        Start-Sleep -Seconds 8
+        (Invoke-WebRequest -Uri "http://127.0.0.1:8501/health" -UseBasicParsing -TimeoutSec 10).StatusCode

@@ -24,6 +24,7 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Blackbox exporter reachability monitoring.
 - `[x]` Control API running on `10.10.1.81:8000`.
 - `[x]` Dashboard running on `10.10.1.81:5173`.
+- `[x]` Laravel operator dashboard running on `10.10.1.81:8090` as an operations console over the FastAPI control plane.
 - `[x]` Ollama installed on LLM nodes.
 - `[x]` Market worker service enabled on machine 4.
 - `[x]` Strategy/risk worker service enabled on machine 5.
@@ -63,6 +64,7 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Order send requires Execution Guard approval token.
 - `[x]` Runtime secrets are environment-driven with no committed secret material.
 - `[x]` Secret manager provider configuration added for env, Vault, SOPS, and cloud providers; active env provider is verifiable through API/dashboard, external provider activation is an operator choice before live trading.
+- `[x]` Guarded live trading enable/disable playbooks added; enablement refuses to run unless all production-readiness gates are green and the exact operator confirmation phrase is supplied from environment.
 
 ## Core API And Dashboard
 
@@ -82,6 +84,8 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` 2FA setup/enable flow.
 - `[x]` Refresh token flow.
 - `[x]` Service API key management.
+- `[x]` Laravel operator dashboard scaffold deployed for readiness, account/market status, and pre-live gate visibility.
+- `[!]` Laravel write-side approval forms; dashboard is intentionally read-first until authenticated audited POST workflows are expanded through FastAPI.
 
 ## Main Orchestrator And Agents
 
@@ -318,13 +322,14 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Real risk policies per account.
 - `[!]` Real strategy validation pipeline; plugin governance, lifecycle order, backtest/forward/tuning job records, permissions, historical candles, and demo report are wired, full historical execution engine is held pending data depth.
 - `[x]` Demo trading validation report endpoint.
-- `[!]` Manual approval workflow proven at API/database level; notification delivery and MT5 handoff are held pending channel credentials and demo execution flow.
+- `[x]` Manual approval workflow proven at API/database level; notification delivery and MT5 handoff remain gated until channel credentials and demo execution flow are proven.
 - `[!]` Restricted live auto-trading reviewed and approved: held by safety policy.
 - `[x]` Secret manager provider layer deployed with environment provider active; external providers held for operator selection.
 - `[x]` Backup verification and non-destructive restore drill tooling deployed.
 - `[x]` Monitoring alerts connected to notification hub.
 - `[!]` Security review completed: held for formal operator review/sign-off.
-- `[!]` Broker compatibility checks passed: held pending broker/account metadata validation.
-- `[!]` Market data quality gates passed: held pending sufficient live candle/tick history.
-- `[!]` Kill switch tested: held pending operator-approved live runtime drill.
+- `[x]` Broker compatibility checks passed for the currently connected demo bridge profile.
+- `[x]` Market data quality gates passed for current pre-live readiness.
+- `[x]` Kill switch tested at control-plane level and included in readiness gates.
 - `[!]` Production-live environment explicitly approved: held by safety policy.
+- `[x]` Safe live runtime enable/disable automation documented in `docs/LIVE_TRADING_ENABLEMENT.md`.
