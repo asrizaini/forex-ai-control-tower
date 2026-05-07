@@ -46,26 +46,104 @@ def _message_id() -> str:
     return f"msg_{int(time.time() * 1000)}"
 
 
+from agents.risk_manager_agent import RiskManagerAgent
+from agents.signal_reviewer_agent import SignalReviewerAgent
+from agents.strategy_agent import StrategyAgent
+
+
 def _workflow_response(task: AgentTask) -> WorkflowResult:
     agent = task.assigned_agent
     task_type = task.task_type
+    request = task.request_json or {}
+
+    # Build an AgentMessage from the task request for real agent logic
+    incoming_message = AgentMessage(
+        message_id=f"msg_{int(time.time() * 1000)}",
+        task_id=task.task_id,
+        sender_agent="Orchestrator Agent",
+        recipient_agent=agent,
+        message_type="task_dispatch",
+        payload_json={"task_type": task_type, "request": request},
+    )
+
+    # Route to real agent implementations where available
     if agent == "Risk Manager":
-        return WorkflowResult(
-            summary="Risk Manager reviewed the queued request in monitor-only mode. No approval, order, or risk-policy change was executed.",
-            risk_status="review_complete_no_execution",
-            next_action="Create or update a governed risk policy before enabling any demo approval flow.",
+        risk_agent = RiskManagerAgent()
+        # Extract risk parameters from the request payload
+        result = risk_agent.evaluate_risk(
+            context=request.get("context", task_type),
+            current_risk_status=request.get("risk_status", "unknown"),
+            confidence=float(request.get("confidence", 0.5)),
+            kill_switch_active=bool(request.get("kill_switch_active", False)),
+            daily_loss_pct=float(request.get("daily_loss_pct", 0.0)),
+            max_daily_loss_pct=float(request.get("max_daily_loss_pct", 5.0)),
+            weekly_loss_pct=float(request.get("weekly_loss_pct", 0.0)),
+            max_weekly_loss_pct=float(request.get("max_weekly_loss_pct", 10.0)),
+            open_trades=int(request.get("open_trades", 0)),
+            max_open_trades=int(request.get("max_open_trades", 3)),
+            news_halt_active=bool(request.get("news_halt_active", False)),
+            trading_mode=request.get("trading_mode", "monitor_only"),
         )
+        return WorkflowResult(
+            summary=result.summary,
+            risk_status=result.risk_status,
+            next_action=result.next_action,
+        )
+
+    if agent == "Strategy Agent":
+        strategy_agent = StrategyAgent()
+        result = strategy_agent.propose_signal(
+            context=request.get("context", task_type),
+            confidence=float(request.get("confidence", 0.5)),
+            symbol=request.get("symbol", ""),
+            direction=request.get("direction", ""),
+            strategy_id=request.get("strategy_id", ""),
+            timeframe=request.get("timeframe", "M1"),
+            lifecycle_state=request.get("lifecycle_state", "draft"),
+            quality_score=float(request.get("quality_score", 0.0)),
+            min_quality_score=float(request.get("min_quality_score", 0.5)),
+            market_data_fresh=bool(request.get("market_data_fresh", True)),
+            trend_status=request.get("trend_status", "neutral"),
+            current_bias=request.get("current_bias", "neutral"),
+        )
+        return WorkflowResult(
+            summary=result.summary,
+            risk_status=result.governance_status,
+            next_action=result.next_action,
+        )
+
+    if agent == "Signal Reviewer":
+        reviewer = SignalReviewerAgent()
+        result = reviewer.review_signal(
+            context=request.get("context", task_type),
+            confidence=float(request.get("confidence", 0.5)),
+            risk_status=request.get("risk_status", "unknown"),
+            signal_status=request.get("signal_status", "active"),
+            direction=request.get("direction", ""),
+            symbol=request.get("symbol", ""),
+            strategy_id=request.get("strategy_id", ""),
+            timeframe=request.get("timeframe", "M1"),
+            min_confidence=float(request.get("min_confidence", 0.4)),
+            max_spread_points=float(request.get("max_spread_points", 30.0)),
+            spread_points=float(request.get("spread_points", 0.0)),
+            news_halt_active=bool(request.get("news_halt_active", False)),
+            market_data_fresh=bool(request.get("market_data_fresh", True)),
+            duplicate_signal=bool(request.get("duplicate_signal", False)),
+            correlation_conflict=bool(request.get("correlation_conflict", False)),
+            strategy_lifecycle_state=request.get("strategy_lifecycle_state", "draft"),
+            quality_score=float(request.get("quality_score", 0.0)),
+        )
+        return WorkflowResult(
+            summary=result.summary,
+            risk_status=result.review_status,
+            next_action=result.next_action,
+        )
+
     if agent == "Market Data Agent":
         return WorkflowResult(
             summary="Market Data Agent reviewed the queued request against MT5 telemetry. Stale or incomplete market data remains blocked from signal generation.",
             risk_status="data_quality_gate_active",
             next_action="Wait for fresh ticks and candle history before technical signal scoring.",
-        )
-    if agent == "Strategy Agent":
-        return WorkflowResult(
-            summary="Strategy Agent accepted the queued request for governance review. Strategy output remains non-executable until backtest, forward test, demo validation, and approval gates pass.",
-            risk_status="strategy_governance_required",
-            next_action="Attach a registered strategy_id and run validation before any signal proposal.",
         )
     if agent == "Deployment Agent":
         return WorkflowResult(

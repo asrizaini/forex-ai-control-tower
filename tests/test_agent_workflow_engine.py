@@ -14,7 +14,13 @@ def test_workflow_engine_processes_queued_task(monkeypatch, tmp_path):
             requested_by="test",
             assigned_agent="Risk Manager",
             task_type="risk_review",
-            request_json={"request": "review risk"},
+            request_json={
+                "request": "review risk",
+                "trading_mode": "monitor_only",
+                "daily_loss_pct": 0.0,
+                "weekly_loss_pct": 0.0,
+                "open_trades": 0,
+            },
         )
     )
     db.commit()
@@ -28,6 +34,7 @@ def test_workflow_engine_processes_queued_task(monkeypatch, tmp_path):
     db.close()
     assert processed == "task_test"
     assert task.status == "completed"
-    assert task.result_json["risk_status"] == "review_complete_no_execution"
+    # With monitor_only mode, RiskManagerAgent correctly blocks execution
+    assert task.result_json["risk_status"] == "risk_blocked"
     assert len(messages) == 2
 
