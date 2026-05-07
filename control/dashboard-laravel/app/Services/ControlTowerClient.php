@@ -46,6 +46,9 @@ class ControlTowerClient
         $baseUrl = rtrim(config('control_tower.api_url'), '/');
         $pending = [];
         foreach ($requests as $key => $path) {
+            if (str_starts_with((string) $key, '__fallback_') || !is_string($path)) {
+                continue;
+            }
             $url = $baseUrl . '/' . ltrim($path, '/');
             $pending[$key] = $this->buildPoolRequest($url, $resolvedToken);
         }
@@ -56,6 +59,9 @@ class ControlTowerClient
         }
         $results = [];
         foreach ($requests as $key => $path) {
+            if (str_starts_with((string) $key, '__fallback_') || !is_string($path)) {
+                continue;
+            }
             $response = $responses[$key] ?? null;
             $fallback = $requests['__fallback_' . $key] ?? [];
             if ($response instanceof Response && $response->successful()) {

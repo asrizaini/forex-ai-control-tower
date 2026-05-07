@@ -488,7 +488,7 @@
           User=aiops
           Group=aiops
           WorkingDirectory=/opt/forex-ai-control-tower/dashboard-laravel
-          ExecStart=/usr/bin/php artisan serve --host=0.0.0.0 --port=5173
+          ExecStart=/usr/bin/php artisan serve --host=0.0.0.0 --port=5173 --no-reload
           Environment=PHP_CLI_SERVER_WORKERS=4
           Restart=always
           RestartSec=5
