@@ -498,6 +498,14 @@
           WantedBy=multi-user.target
 
     - name: Copy data cleanup worker script
+      ansible.builtin.file:
+        path: /opt/forex-ai-control-tower/app/scripts
+        state: directory
+        owner: aiops
+        group: aiops
+        mode: "0755"
+
+    - name: Copy data cleanup worker script file
       ansible.builtin.copy:
         src: ../../scripts/data_cleanup_worker.py
         dest: /opt/forex-ai-control-tower/app/scripts/data_cleanup_worker.py
