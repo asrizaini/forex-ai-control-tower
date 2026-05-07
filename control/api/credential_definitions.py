@@ -73,11 +73,21 @@ DEFINITIONS: tuple[CredentialDefinition, ...] = (
     CredentialDefinition("ORCHESTRATOR_LLM_RETRY_COUNT", "Orchestrator LLM retries", "OpenClaw", False, False, None, placeholder="1", pattern=r"^[0-3]$", field_type="number"),
     CredentialDefinition("MT5_DEFAULT_ACCOUNT_ID", "MT5 default account ID", "MT5 Bridge", False, False, None, placeholder="demo_main"),
     CredentialDefinition("MT5_DEFAULT_BRIDGE_PORT", "MT5 default bridge port", "MT5 Bridge", False, False, None, placeholder="8501", pattern=r"^\d+$", field_type="number"),
-    CredentialDefinition("MT5_BRIDGE_API_URL", "MT5 bridge API URL", "MT5 Bridge", False, False, None, placeholder="http://10.10.1.86:8501"),
+    CredentialDefinition("MT5_BRIDGE_API_URL", "MT5 bridge API URL", "MT5 Bridge", True, False, None, placeholder="http://10.10.1.86:8501"),
     CredentialDefinition("MT5_BRIDGE_URL", "MT5 bridge base URL", "MT5 Bridge", False, False, None, placeholder="http://10.10.1.86:8501"),
     CredentialDefinition("MT5_DEFAULT_TERMINAL_PORT", "MT5 default terminal port", "MT5 Bridge", False, False, None, placeholder="8501", pattern=r"^\d+$", field_type="number"),
     CredentialDefinition("MT5_TERMINAL_PATH", "MT5 terminal path", "MT5 Bridge", False, False, None, placeholder=r"C:\Program Files\MetaTrader 5\terminal64.exe"),
     CredentialDefinition("MT5_ACCOUNT_PROFILES_FILE", "MT5 account profiles file", "MT5 Bridge", False, False, None, placeholder=r"C:\ForexAI\mt5_bridge\account_profiles.json"),
+    CredentialDefinition("MT5_SERVER", "MT5 live server address", "MT5 Bridge", False, False, None, placeholder="MetaQuotes-Demo"),
+    CredentialDefinition("MT5_LOGIN", "MT5 live account login", "MT5 Bridge", False, False, None, placeholder="12345678", pattern=r"^\d+$", field_type="number"),
+    CredentialDefinition("MT5_PASSWORD", "MT5 live account password", "MT5 Bridge", False, True, None, min_length=4),
+    CredentialDefinition("MT5_DEMO_SERVER", "MT5 demo server address", "MT5 Bridge", False, False, None, placeholder="MetaQuotes-Demo"),
+    CredentialDefinition("MT5_DEMO_LOGIN", "MT5 demo account login", "MT5 Bridge", False, False, None, placeholder="87654321", pattern=r"^\d+$", field_type="number"),
+    CredentialDefinition("MT5_DEMO_PASSWORD", "MT5 demo account password", "MT5 Bridge", False, True, None, min_length=4),
+    CredentialDefinition("MT5_MAX_SLIPPAGE_POINTS", "MT5 max slippage points", "MT5 Bridge", False, False, None, placeholder="10", pattern=r"^\d+$", field_type="number"),
+    CredentialDefinition("MT5_ORDER_TIMEOUT_SECONDS", "MT5 order timeout seconds", "MT5 Bridge", False, False, None, placeholder="30", pattern=r"^\d+$", field_type="number"),
+    CredentialDefinition("MT5_RETRY_COUNT", "MT5 connection retry count", "MT5 Bridge", False, False, None, placeholder="3", pattern=r"^[1-5]$", field_type="number"),
+    CredentialDefinition("MT5_HEARTBEAT_INTERVAL_SECONDS", "MT5 heartbeat interval seconds", "MT5 Bridge", False, False, None, placeholder="60", pattern=r"^\d+$", field_type="number"),
 )
 
 DEFINITION_BY_NAME = {definition.name: definition for definition in DEFINITIONS}

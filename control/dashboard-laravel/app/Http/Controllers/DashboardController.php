@@ -27,22 +27,38 @@ class DashboardController extends Controller
 
     public function overview(Request $request): View
     {
-        return $this->render($request, 'pages.overview', 'overview', [
-            'health' => $this->client->get('/health', null, ['status' => 'unavailable']),
-            'apiStatus' => $this->client->get('/api/v1/api/status', null, ['status' => 'unavailable', 'services' => []]),
-            'runtimeStatus' => $this->client->get('/api/v1/system/runtime', null, ['orchestrator' => ['status' => 'down']]),
-            'healthStatus' => $this->client->get('/api/v1/system/health/status', null, ['healthy' => false, 'services' => []]),
-            'calendarStatus' => $this->client->get('/api/v1/calendar/status', null, ['status' => 'unavailable', 'sources' => []]),
-            'newsStatus' => $this->client->get('/api/v1/news/status', null, ['risk_status' => 'unavailable']),
-            'workers' => $this->client->get('/api/v1/workers/status', null, ['workers' => []]),
-            'pairSummaries' => $this->client->get('/api/v1/pair-summaries', null, ['items' => [], 'summary' => []]),
-            'signals' => $this->client->get('/api/v1/signals/summary', null, ['items' => [], 'summary' => []]),
-            'signalRecords' => $this->client->get('/api/v1/signals/records?limit=12', null, ['items' => []]),
-            'accounts' => $this->client->get('/api/v1/accounts/records', null, []),
-            'accountSnapshots' => $this->client->get('/api/v1/telemetry/accounts/latest?limit=5', null, []),
-            'readiness' => $this->client->get('/api/v1/system/production-readiness', null, []),
-            'auditLogs' => $this->client->get('/api/v1/logs/audit?limit=8', null, ['items' => []]),
+        $poolResults = $this->client->getPool([
+            'health' => '/health',
+            '__fallback_health' => ['status' => 'unavailable'],
+            'apiStatus' => '/api/v1/api/status',
+            '__fallback_apiStatus' => ['status' => 'unavailable', 'services' => []],
+            'runtimeStatus' => '/api/v1/system/runtime',
+            '__fallback_runtimeStatus' => ['orchestrator' => ['status' => 'down']],
+            'healthStatus' => '/api/v1/system/health/status',
+            '__fallback_healthStatus' => ['healthy' => false, 'services' => []],
+            'calendarStatus' => '/api/v1/calendar/status',
+            '__fallback_calendarStatus' => ['status' => 'unavailable', 'sources' => []],
+            'newsStatus' => '/api/v1/news/status',
+            '__fallback_newsStatus' => ['risk_status' => 'unavailable'],
+            'workers' => '/api/v1/workers/status',
+            '__fallback_workers' => ['workers' => []],
+            'pairSummaries' => '/api/v1/pair-summaries',
+            '__fallback_pairSummaries' => ['items' => [], 'summary' => []],
+            'signals' => '/api/v1/signals/summary',
+            '__fallback_signals' => ['items' => [], 'summary' => []],
+            'signalRecords' => '/api/v1/signals/records?limit=12',
+            '__fallback_signalRecords' => ['items' => []],
+            'accounts' => '/api/v1/accounts/records',
+            '__fallback_accounts' => [],
+            'accountSnapshots' => '/api/v1/telemetry/accounts/latest?limit=5',
+            '__fallback_accountSnapshots' => [],
+            'readiness' => '/api/v1/system/production-readiness',
+            '__fallback_readiness' => [],
+            'auditLogs' => '/api/v1/logs/audit?limit=8',
+            '__fallback_auditLogs' => ['items' => []],
         ]);
+
+        return $this->render($request, 'pages.overview', 'overview', $poolResults);
     }
 
     public function tradingPairs(Request $request): View
@@ -740,7 +756,8 @@ class DashboardController extends Controller
             $active = 'login';
             $data = [];
         }
-        $runtime = $this->client->get('/health', null, [
+        // Use health data from page data if already fetched (e.g. overview pool), otherwise fetch it
+        $runtime = $data['health'] ?? $this->client->get('/health', null, [
             'status' => 'unavailable',
             'environment' => 'demo',
             'trading_mode' => 'monitor_only',
