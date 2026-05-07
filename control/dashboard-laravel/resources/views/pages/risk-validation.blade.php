@@ -10,7 +10,16 @@
     .risk-helper {color: #9cb2ca; font-size: 13px; line-height: 1.45}
     .step-grid {display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr))}
     @media(max-width: 1180px){.step-grid{grid-template-columns:1fr}}
+    .flash-msg {padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 14px}
+    .flash-msg.ok {background: #0d2818; border: 1px solid #1a5c2e; color: #4ade80}
+    .flash-msg.err {background: #2a0f1a; border: 1px solid #6b2d42; color: #f87171}
 </style>
+@if(session('status'))
+    <div class="flash-msg ok">{{ session('status') }}</div>
+@endif
+@if(session('error'))
+    <div class="flash-msg err">{{ session('error') }}</div>
+@endif
 @php
     $demoAccount = collect($accounts ?? [])->firstWhere('account_id', 'demo_main') ?? collect($accounts ?? [])->first();
     $latestAccount = collect($accountSnapshots ?? [])->first();
@@ -92,6 +101,23 @@
             <form method="POST" action="{{ route('demo-trading.mode') }}">
                 @csrf
                 <input type="hidden" name="account_id" value="{{ $demoAccount['account_id'] }}">
+                <input type="hidden" name="trading_mode" value="monitor_only">
+                <button class="secondary" type="submit">Stop Demo Auto Trade</button>
+            </form>
+            <form method="POST" action="{{ route('demo-trading.run-cycle') }}">
+                @csrf
+                <button class="secondary" type="submit">Run Demo Execution Cycle</button>
+            </form>
+        @else
+            <form method="POST" action="{{ route('demo-trading.mode') }}">
+                @csrf
+                <input type="hidden" name="account_id" value="demo_main">
+                <input type="hidden" name="trading_mode" value="demo_auto">
+                <button type="submit">Start Demo Auto Trade</button>
+            </form>
+            <form method="POST" action="{{ route('demo-trading.mode') }}">
+                @csrf
+                <input type="hidden" name="account_id" value="demo_main">
                 <input type="hidden" name="trading_mode" value="monitor_only">
                 <button class="secondary" type="submit">Stop Demo Auto Trade</button>
             </form>

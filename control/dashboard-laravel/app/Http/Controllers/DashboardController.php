@@ -122,14 +122,25 @@ class DashboardController extends Controller
     public function riskValidation(Request $request): View
     {
         $token = $this->optionalToken($request);
-        return $this->render($request, 'pages.risk-validation', 'risk-validation', [
-            'summaries' => $this->client->get('/api/v1/pair-summaries', null, ['items' => [], 'summary' => []]),
-            'accounts' => $this->client->get('/api/v1/accounts/records', null, []),
-            'accountSnapshots' => $this->client->get('/api/v1/telemetry/accounts/latest?limit=5', null, []),
-            'executions' => $this->client->get('/api/v1/trades/executions?limit=80', null, ['items' => []]),
-            'demoStatus' => $token ? $this->client->get('/api/v1/trades/demo-auto/status', $token, []) : [],
-            'demoActivity' => $token ? $this->client->get('/api/v1/trades/demo-auto/activity?limit=40', $token, ['items' => []]) : ['items' => []],
-        ]);
+        $poolRequests = [
+            'summaries' => '/api/v1/pair-summaries',
+            '__fallback_summaries' => ['items' => [], 'summary' => []],
+            'accounts' => '/api/v1/accounts/records',
+            '__fallback_accounts' => [],
+            'accountSnapshots' => '/api/v1/telemetry/accounts/latest?limit=5',
+            '__fallback_accountSnapshots' => [],
+            'executions' => '/api/v1/trades/executions?limit=80',
+            '__fallback_executions' => ['items' => []],
+        ];
+        if ($token) {
+            $poolRequests['demoStatus'] = '/api/v1/trades/demo-auto/status';
+            $poolRequests['__fallback_demoStatus'] = [];
+            $poolRequests['demoActivity'] = '/api/v1/trades/demo-auto/activity?limit=40';
+            $poolRequests['__fallback_demoActivity'] = ['items' => []];
+        }
+        $poolResults = $this->client->getPool($poolRequests, $token);
+
+        return $this->render($request, 'pages.risk-validation', 'risk-validation', $poolResults);
     }
 
     public function testing(Request $request): View
