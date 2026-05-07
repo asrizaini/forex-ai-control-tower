@@ -17,7 +17,7 @@ from ..db import get_db
 from ..dependencies import current_principal
 from ..models import AnalysisSnapshot, HistoricalCandle, MarketSnapshot, SignalRecord, Strategy, StrategyLabJob, TradingPair, WorkerStatus
 from ..permissions import has_permission
-from ..time_utils import iso_local
+from ..time_utils import utcnow, iso_local
 from strategies.lab import deterministic_backtest_result
 from strategies.registry import discover_plugins, plugin_metadata
 
@@ -25,14 +25,15 @@ router = APIRouter(tags=["trading"])
 
 DEFAULT_PAIRS = [
     ("EURUSD", "EUR/USD", True, "M1", "trend_pullback_v1"),
-    ("GBPUSD", "GBP/USD", True, "M1", "trend_pullback_v1"),
-    ("USDJPY", "USD/JPY", True, "M1", "trend_pullback_v1"),
+    ("GBPUSD", "GBP/USD", True, "M5", "mean_reversion_v1"),
+    ("USDJPY", "USD/JPY", True, "M15", "breakout_continuation_v1"),
     ("XAUUSD", "Gold / USD", True, "M1", "trend_pullback_v1"),
-    ("AUDUSD", "AUD/USD", False, "M1", "trend_pullback_v1"),
-    ("USDCAD", "USD/CAD", False, "M1", "trend_pullback_v1"),
-    ("USDCHF", "USD/CHF", False, "M1", "trend_pullback_v1"),
-    ("NZDUSD", "NZD/USD", False, "M1", "trend_pullback_v1"),
+    ("AUDUSD", "AUD/USD", True, "M5", "mean_reversion_v1"),
+    ("USDCAD", "USD/CAD", True, "M15", "breakout_continuation_v1"),
+    ("USDCHF", "USD/CHF", True, "M5", "mean_reversion_v1"),
+    ("NZDUSD", "NZD/USD", True, "M15", "breakout_continuation_v1"),
 ]
+ALLOWED_TIMEFRAMES = {"M1", "M5", "M15", "M30", "H1", "H4", "D1"}
 
 
 class TradingPairPayload(BaseModel):
@@ -45,6 +46,15 @@ class TradingPairPayload(BaseModel):
     metadata_json: dict[str, Any] = Field(default_factory=dict)
 
 
+class TradingPairUpdatePayload(BaseModel):
+    display_name: str | None = Field(default=None, max_length=80)
+    enabled: bool | None = None
+    default_timeframe: str | None = Field(default=None, max_length=20)
+    assigned_strategy_id: str | None = Field(default=None, max_length=100)
+    status: str | None = Field(default=None, max_length=60)
+    metadata_json: dict[str, Any] | None = None
+
+
 class BacktestRunPayload(BaseModel):
     symbol: str = Field(min_length=3, max_length=40)
     timeframe: str = Field(default="M1", max_length=20)
@@ -55,7 +65,7 @@ class BacktestRunPayload(BaseModel):
 
 
 def _now() -> datetime:
-    return datetime.utcnow()
+    return utcnow()
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -65,8 +75,40 @@ def _iso(value: datetime | None) -> str | None:
 def _seed_pairs(db: Session) -> None:
     changed = False
     for symbol, display_name, enabled, timeframe, strategy_id in DEFAULT_PAIRS:
+        seeded_timeframes = [timeframe, "M5", "M15", "H1"]
         existing = db.scalar(select(TradingPair).where(TradingPair.symbol == symbol))
         if existing:
+            metadata = existing.metadata_json or {}
+            current_tfs = metadata.get("analysis_timeframes")
+            if (
+                not isinstance(current_tfs, list)
+                or len(current_tfs) == 0
+                or (metadata.get("source") == "default_seed" and [str(tf).upper() for tf in current_tfs] == ["M1"])
+            ):
+                metadata["analysis_timeframes"] = seeded_timeframes
+                existing.metadata_json = metadata
+                changed = True
+            # Reconcile legacy seeded rows from early scaffold defaults.
+            if (
+                metadata.get("source") == "default_seed"
+                and not existing.enabled
+                and existing.last_processed_at is None
+                and enabled
+            ):
+                existing.enabled = True
+                existing.status = "enabled"
+                existing.default_timeframe = existing.default_timeframe or timeframe
+                existing.assigned_strategy_id = existing.assigned_strategy_id or strategy_id
+                existing.updated_at = _now()
+                changed = True
+            if (
+                metadata.get("source") == "default_seed"
+                and existing.assigned_strategy_id in {None, "", "trend_pullback_v1"}
+                and strategy_id != "trend_pullback_v1"
+            ):
+                existing.assigned_strategy_id = strategy_id
+                existing.updated_at = _now()
+                changed = True
             continue
         db.add(
             TradingPair(
@@ -76,7 +118,7 @@ def _seed_pairs(db: Session) -> None:
                 default_timeframe=timeframe,
                 assigned_strategy_id=strategy_id,
                 status="enabled" if enabled else "disabled",
-                metadata_json={"source": "default_seed"},
+                metadata_json={"source": "default_seed", "analysis_timeframes": seeded_timeframes},
             )
         )
         changed = True
@@ -85,15 +127,24 @@ def _seed_pairs(db: Session) -> None:
 
 
 def _pair_dict(row: TradingPair) -> dict[str, Any]:
+    metadata = row.metadata_json or {}
+    configured = metadata.get("analysis_timeframes")
+    if isinstance(configured, list):
+        configured_timeframes = [str(item).upper() for item in configured if str(item).strip()]
+    else:
+        configured_timeframes = []
+    if row.default_timeframe and row.default_timeframe not in configured_timeframes:
+        configured_timeframes.insert(0, row.default_timeframe)
     return {
         "symbol": row.symbol,
         "display_name": row.display_name or row.symbol,
         "enabled": row.enabled,
         "default_timeframe": row.default_timeframe,
+        "configured_timeframes": configured_timeframes or [row.default_timeframe or "M1"],
         "assigned_strategy_id": row.assigned_strategy_id,
         "status": row.status,
         "last_processed_at": _iso(row.last_processed_at),
-        "metadata_json": row.metadata_json or {},
+        "metadata_json": metadata,
         "updated_at": _iso(row.updated_at),
     }
 
@@ -111,6 +162,21 @@ def _latest_candles(db: Session, symbol: str, timeframe: str, limit: int = 120) 
             .limit(limit)
         )
     )
+
+
+def _configured_timeframes(pair: TradingPair) -> list[str]:
+    metadata = pair.metadata_json or {}
+    configured = metadata.get("analysis_timeframes")
+    values: list[str] = []
+    if isinstance(configured, list):
+        for item in configured:
+            timeframe = str(item).strip().upper()
+            if timeframe in ALLOWED_TIMEFRAMES and timeframe not in values:
+                values.append(timeframe)
+    default = (pair.default_timeframe or "M1").upper()
+    if default not in values:
+        values.insert(0, default)
+    return values or ["M1"]
 
 
 def _tf_seconds(timeframe: str) -> int:
@@ -226,16 +292,80 @@ def _signal_dict(signal: SignalRecord | None) -> dict[str, Any]:
 
 def _build_pair_summary(db: Session, pair: TradingPair) -> dict[str, Any]:
     symbol = pair.symbol
-    timeframe = pair.default_timeframe or "M1"
+    default_timeframe = (pair.default_timeframe or "M1").upper()
+    timeframe_breakdown: list[dict[str, Any]] = []
+    primary_candle: dict[str, Any] | None = None
+    primary_trend: dict[str, Any] | None = None
+    primary_timeframe = default_timeframe
+    signal_candidates: list[dict[str, Any]] = []
+
+    def _timeframe_rank(tf: str) -> int:
+        return {"D1": 7, "H4": 6, "H1": 5, "M30": 4, "M15": 3, "M5": 2, "M1": 1}.get(tf.upper(), 0)
+
+    for tf in _configured_timeframes(pair):
+        candles_tf = _latest_candles(db, symbol, tf)
+        candle_tf = _candle_analysis(candles_tf, tf)
+        trend_tf = _trend_analysis(candles_tf)
+        signal_tf = _latest_signal(db, symbol, tf)
+        signal_tf_dict = _signal_dict(signal_tf)
+        timeframe_breakdown.append(
+            {
+                "timeframe": tf,
+                "freshness": "stale" if candle_tf.get("stale") else "fresh",
+                "trend_status": trend_tf.get("status"),
+                "bias": trend_tf.get("bias"),
+                "signal_status": signal_tf_dict.get("signal_status"),
+                "signal_confidence": signal_tf_dict.get("confidence", 0.0),
+                "candle_summary": candle_tf.get("summary"),
+                "last_candle_timestamp": candle_tf.get("last_candle_timestamp"),
+            }
+        )
+        if signal_tf:
+            signal_candidates.append(
+                {
+                    "timeframe": tf,
+                    "signal": signal_tf,
+                    "signal_dict": signal_tf_dict,
+                    "fresh": not bool(candle_tf.get("stale")),
+                    "rank": _timeframe_rank(tf),
+                }
+            )
+        if tf == default_timeframe:
+            primary_candle = candle_tf
+            primary_trend = trend_tf
+            primary_timeframe = default_timeframe
+    preferred = sorted(
+        signal_candidates,
+        key=lambda item: (
+            1 if item["signal_dict"].get("direction") in {"buy", "sell"} else 0,
+            1 if item["fresh"] else 0,
+            float(item["signal_dict"].get("confidence") or 0.0),
+            item["rank"],
+        ),
+        reverse=True,
+    )
+    if preferred:
+        primary_timeframe = str(preferred[0]["timeframe"])
+        if primary_timeframe != default_timeframe:
+            candles_tf = _latest_candles(db, symbol, primary_timeframe)
+            primary_candle = _candle_analysis(candles_tf, primary_timeframe)
+            primary_trend = _trend_analysis(candles_tf)
     snapshot = _latest_snapshot(db, symbol)
-    candles = _latest_candles(db, symbol, timeframe)
-    candle = _candle_analysis(candles, timeframe)
-    trend = _trend_analysis(candles)
+    candle = primary_candle or _candle_analysis([], primary_timeframe)
+    trend = primary_trend or _trend_analysis([])
     news = evaluate_news_status(symbol)
-    signal = _latest_signal(db, symbol, timeframe)
+    signal = _latest_signal(db, symbol, primary_timeframe)
     stale = bool(candle.get("stale")) or (snapshot is None) or (snapshot.freshness_seconds is not None and snapshot.freshness_seconds > 180)
     signal_stale = signal is None or (_now() - signal.created_at) > timedelta(minutes=15)
     current_bias = "stale" if stale else trend["bias"]
+    halt_events = news.get("active_halt_events", []) if isinstance(news.get("active_halt_events"), list) else []
+    next_event = halt_events[0] if halt_events else (news.get("next_high_impact_event") or {})
+    halt_summary = ""
+    if news.get("news_halt_active"):
+        event_title = str(next_event.get("title", "high-impact event"))
+        resume_in = news.get("safe_resume_in_minutes")
+        resume_text = f" Resume after approximately {resume_in} minutes." if isinstance(resume_in, int) else ""
+        halt_summary = f"Blocked by high-impact news window ({event_title}).{resume_text}"
     if news.get("news_halt_active"):
         final = "Blocked"
     elif stale:
@@ -251,8 +381,12 @@ def _build_pair_summary(db: Session, pair: TradingPair) -> dict[str, Any]:
         "symbol": symbol,
         "display_name": pair.display_name or symbol,
         "enabled": pair.enabled,
+        "strategy_id": pair.assigned_strategy_id,
         "current_price": (snapshot.payload_json or {}).get("last_price") if snapshot else None,
-        "timeframe": timeframe,
+        "timeframe": primary_timeframe,
+        "default_timeframe": default_timeframe,
+        "configured_timeframes": _configured_timeframes(pair),
+        "timeframe_breakdown": timeframe_breakdown,
         "last_candle_timestamp": candle.get("last_candle_timestamp"),
         "last_signal_timestamp": _iso(signal.created_at) if signal else None,
         "data_freshness_status": "stale" if stale else "fresh",
@@ -264,7 +398,7 @@ def _build_pair_summary(db: Session, pair: TradingPair) -> dict[str, Any]:
         "technical_summary": trend["summary"],
         "fundamental_summary": news.get("note", "News/fundamental status unavailable."),
         "candle_summary": candle["summary"],
-        "risk_summary": "Blocked by high-impact news window." if news.get("news_halt_active") else "Risk validation is monitor-only and no execution is authorized.",
+        "risk_summary": halt_summary or "Risk validation is monitor-only and no execution is authorized.",
         "final_conclusion": final,
         "candle_analysis": candle,
         "trend_analysis": trend,
@@ -291,42 +425,69 @@ def _store_analysis_snapshot(db: Session, analysis_type: str, summary: dict[str,
 
 
 def _generate_signal_for_summary(db: Session, summary: dict[str, Any], strategy_id: str | None) -> SignalRecord:
+    timeframe = str(summary.get("timeframe") or "M1").upper()
     blockers: list[str] = []
     if summary["data_freshness_status"] == "stale":
         blockers.append("stale_market_or_candle_data")
     if summary.get("news_status", {}).get("news_halt_active"):
         blockers.append("high_impact_news_window")
-    trend_bias = summary.get("trend_analysis", {}).get("bias", "neutral")
-    candle_direction = summary.get("candle_analysis", {}).get("direction", "neutral")
+    trend_bias = str(summary.get("trend_analysis", {}).get("bias", "neutral")).lower()
+    trend_status = str(summary.get("trend_analysis", {}).get("status", "ranging")).lower()
+    candle = summary.get("candle_analysis", {}) if isinstance(summary.get("candle_analysis"), dict) else {}
+    candle_direction = str(candle.get("direction", "neutral")).lower()
+    has_breakout = bool(candle.get("breakout"))
+    has_rejection = bool(candle.get("rejection"))
+    has_indecision = bool(candle.get("indecision") or candle.get("doji"))
+    selected_strategy = (strategy_id or "trend_pullback_v1").strip()
+
+    def trend_pullback_rule() -> tuple[str, str, float, str]:
+        if trend_bias == "bullish" and candle_direction in {"bullish", "neutral"}:
+            return "buy", "buy", 72.0, "Trend Pullback confirms bullish continuation."
+        if trend_bias == "bearish" and candle_direction in {"bearish", "neutral"}:
+            return "sell", "sell", 72.0, "Trend Pullback confirms bearish continuation."
+        return "hold", "hold", 45.0, "Trend Pullback sees neutral or conflicting context."
+
+    def mean_reversion_rule() -> tuple[str, str, float, str]:
+        if has_indecision:
+            return "hold", "hold", 40.0, "Mean Reversion waits through indecision candle."
+        if trend_status == "ranging":
+            if candle_direction == "bearish" and has_rejection:
+                return "buy", "buy", 68.0, "Mean Reversion sees bearish rejection inside range."
+            if candle_direction == "bullish" and has_rejection:
+                return "sell", "sell", 68.0, "Mean Reversion sees bullish rejection inside range."
+        return "hold", "hold", 45.0, "Mean Reversion conditions are not ready."
+
+    def breakout_rule() -> tuple[str, str, float, str]:
+        if not has_breakout:
+            return "hold", "hold", 42.0, "Breakout strategy is waiting for breakout candle."
+        if trend_bias == "bullish":
+            return "buy", "buy", 74.0, "Breakout continuation aligns with bullish trend."
+        if trend_bias == "bearish":
+            return "sell", "sell", 74.0, "Breakout continuation aligns with bearish trend."
+        return "hold", "hold", 48.0, "Breakout detected but higher-timeframe bias is neutral."
+
+    strategy_rules = {
+        "trend_pullback_v1": trend_pullback_rule,
+        "mean_reversion_v1": mean_reversion_rule,
+        "breakout_continuation_v1": breakout_rule,
+    }
     if blockers:
         direction = "hold"
         signal_status = "blocked"
         confidence = 0.0
         reason = "Signal blocked because " + ", ".join(blockers) + "."
-    elif trend_bias == "bullish" and candle_direction in {"bullish", "neutral"}:
-        direction = "buy"
-        signal_status = "buy"
-        confidence = 72.0
-        reason = "Trend bias is bullish and latest candle does not conflict."
-    elif trend_bias == "bearish" and candle_direction in {"bearish", "neutral"}:
-        direction = "sell"
-        signal_status = "sell"
-        confidence = 72.0
-        reason = "Trend bias is bearish and latest candle does not conflict."
     else:
-        direction = "hold"
-        signal_status = "hold"
-        confidence = 45.0
-        reason = "Trend and candle context are neutral or conflicting."
+        rule = strategy_rules.get(selected_strategy, trend_pullback_rule)
+        direction, signal_status, confidence, reason = rule()
     signal = SignalRecord(
         signal_id=f"sig_{summary['symbol']}_{secrets.token_hex(8)}",
         symbol=summary["symbol"],
-        timeframe=summary["timeframe"],
+        timeframe=timeframe,
         direction=direction,
         confidence=confidence,
         signal_status=signal_status,
         freshness_status=summary["data_freshness_status"],
-        strategy_id=strategy_id,
+        strategy_id=selected_strategy,
         entry_idea="Wait for confirmation; monitor-only signal." if direction == "hold" else "Use demo/manual approval workflow only; no auto execution.",
         stop_loss_idea="Derived by approved strategy/risk policy before execution.",
         take_profit_idea="Derived by approved strategy/risk policy before execution.",
@@ -369,7 +530,7 @@ def create_trading_pair(payload: TradingPairPayload, db: Session = Depends(get_d
 
 
 @router.put("/trading-pairs/{symbol}")
-def update_trading_pair(symbol: str, payload: TradingPairPayload, db: Session = Depends(get_db), principal=Depends(current_principal)) -> dict[str, Any]:
+def update_trading_pair(symbol: str, payload: TradingPairUpdatePayload, db: Session = Depends(get_db), principal=Depends(current_principal)) -> dict[str, Any]:
     if not has_permission(principal.role, "system:write"):
         raise HTTPException(status_code=403, detail="Permission denied")
     _seed_pairs(db)
@@ -377,12 +538,20 @@ def update_trading_pair(symbol: str, payload: TradingPairPayload, db: Session = 
     if not row:
         row = TradingPair(symbol=symbol.upper())
         db.add(row)
-    row.display_name = payload.display_name or row.symbol
-    row.enabled = payload.enabled
-    row.default_timeframe = payload.default_timeframe.upper()
-    row.assigned_strategy_id = payload.assigned_strategy_id or None
-    row.status = "enabled" if payload.enabled else "disabled"
-    row.metadata_json = payload.metadata_json
+    updates = payload.model_dump(exclude_unset=True)
+    if "display_name" in updates:
+        row.display_name = updates["display_name"] or row.display_name or row.symbol
+    if "enabled" in updates and updates["enabled"] is not None:
+        row.enabled = bool(updates["enabled"])
+        row.status = "enabled" if row.enabled else "disabled"
+    if "default_timeframe" in updates and updates["default_timeframe"]:
+        row.default_timeframe = str(updates["default_timeframe"]).upper()
+    if "assigned_strategy_id" in updates:
+        row.assigned_strategy_id = updates["assigned_strategy_id"] or None
+    if "metadata_json" in updates and updates["metadata_json"] is not None:
+        row.metadata_json = updates["metadata_json"]
+    if not row.status:
+        row.status = "enabled" if row.enabled else "disabled"
     row.updated_at = _now()
     audit(db, principal, "update", "trading_pair", row.symbol, {"enabled": row.enabled, "timeframe": row.default_timeframe, "strategy": row.assigned_strategy_id})
     db.commit()
@@ -417,9 +586,22 @@ def run_analysis(db: Session = Depends(get_db), principal=Depends(current_princi
         _store_analysis_snapshot(db, "fundamental", summary)
         _store_analysis_snapshot(db, "candle", summary)
         _store_analysis_snapshot(db, "trend", summary)
-        _generate_signal_for_summary(db, summary, pair.assigned_strategy_id)
+        generated_timeframes: list[str] = []
+        for tf in summary.get("configured_timeframes", [summary.get("timeframe", "M1")]):
+            tf_upper = str(tf).upper()
+            tf_row = next((item for item in summary.get("timeframe_breakdown", []) if str(item.get("timeframe")).upper() == tf_upper), None)
+            tf_summary = dict(summary)
+            tf_summary["timeframe"] = tf_upper
+            if tf_row:
+                tf_summary["candle_summary"] = tf_row.get("candle_summary", summary.get("candle_summary"))
+                tf_summary["trend_status"] = tf_row.get("trend_status", summary.get("trend_status"))
+                tf_summary["current_bias"] = tf_row.get("bias", summary.get("current_bias"))
+                tf_summary["data_freshness_status"] = tf_row.get("freshness", summary.get("data_freshness_status"))
+            _generate_signal_for_summary(db, tf_summary, pair.assigned_strategy_id)
+            generated_timeframes.append(tf_upper)
         pair.last_processed_at = _now()
         pair.status = "processed_stale" if summary["data_freshness_status"] == "stale" else "processed"
+        summary["generated_timeframes"] = generated_timeframes
         summaries.append(summary)
     for worker_id in ("technical_analysis_worker", "fundamental_analysis_worker", "signal_generation_worker", "risk_analysis_worker"):
         worker = db.scalar(select(WorkerStatus).where(WorkerStatus.worker_id == worker_id))
@@ -454,6 +636,15 @@ def pair_summaries(db: Session = Depends(get_db)) -> dict[str, Any]:
         "missing_data": [item["symbol"] for item in items if item["candle_analysis"].get("missing_candles")],
     }
     return {"items": items, "summary": buckets, "updated_at": _iso(_now())}
+
+
+@router.get("/pair-summaries/{symbol}")
+def pair_summary_detail(symbol: str, db: Session = Depends(get_db)) -> dict[str, Any]:
+    _seed_pairs(db)
+    pair = db.scalar(select(TradingPair).where(TradingPair.symbol == symbol.upper()))
+    if not pair:
+        raise HTTPException(status_code=404, detail="Trading pair not found")
+    return {"status": "ok", "item": _build_pair_summary(db, pair), "updated_at": _iso(_now())}
 
 
 @router.get("/signals/records")

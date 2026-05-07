@@ -6,18 +6,24 @@ import time
 from hashlib import sha256
 
 
+def _sign_payload(secret: str, payload: str) -> str:
+    """Compute HMAC-SHA256 signature for a given payload string."""
+    return hmac.new(secret.encode(), payload.encode(), sha256).hexdigest()
+
+
 def create_approval_token(account_id: str, strategy_id: str, ttl_seconds: int = 60) -> str:
     secret = os.getenv("EXECUTION_GUARD_SIGNING_KEY")
     if not secret:
         raise RuntimeError("EXECUTION_GUARD_SIGNING_KEY is required")
     expires_at = int(time.time()) + ttl_seconds
     payload = f"{account_id}:{strategy_id}:{expires_at}"
-    signature = hmac.new(secret.encode(), payload.encode(), sha256).hexdigest()
+    signature = _sign_payload(secret, payload)
     return f"{payload}:{signature}"
 
 
 def validate_approval_token(token: str | None) -> bool:
-    if not os.getenv("EXECUTION_GUARD_SIGNING_KEY"):
+    secret = os.getenv("EXECUTION_GUARD_SIGNING_KEY")
+    if not secret:
         return False
     if not token:
         return False
@@ -31,5 +37,9 @@ def validate_approval_token(token: str | None) -> bool:
         return False
     if expires_at < int(time.time()):
         return False
-    expected = create_approval_token(account_id, strategy_id, expires_at - int(time.time())).rsplit(":", 1)[1]
+    # Recompute the signature from the exact same payload to avoid
+    # time-of-check vs time-of-use drift that occurred when calling
+    # create_approval_token() with a recomputed TTL.
+    payload = f"{account_id}:{strategy_id}:{expires_raw}"
+    expected = _sign_payload(secret, payload)
     return hmac.compare_digest(expected, signature)

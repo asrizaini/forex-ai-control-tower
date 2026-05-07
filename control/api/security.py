@@ -9,6 +9,8 @@ import struct
 import time
 from datetime import datetime, timedelta
 
+from .time_utils import utcnow
+
 
 PASSWORD_ITERATIONS = 210_000
 
@@ -55,7 +57,7 @@ def verify_totp(secret: str | None, code: str | None, window: int = 1) -> bool:
 
 
 def refresh_expiry(days: int = 7) -> datetime:
-    return datetime.utcnow() + timedelta(days=days)
+    return utcnow() + timedelta(days=days)
 
 
 def otpauth_uri(user_id: str, secret: str) -> str:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,6 +12,7 @@ from ..crud import audit
 from ..db import get_db
 from ..dependencies import current_principal
 from ..models import RefreshToken, User, UserCredential
+from ..time_utils import utcnow
 from ..permissions import has_permission
 from ..security import (
     generate_totp_secret,
@@ -24,6 +24,7 @@ from ..security import (
     verify_password,
     verify_totp,
 )
+from ..credential_store import runtime_value
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -42,8 +43,8 @@ def _refresh_payload(db: Session, user: User) -> dict:
 
 @router.post("/bootstrap-admin")
 def bootstrap_admin(payload: BootstrapAdminRequest, db: Session = Depends(get_db)) -> dict:
-    expected_password = os.getenv("LOCAL_ADMIN_BOOTSTRAP_PASSWORD")
-    if os.getenv("LOCAL_AUTH_BOOTSTRAP_ENABLED", "false").lower() != "true" or not expected_password:
+    expected_password = runtime_value("LOCAL_ADMIN_BOOTSTRAP_PASSWORD")
+    if runtime_value("LOCAL_AUTH_BOOTSTRAP_ENABLED", "false").lower() != "true" or not expected_password:
         raise HTTPException(status_code=503, detail="Local auth bootstrap is disabled")
     if payload.password != expected_password:
         raise HTTPException(status_code=403, detail="Bootstrap password does not match environment")
@@ -94,7 +95,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> dict:
     if credential.two_factor_enabled and not verify_totp(credential.totp_secret_encrypted, payload.totp_code):
         raise HTTPException(status_code=401, detail="2FA code required")
     credential.failed_login_count = 0
-    credential.last_login_at = datetime.utcnow()
+    credential.last_login_at = utcnow()
     audit(db, None, "login", "user", payload.user_id, {"role": user.role})
     token_payload = _refresh_payload(db, user)
     db.commit()
@@ -105,7 +106,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> dict:
 def refresh(payload: RefreshTokenRequest, db: Session = Depends(get_db)) -> dict:
     token_hash = hash_token(payload.refresh_token)
     refresh_token = db.scalar(select(RefreshToken).where(RefreshToken.token_hash == token_hash))
-    if not refresh_token or refresh_token.revoked or refresh_token.expires_at < datetime.utcnow():
+    if not refresh_token or refresh_token.revoked or refresh_token.expires_at < utcnow():
         raise HTTPException(status_code=401, detail="Invalid refresh token")
     user = db.scalar(select(User).where(User.user_id == refresh_token.user_id))
     if not user or not user.enabled:

@@ -1,5 +1,5 @@
 from execution_guard.guard import approve_execution
-from execution_guard.approval_token import validate_approval_token
+from execution_guard.approval_token import create_approval_token, validate_approval_token
 from execution_guard.control_plane import ExecutionTelemetry, evaluate_control_plane_policy
 from execution_guard.exposure import evaluate_exposure
 from execution_guard.schemas import ExecutionRequest
@@ -19,6 +19,39 @@ def test_monitor_only_blocks_execution_by_default():
 def test_approval_token_validation_fails_without_signing_key(monkeypatch):
     monkeypatch.delenv("EXECUTION_GUARD_SIGNING_KEY", raising=False)
     assert validate_approval_token("token") is False
+
+
+def test_approval_token_round_trip(monkeypatch):
+    """Verify that create_approval_token produces tokens that validate correctly."""
+    monkeypatch.setenv("EXECUTION_GUARD_SIGNING_KEY", "test-signing-key-for-round-trip")
+    token = create_approval_token("demo_main", "trend_pullback_v1", ttl_seconds=60)
+    assert validate_approval_token(token) is True
+
+
+def test_approval_token_rejects_expired(monkeypatch):
+    """Verify that expired tokens are rejected."""
+    monkeypatch.setenv("EXECUTION_GUARD_SIGNING_KEY", "test-signing-key-for-expiry")
+    token = create_approval_token("demo_main", "trend_pullback_v1", ttl_seconds=-1)
+    assert validate_approval_token(token) is False
+
+
+def test_approval_token_rejects_tampered(monkeypatch):
+    """Verify that tampered tokens are rejected."""
+    monkeypatch.setenv("EXECUTION_GUARD_SIGNING_KEY", "test-signing-key-for-tamper")
+    token = create_approval_token("demo_main", "trend_pullback_v1", ttl_seconds=60)
+    # Tamper with the account_id in the token
+    parts = token.split(":")
+    parts[0] = "tampered_account"
+    tampered = ":".join(parts)
+    assert validate_approval_token(tampered) is False
+
+
+def test_approval_token_rejects_wrong_signing_key(monkeypatch):
+    """Verify that tokens signed with a different key are rejected."""
+    monkeypatch.setenv("EXECUTION_GUARD_SIGNING_KEY", "key-one")
+    token = create_approval_token("demo_main", "trend_pullback_v1", ttl_seconds=60)
+    monkeypatch.setenv("EXECUTION_GUARD_SIGNING_KEY", "key-two")
+    assert validate_approval_token(token) is False
 
 
 def _seed_guard_fixture(tmp_path):

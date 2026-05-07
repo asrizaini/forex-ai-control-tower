@@ -14,6 +14,7 @@ from ..crud import audit
 from ..db import get_db
 from ..dependencies import current_principal
 from ..models import Account, AccountSnapshot, MobilePushRegistration, NotificationEvent, PermissionAssignment, TradeApproval
+from ..time_utils import utcnow, iso_local
 
 router = APIRouter(prefix="/mobile", tags=["mobile"])
 
@@ -94,7 +95,7 @@ def register_push(
         existing.language = payload.language
         existing.preferences_json = payload.preferences_json
         existing.enabled = True
-        existing.updated_at = datetime.utcnow()
+        existing.updated_at = utcnow()
         registration = existing
     else:
         registration = MobilePushRegistration(
@@ -160,7 +161,7 @@ def mobile_summary(
                 "level": notification.level,
                 "title": notification.title,
                 "status": notification.status,
-                "created_at": notification.created_at.isoformat(),
+                "created_at": iso_local(notification.created_at),
             }
             for notification in notifications
         ],

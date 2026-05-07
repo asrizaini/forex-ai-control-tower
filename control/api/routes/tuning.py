@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import secrets
 from datetime import datetime
+from ..time_utils import utcnow
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
@@ -43,7 +44,7 @@ def create_tuning_job(
         parameters_json=payload.parameters_json,
         result_json={"overfitting_detection": "required_before_promotion", "mock_safe": True},
         created_by=principal.user_id,
-        updated_at=datetime.utcnow(),
+        updated_at=utcnow(),
     )
     db.add(job)
     audit(db, principal, "queue", "tuning_job", job.job_id, {"strategy_id": payload.strategy_id})

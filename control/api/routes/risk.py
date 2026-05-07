@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
+from ..time_utils import utcnow
+import json
+import urllib.error
+import urllib.request
 
 from fastapi import APIRouter
 from fastapi import Depends, HTTPException
@@ -9,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from ..dependencies import current_principal
 from ..auth import Principal
-from ..control_schemas import ExecutionGuardCheckOut, ExecutionGuardCheckRequest, KillSwitchCreate, KillSwitchOut, RiskPolicyCreate, RiskPolicyOut
+from ..control_schemas import DemoTradingModeRequest, ExecutionGuardCheckOut, ExecutionGuardCheckRequest, KillSwitchCreate, KillSwitchOut, RiskPolicyCreate, RiskPolicyOut
 from ..crud import audit
 from ..db import get_db
 from ..models import Account, KillSwitch, RiskPolicy
@@ -19,6 +23,7 @@ from execution_guard.exposure import evaluate_exposure
 from execution_guard.guard import approve_execution
 from execution_guard.schemas import ExecutionRequest
 from risk.kill_switch import active_kill_switch_exists, validate_scope
+from ..credential_store import runtime_int, runtime_value
 
 router = APIRouter(prefix="/risk", tags=["risk"])
 
@@ -69,7 +74,7 @@ def deactivate_kill_switch(
         raise HTTPException(status_code=404, detail="Kill switch not found")
     record.active = False
     record.deactivated_by = principal.user_id
-    record.updated_at = datetime.utcnow()
+    record.updated_at = utcnow()
     audit(db, principal, "deactivate", "kill_switch", str(kill_switch_id), {"scope": record.scope, "target_id": record.target_id})
     db.commit()
     db.refresh(record)
@@ -79,6 +84,80 @@ def deactivate_kill_switch(
 @router.get("/policies", response_model=list[RiskPolicyOut])
 def list_risk_policies(db: Session = Depends(get_db)) -> list[RiskPolicy]:
     return list(db.scalars(select(RiskPolicy).order_by(RiskPolicy.created_at.desc()).limit(200)))
+
+
+def _sync_mt5_account_mode(account_id: str, environment: str, trading_mode: str) -> dict[str, object]:
+    bridge_token = runtime_value("BRIDGE_API_TOKEN")
+    if not bridge_token:
+        return {"synced": False, "reason": "bridge_token_missing"}
+    base_url = runtime_value("MT5_BRIDGE_API_URL", "http://10.10.1.86:8501").rstrip("/")
+    headers = {
+        "X-Bridge-Token": bridge_token,
+        "Content-Type": "application/json",
+    }
+    try:
+        with urllib.request.urlopen(urllib.request.Request(base_url + "/accounts/profiles", headers=headers), timeout=8) as response:
+            profiles = json.loads(response.read().decode("utf-8")).get("accounts", [])
+    except (urllib.error.URLError, TimeoutError, ValueError):
+        return {"synced": False, "reason": "bridge_read_failed"}
+
+    profile = next((item for item in profiles if str(item.get("account_id")) == account_id), None)
+    if not profile:
+        profile = {
+            "account_id": account_id,
+            "terminal_port": runtime_int("MT5_DEFAULT_TERMINAL_PORT", 8501),
+            "environment": environment,
+            "trading_mode": trading_mode,
+            "terminal_path": runtime_value("MT5_TERMINAL_PATH", ""),
+            "enabled": True,
+        }
+    else:
+        profile = {
+            **profile,
+            "environment": environment,
+            "trading_mode": trading_mode,
+            "enabled": bool(profile.get("enabled", True)),
+        }
+    body = json.dumps(profile).encode("utf-8")
+    try:
+        request = urllib.request.Request(base_url + "/accounts/profiles", data=body, headers=headers, method="POST")
+        with urllib.request.urlopen(request, timeout=8):
+            return {"synced": True}
+    except (urllib.error.URLError, TimeoutError):
+        return {"synced": False, "reason": "bridge_write_failed"}
+
+
+@router.post("/demo-trading-mode")
+def set_demo_trading_mode(
+    payload: DemoTradingModeRequest,
+    principal: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+) -> dict:
+    if not has_permission(principal.role, "risk:write"):
+        raise HTTPException(status_code=403, detail="Permission denied")
+    account = db.scalar(select(Account).where(Account.account_id == payload.account_id).limit(1))
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    if account.environment != "demo":
+        raise HTTPException(status_code=400, detail="Demo trading mode switch is only allowed for demo accounts")
+    account.trading_mode = payload.trading_mode
+    sync_result = _sync_mt5_account_mode(account.account_id, account.environment, account.trading_mode)
+    audit(
+        db,
+        principal,
+        "set_demo_trading_mode",
+        "account",
+        account.account_id,
+        {"trading_mode": account.trading_mode, "bridge_profile_sync": sync_result.get("synced", False)},
+    )
+    db.commit()
+    db.refresh(account)
+    return {
+        "account_id": account.account_id,
+        "environment": account.environment,
+        "trading_mode": account.trading_mode,
+        "bridge_profile_sync": sync_result,
+    }
 
 
 @router.post("/policies", response_model=RiskPolicyOut)

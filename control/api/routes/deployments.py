@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import secrets
 from datetime import datetime
+from ..time_utils import utcnow
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -30,7 +31,7 @@ def list_resource() -> dict:
 
 
 def _deployment_id() -> str:
-    return f"dep_{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}_{secrets.token_hex(4)}"
+    return f"dep_{utcnow().strftime('%Y%m%dT%H%M%SZ')}_{secrets.token_hex(4)}"
 
 
 @router.get("/records", response_model=list[ReleaseRecordOut])
@@ -89,7 +90,7 @@ def update_status(
     record.status = payload.status
     if payload.test_result:
         record.test_result = payload.test_result
-    record.updated_at = datetime.utcnow()
+    record.updated_at = utcnow()
     audit(db, principal, "update", "deployment_record", deployment_id, {"status": payload.status, "notes": payload.notes})
     db.commit()
     db.refresh(record)

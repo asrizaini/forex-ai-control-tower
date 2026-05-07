@@ -29,7 +29,8 @@ def test_strategy_plugin_sync_promotion_and_permission(monkeypatch, tmp_path):
 
     synced = client.post("/api/v1/strategies/plugins/sync", headers=headers)
     assert synced.status_code == 200
-    assert synced.json()[0]["strategy_id"] == "trend_pullback_v1"
+    synced_ids = [s["strategy_id"] for s in synced.json()]
+    assert "trend_pullback_v1" in synced_ids
 
     bad_jump = client.post(
         "/api/v1/strategies/records/trend_pullback_v1/promote",

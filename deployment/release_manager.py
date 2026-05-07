@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, asdict
 from datetime import datetime
+from control.api.time_utils import utcnow
 
 
 @dataclass(frozen=True)
@@ -27,7 +28,7 @@ def deployment_record(
     test_result: str = "not_run",
 ) -> dict:
     record = DeploymentRecord(
-        deployment_id=f"dep_{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}",
+        deployment_id=f"dep_{utcnow().strftime('%Y%m%dT%H%M%SZ')}",
         version=version,
         environment=environment,
         changelog=changelog,
@@ -35,6 +36,6 @@ def deployment_record(
         test_result=test_result,
         approver=approver,
         rollback_command=rollback_command,
-        created_at=datetime.utcnow().isoformat() + "Z",
+        created_at=utcnow().isoformat() + "Z",
     )
     return {**asdict(record), "rollback_available": bool(rollback_command)}

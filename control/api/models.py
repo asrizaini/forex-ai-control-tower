@@ -1,11 +1,21 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import Boolean, DateTime, Float, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
+
+
+def utcnow() -> datetime:
+    """Return the current UTC datetime as a naive object.
+
+    Uses datetime.now(UTC) internally (avoiding the deprecated datetime.utcnow())
+    but strips timezone info for SQLAlchemy DateTime column compatibility,
+    which stores naive datetimes by default.
+    """
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class User(Base):
@@ -18,7 +28,7 @@ class User(Base):
     language: Mapped[str] = mapped_column(String(16), default="en")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     onboarding_complete: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
 class Account(Base):
@@ -31,7 +41,7 @@ class Account(Base):
     account_group: Mapped[str] = mapped_column(String(80), default="default")
     trading_mode: Mapped[str] = mapped_column(String(40), default="monitor_only")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
 class Strategy(Base):
@@ -46,7 +56,7 @@ class Strategy(Base):
     allowed_environments: Mapped[list] = mapped_column(JSON, default=lambda: ["dev", "staging", "demo"])
     live_approval_status: Mapped[str] = mapped_column(String(60), default="not_approved")
     metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
 class StrategyApproval(Base):
@@ -60,7 +70,7 @@ class StrategyApproval(Base):
     gate: Mapped[str] = mapped_column(String(120), index=True)
     notes: Mapped[str] = mapped_column(Text, default="")
     rollback_target: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class StrategyLabJob(Base):
@@ -77,8 +87,8 @@ class StrategyLabJob(Base):
     result_json: Mapped[dict] = mapped_column(JSON, default=dict)
     quality_score: Mapped[float | None] = mapped_column(Float, nullable=True, index=True)
     created_by: Mapped[str] = mapped_column(String(120), default="system", index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class NotificationEvent(Base):
@@ -97,7 +107,7 @@ class NotificationEvent(Base):
     pending_channels: Mapped[list] = mapped_column(JSON, default=list)
     status: Mapped[str] = mapped_column(String(60), default="queued", index=True)
     metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class LlmUsage(Base):
@@ -115,7 +125,7 @@ class LlmUsage(Base):
     approved: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     fallback_reason: Mapped[str] = mapped_column(String(160), default="")
     metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class ModelEvaluation(Base):
@@ -131,7 +141,7 @@ class ModelEvaluation(Base):
     estimated_cost: Mapped[float] = mapped_column(Float, default=0.0)
     accepted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     feedback_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class PermissionAssignment(Base):
@@ -143,7 +153,7 @@ class PermissionAssignment(Base):
     strategy_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     permission: Mapped[str] = mapped_column(String(120), index=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
 class RiskPolicy(Base):
@@ -160,7 +170,7 @@ class RiskPolicy(Base):
     max_spread_points: Mapped[float] = mapped_column(Float, default=0.0)
     auto_execution_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
 class KillSwitch(Base):
@@ -173,8 +183,8 @@ class KillSwitch(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     created_by: Mapped[str] = mapped_column(String(120), default="system", index=True)
     deactivated_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class AuditLog(Base):
@@ -186,7 +196,7 @@ class AuditLog(Base):
     resource_type: Mapped[str] = mapped_column(String(80), index=True)
     resource_id: Mapped[str] = mapped_column(String(160), index=True)
     details: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
     note: Mapped[str] = mapped_column(Text, default="")
 
 
@@ -203,7 +213,7 @@ class MarketSnapshot(Base):
     feed_fresh: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     data_quality: Mapped[str] = mapped_column(String(40), default="limited", index=True)
     payload_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class HistoricalCandle(Base):
@@ -221,7 +231,7 @@ class HistoricalCandle(Base):
     tick_volume: Mapped[float | None] = mapped_column(Float, nullable=True)
     spread: Mapped[float | None] = mapped_column(Float, nullable=True)
     payload_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class TradingPair(Base):
@@ -236,8 +246,8 @@ class TradingPair(Base):
     status: Mapped[str] = mapped_column(String(60), default="configured", index=True)
     last_processed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class SignalRecord(Base):
@@ -259,7 +269,7 @@ class SignalRecord(Base):
     blockers: Mapped[list] = mapped_column(JSON, default=list)
     risk_notes: Mapped[str] = mapped_column(Text, default="")
     analysis_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class AccountSnapshot(Base):
@@ -279,7 +289,7 @@ class AccountSnapshot(Base):
     risk_mode: Mapped[str] = mapped_column(String(40), default="monitor_only", index=True)
     auto_execution_enabled: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     payload_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class UserCredential(Base):
@@ -293,7 +303,7 @@ class UserCredential(Base):
     totp_secret_encrypted: Mapped[str | None] = mapped_column(String(255), nullable=True)
     failed_login_count: Mapped[int] = mapped_column(Integer, default=0)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class RefreshToken(Base):
@@ -304,7 +314,7 @@ class RefreshToken(Base):
     token_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime, index=True)
     revoked: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class ServiceApiKey(Base):
@@ -318,7 +328,7 @@ class ServiceApiKey(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     created_by: Mapped[str] = mapped_column(String(120), default="system", index=True)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class AgentTask(Base):
@@ -335,8 +345,8 @@ class AgentTask(Base):
     result_json: Mapped[dict] = mapped_column(JSON, default=dict)
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     max_attempts: Mapped[int] = mapped_column(Integer, default=3)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class AgentMessage(Base):
@@ -349,7 +359,7 @@ class AgentMessage(Base):
     recipient_agent: Mapped[str] = mapped_column(String(120), index=True)
     message_type: Mapped[str] = mapped_column(String(80), index=True)
     payload_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class AgentState(Base):
@@ -360,7 +370,7 @@ class AgentState(Base):
     status: Mapped[str] = mapped_column(String(60), default="standby", index=True)
     heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     state_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class AgentToolPolicy(Base):
@@ -372,7 +382,7 @@ class AgentToolPolicy(Base):
     allowed: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     environment: Mapped[str] = mapped_column(String(40), default="demo", index=True)
     reason: Mapped[str] = mapped_column(Text, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class ReleaseRecord(Base):
@@ -391,8 +401,8 @@ class ReleaseRecord(Base):
     rollback_target: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
     created_by: Mapped[str] = mapped_column(String(120), default="system", index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class MobilePushRegistration(Base):
@@ -408,8 +418,8 @@ class MobilePushRegistration(Base):
     language: Mapped[str] = mapped_column(String(16), default="en")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     preferences_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class CredentialConfig(Base):
@@ -425,8 +435,8 @@ class CredentialConfig(Base):
     validation_status: Mapped[str] = mapped_column(String(60), default="missing", index=True)
     validation_message: Mapped[str] = mapped_column(String(255), default="")
     updated_by: Mapped[str] = mapped_column(String(120), default="system", index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class TradeApproval(Base):
@@ -448,8 +458,28 @@ class TradeApproval(Base):
     reason: Mapped[str] = mapped_column(Text, default="")
     guard_check_json: Mapped[dict] = mapped_column(JSON, default=dict)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+class TradeExecution(Base):
+    __tablename__ = "trade_executions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    execution_id: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    account_id: Mapped[str] = mapped_column(String(80), index=True)
+    symbol: Mapped[str] = mapped_column(String(40), index=True)
+    timeframe: Mapped[str] = mapped_column(String(20), default="M1", index=True)
+    strategy_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    signal_id: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
+    direction: Mapped[str] = mapped_column(String(12), default="hold", index=True)
+    volume: Mapped[float] = mapped_column(Float, default=0.0)
+    status: Mapped[str] = mapped_column(String(60), default="queued", index=True)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    mt5_check_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    mt5_send_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    guard_checks_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class DataSourceConfig(Base):
@@ -475,8 +505,8 @@ class DataSourceConfig(Base):
     last_error: Mapped[str] = mapped_column(Text, default="")
     last_success_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     last_failure_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class CalendarEvent(Base):
@@ -500,9 +530,9 @@ class CalendarEvent(Base):
     raw_json: Mapped[dict] = mapped_column(JSON, default=dict)
     normalized_json: Mapped[dict] = mapped_column(JSON, default=dict)
     snapshot_type: Mapped[str] = mapped_column(String(40), default="latest", index=True)
-    scraped_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    scraped_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class NewsItem(Base):
@@ -522,8 +552,8 @@ class NewsItem(Base):
     related_event_uid: Mapped[str | None] = mapped_column(String(160), nullable=True, index=True)
     raw_json: Mapped[dict] = mapped_column(JSON, default=dict)
     normalized_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class AlertRule(Base):
@@ -545,8 +575,8 @@ class AlertRule(Base):
     severity: Mapped[str] = mapped_column(String(40), default="warning", index=True)
     fired_state_json: Mapped[dict] = mapped_column(JSON, default=dict)
     created_by: Mapped[str] = mapped_column(String(120), default="system", index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class AlertDeliveryHistory(Base):
@@ -561,7 +591,7 @@ class AlertDeliveryHistory(Base):
     status: Mapped[str] = mapped_column(String(60), default="queued", index=True)
     message: Mapped[str] = mapped_column(Text, default="")
     error: Mapped[str] = mapped_column(Text, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class WorkerStatus(Base):
@@ -580,7 +610,7 @@ class WorkerStatus(Base):
     retry_count: Mapped[int] = mapped_column(Integer, default=0)
     config_json: Mapped[dict] = mapped_column(JSON, default=dict)
     health_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class WorkerRun(Base):
@@ -590,7 +620,7 @@ class WorkerRun(Base):
     run_id: Mapped[str] = mapped_column(String(120), unique=True, index=True)
     worker_id: Mapped[str] = mapped_column(String(120), index=True)
     status: Mapped[str] = mapped_column(String(60), index=True)
-    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     duration_ms: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str] = mapped_column(Text, default="")
@@ -610,7 +640,7 @@ class AnalysisSnapshot(Base):
     summary: Mapped[str] = mapped_column(Text, default="")
     inputs_json: Mapped[dict] = mapped_column(JSON, default=dict)
     output_json: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class SystemSetting(Base):
@@ -622,5 +652,5 @@ class SystemSetting(Base):
     value_type: Mapped[str] = mapped_column(String(40), default="string")
     category: Mapped[str] = mapped_column(String(80), default="general", index=True)
     updated_by: Mapped[str] = mapped_column(String(120), default="system", index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)

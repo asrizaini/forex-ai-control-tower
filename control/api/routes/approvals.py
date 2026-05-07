@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import secrets
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -14,6 +14,7 @@ from ..db import get_db
 from ..dependencies import current_principal
 from ..models import TradeApproval
 from ..permissions import has_permission
+from ..time_utils import utcnow
 
 router = APIRouter(prefix="/approvals", tags=["approvals"])
 
@@ -73,7 +74,7 @@ def create_approval_request(
         requested_by=principal.user_id,
         reason=payload.reason,
         guard_check_json=payload.guard_check_json,
-        expires_at=datetime.utcnow() + timedelta(minutes=payload.expires_minutes),
+        expires_at=utcnow() + timedelta(minutes=payload.expires_minutes),
     )
     db.add(approval)
     audit(db, principal, "create", "trade_approval", approval.approval_id, {"account_id": payload.account_id, "strategy_id": payload.strategy_id})
@@ -96,15 +97,15 @@ def decide_approval_request(
         raise HTTPException(status_code=403, detail="Permission denied")
     if approval.status != "pending":
         raise HTTPException(status_code=400, detail="Approval request is not pending")
-    if approval.expires_at and approval.expires_at < datetime.utcnow():
+    if approval.expires_at and approval.expires_at < utcnow():
         approval.status = "expired"
-        approval.updated_at = datetime.utcnow()
+        approval.updated_at = utcnow()
         db.commit()
         raise HTTPException(status_code=400, detail="Approval request expired")
     approval.status = payload.decision
     approval.decided_by = principal.user_id
     approval.reason = payload.reason or approval.reason
-    approval.updated_at = datetime.utcnow()
+    approval.updated_at = utcnow()
     audit(db, principal, payload.decision, "trade_approval", approval_id, {"account_id": approval.account_id, "strategy_id": approval.strategy_id})
     db.commit()
     db.refresh(approval)

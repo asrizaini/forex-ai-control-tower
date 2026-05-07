@@ -6,6 +6,8 @@ import time
 from collections.abc import Callable
 from datetime import datetime, timedelta
 
+from .time_utils import utcnow
+
 from fastapi import Request
 from prometheus_client import Counter, Gauge, Histogram
 from sqlalchemy import func, select
@@ -171,7 +173,7 @@ def collect_database_metrics() -> None:
         for scope, count in db.execute(select(RiskPolicy.scope, func.count()).group_by(RiskPolicy.scope)):
             RISK_POLICIES.labels(scope or "unknown").set(count)
 
-        cutoff = datetime.utcnow() - timedelta(minutes=20)
+        cutoff = utcnow() - timedelta(minutes=20)
         stale_symbols = 0
         latest_symbols = list(db.scalars(select(MarketSnapshot.symbol).group_by(MarketSnapshot.symbol)))
         for symbol in latest_symbols:

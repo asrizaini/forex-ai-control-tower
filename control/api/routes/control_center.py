@@ -22,14 +22,16 @@ from ..models import (
     NewsItem,
     SystemSetting,
     TradingPair,
+    TradeExecution,
     SignalRecord,
     WorkerRun,
     WorkerStatus,
 )
 from news_feed.providers import PROVIDERS
 from news_feed.adapter import evaluate_news_status
+from notifications.hub import channel_status
 
-from ..time_utils import iso_local
+from ..time_utils import utcnow, iso_local
 
 router = APIRouter(tags=["control-center"])
 
@@ -137,7 +139,7 @@ class SettingPayload(BaseModel):
 
 
 def _now() -> datetime:
-    return datetime.utcnow()
+    return utcnow()
 
 
 def _audit(db: Session, actor: str, action: str, resource_type: str, resource_id: str, details: dict[str, Any] | None = None) -> None:
@@ -228,7 +230,18 @@ def _refresh_worker_runtime_status(db: Session) -> None:
     news_ready = bool(news.get("provider_enabled")) and not news.get("provider_error") and int(news.get("events_count") or 0) > 0
     enabled_pairs = db.scalar(select(func.count()).select_from(TradingPair).where(TradingPair.enabled.is_(True))) or 0
     latest_signals = db.scalar(select(func.count()).select_from(SignalRecord)) or 0
+    sent_executions = db.scalar(select(func.count()).select_from(TradeExecution).where(TradeExecution.status == "sent")) or 0
+    blocked_executions = db.scalar(select(func.count()).select_from(TradeExecution).where(TradeExecution.status == "blocked")) or 0
+    failed_executions = db.scalar(select(func.count()).select_from(TradeExecution).where(TradeExecution.status == "failed")) or 0
     stale_pairs = db.scalar(select(func.count()).select_from(TradingPair).where(TradingPair.enabled.is_(True), TradingPair.status.ilike("%stale%"))) or 0
+    notify_channels = channel_status()
+    telegram_ready = bool(notify_channels.get("telegram", {}).get("delivery_enabled"))
+    push_ready = bool(notify_channels.get("mobile_push", {}).get("delivery_enabled"))
+    active_notify_channels = [
+        channel
+        for channel, ready in (("telegram", telegram_ready), ("mobile_push", push_ready))
+        if ready
+    ]
     status_updates = {
         "news_worker": (
             "running" if news_ready else "degraded",
@@ -262,9 +275,28 @@ def _refresh_worker_runtime_status(db: Session) -> None:
         "data_validation_worker": ("ready", {"note": "Data validation gates are active for market/news quality checks."}),
         "signal_generation_worker": (
             "running" if enabled_pairs else "waiting_pairs",
-            {"note": "Operator approved demo signal generation. Signals remain monitor-only and cannot execute without approval and Execution Guard.", "enabled_pairs": enabled_pairs, "signal_records": latest_signals},
+            {
+                "note": "Operator approved demo signal generation. Demo execution cycle now evaluates governed signals before MT5 handoff.",
+                "enabled_pairs": enabled_pairs,
+                "signal_records": latest_signals,
+                "sent_executions": sent_executions,
+                "blocked_executions": blocked_executions,
+                "failed_executions": failed_executions,
+            },
         ),
-        "notification_worker": ("waiting_channels", {"note": "Notification worker requires configured Telegram/WhatsApp/email/mobile credentials before delivery."}),
+        "notification_worker": (
+            "running" if active_notify_channels else "waiting_channels",
+            {
+                "note": (
+                    f"Notification worker is active via {', '.join(active_notify_channels)}."
+                    if active_notify_channels
+                    else "Notification worker requires configured Telegram or Mobile Push credentials before delivery."
+                ),
+                "active_channels": active_notify_channels,
+                "telegram_ready": telegram_ready,
+                "mobile_push_ready": push_ready,
+            },
+        ),
     }
     for worker_id, (status, health) in status_updates.items():
         row = db.scalar(select(WorkerStatus).where(WorkerStatus.worker_id == worker_id))
@@ -586,6 +618,25 @@ def workers_status(db: Session = Depends(get_db)) -> dict[str, Any]:
     _seed_control_center(db)
     _refresh_worker_runtime_status(db)
     rows = db.scalars(select(WorkerStatus).order_by(WorkerStatus.worker_type, WorkerStatus.worker_id)).all()
+    run_rows = db.scalars(select(WorkerRun).order_by(WorkerRun.started_at.desc()).limit(500)).all()
+    run_index: dict[str, dict[str, Any]] = {}
+    for run in run_rows:
+        bucket = run_index.setdefault(
+            run.worker_id,
+            {"latest": None, "latest_effective": None, "failed_runs": 0, "retry_runs": 0, "completed_runs": 0, "queued_runs": 0},
+        )
+        if bucket["latest"] is None:
+            bucket["latest"] = run
+        if bucket["latest_effective"] is None and run.status != "queued":
+            bucket["latest_effective"] = run
+        if run.status == "failed":
+            bucket["failed_runs"] += 1
+        if run.status == "retrying":
+            bucket["retry_runs"] += 1
+        if run.status == "completed":
+            bucket["completed_runs"] += 1
+        if run.status == "queued":
+            bucket["queued_runs"] += 1
     return {
         "workers": [
             {
@@ -601,6 +652,18 @@ def workers_status(db: Session = Depends(get_db)) -> dict[str, Any]:
                 "retry_count": row.retry_count,
                 "config_json": row.config_json,
                 "health_json": row.health_json,
+                "run_summary": (
+                    (lambda bucket: {
+                        "latest_run_id": ((bucket.get("latest_effective") or bucket.get("latest")).run_id if (bucket.get("latest_effective") or bucket.get("latest")) else None),
+                        "latest_run_status": ((bucket.get("latest_effective") or bucket.get("latest")).status if (bucket.get("latest_effective") or bucket.get("latest")) else None),
+                        "latest_run_started_at": _serialize_dt((bucket.get("latest_effective") or bucket.get("latest")).started_at) if (bucket.get("latest_effective") or bucket.get("latest")) else None,
+                        "latest_run_finished_at": _serialize_dt((bucket.get("latest_effective") or bucket.get("latest")).finished_at) if (bucket.get("latest_effective") or bucket.get("latest")) else None,
+                        "failed_runs": bucket.get("failed_runs", 0),
+                        "retry_runs": bucket.get("retry_runs", 0),
+                        "completed_runs": bucket.get("completed_runs", 0),
+                        "queued_runs": bucket.get("queued_runs", 0),
+                    })(run_index.get(row.worker_id, {}))
+                ),
             }
             for row in rows
         ]
@@ -615,13 +678,24 @@ def worker_action(worker_id: str, action: str, db: Session = Depends(get_db), pr
     row = db.scalar(select(WorkerStatus).where(WorkerStatus.worker_id == worker_id))
     if not row:
         raise HTTPException(status_code=404, detail="Worker not found.")
-    row.status = "queued_" + action
-    row.updated_at = _now()
+    now = _now()
+    row.status = "running" if action in {"start", "restart"} else "stopped"
+    row.updated_at = now
     run_id = f"{worker_id}_{uuid.uuid4().hex[:12]}"
-    db.add(WorkerRun(run_id=run_id, worker_id=worker_id, status="queued", result_json={"requested_action": action}))
+    db.add(
+        WorkerRun(
+            run_id=run_id,
+            worker_id=worker_id,
+            status="completed",
+            started_at=now,
+            finished_at=now,
+            duration_ms=0,
+            result_json={"requested_action": action, "applied_mode": "control_plane_runtime"},
+        )
+    )
     _audit(db, principal.user_id, f"worker_{action}_requested", "worker", worker_id)
     db.commit()
-    return {"status": "queued", "worker_id": worker_id, "action": action, "run_id": run_id}
+    return {"status": "applied", "worker_id": worker_id, "action": action, "run_id": run_id}
 
 
 @router.get("/analysis/{analysis_type}/latest")
@@ -653,28 +727,34 @@ def latest_analysis(analysis_type: str, db: Session = Depends(get_db), symbol: s
 def seed_analysis_snapshot(analysis_type: str, db: Session = Depends(get_db), principal=Depends(_require_admin)) -> dict[str, Any]:
     if analysis_type not in {"technical", "fundamental"}:
         raise HTTPException(status_code=400, detail="analysis_type must be technical or fundamental")
-    snapshot_id = f"{analysis_type}_{uuid.uuid4().hex[:16]}"
-    summary = (
-        "Technical signal will be flagged when high-impact calendar/news risk is nearby."
-        if analysis_type == "technical"
-        else "Fundamental summary ranks currency risk from calendar and news context."
-    )
-    db.add(
-        AnalysisSnapshot(
-            snapshot_id=snapshot_id,
-            analysis_type=analysis_type,
-            symbol="EURUSD",
-            timeframe="H1",
-            confidence=0.0,
-            status="scaffold_ready",
-            summary=summary,
-            inputs_json={"calendar_context": True, "news_context": True},
-            output_json={"note": "Connect worker runtime to produce live snapshots."},
+    pairs = db.scalars(select(TradingPair).where(TradingPair.enabled.is_(True)).order_by(TradingPair.symbol.asc())).all()
+    if not pairs:
+        pairs = [TradingPair(symbol="EURUSD", default_timeframe="H1", enabled=True)]
+    snapshot_ids: list[str] = []
+    for pair in pairs:
+        snapshot_id = f"{analysis_type}_{pair.symbol}_{uuid.uuid4().hex[:10]}"
+        summary = (
+            f"{pair.symbol} technical context prepared. Signals are still monitor-only and blocked from execution without approvals."
+            if analysis_type == "technical"
+            else f"{pair.symbol} fundamental context prepared from calendar/news. Risk gates remain active."
         )
-    )
+        db.add(
+            AnalysisSnapshot(
+                snapshot_id=snapshot_id,
+                analysis_type=analysis_type,
+                symbol=pair.symbol,
+                timeframe=(pair.default_timeframe or "H1"),
+                confidence=0.0,
+                status="scaffold_ready",
+                summary=summary,
+                inputs_json={"calendar_context": True, "news_context": True, "seeded": True},
+                output_json={"note": "Connect worker runtime to produce live snapshots."},
+            )
+        )
+        snapshot_ids.append(snapshot_id)
     _audit(db, principal.user_id, "analysis_snapshot_seeded", "analysis", analysis_type)
     db.commit()
-    return {"status": "created", "snapshot_id": snapshot_id}
+    return {"status": "created", "analysis_type": analysis_type, "pairs": [pair.symbol for pair in pairs], "snapshot_ids": snapshot_ids}
 
 
 @router.get("/logs/audit")

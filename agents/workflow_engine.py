@@ -7,6 +7,7 @@ import sys
 import time
 from dataclasses import asdict, dataclass
 from datetime import datetime
+from control.api.time_utils import utcnow
 from pathlib import Path
 
 from sqlalchemy import select
@@ -15,6 +16,7 @@ from agent_theater.loki import push_event
 from agents.catalog import AGENT_CATALOG
 from control.api.db import SessionLocal, init_db
 from control.api.models import AgentMessage, AgentState, AgentTask, AgentToolPolicy
+from control.api.time_utils import format_local
 
 
 running = True
@@ -32,8 +34,8 @@ def _stop(_signum: int, _frame: object) -> None:
     running = False
 
 
-def _utc_timestamp() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+def _local_timestamp() -> str:
+    return format_local(utcnow())
 
 
 def _event_log_path() -> Path:
@@ -87,7 +89,7 @@ def _append_theater_event(event: dict) -> None:
 
 
 def _upsert_state(db, agent_name: str, status: str, state: dict) -> None:
-    now = datetime.utcnow()
+    now = utcnow()
     record = db.scalar(select(AgentState).where(AgentState.agent_name == agent_name))
     if record:
         record.status = status
@@ -102,7 +104,7 @@ def seed_agent_catalog() -> int:
     init_db()
     db = SessionLocal()
     try:
-        now = datetime.utcnow()
+        now = utcnow()
         count = 0
         for entry in AGENT_CATALOG:
             record = db.scalar(select(AgentState).where(AgentState.agent_name == entry.name))
@@ -153,7 +155,7 @@ def process_one_task() -> str | None:
 
         task.status = "running"
         task.attempts += 1
-        task.updated_at = datetime.utcnow()
+        task.updated_at = utcnow()
         _upsert_state(db, task.assigned_agent, "running", {"task_id": task.task_id, "task_type": task.task_type})
         db.add(
             AgentMessage(
@@ -170,7 +172,7 @@ def process_one_task() -> str | None:
         result = _workflow_response(task)
         task.status = "completed"
         task.result_json = asdict(result)
-        task.updated_at = datetime.utcnow()
+        task.updated_at = utcnow()
         _upsert_state(db, task.assigned_agent, "standby", {"last_task_id": task.task_id, "last_result": result.risk_status})
         db.add(
             AgentMessage(
@@ -185,7 +187,7 @@ def process_one_task() -> str | None:
         db.commit()
         _append_theater_event(
             {
-                "timestamp": _utc_timestamp(),
+                "timestamp": _local_timestamp(),
                 "agent": task.assigned_agent,
                 "stream": "Workflow Timeline",
                 "summary": result.summary,
