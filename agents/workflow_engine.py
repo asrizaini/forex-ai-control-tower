@@ -151,6 +151,49 @@ def _workflow_response(task: AgentTask) -> WorkflowResult:
             risk_status="deployment_governance_required",
             next_action="Prepare a deployment record before applying changes to production-live workflows.",
         )
+
+    # --- Auto-heal task types ---
+    if task_type == "auto_heal_service_down":
+        service = request.get("service_name", "unknown")
+        error = request.get("error_info", "unknown")
+        return WorkflowResult(
+            summary=f"Auto-heal: Service '{service}' is down ({error}). Orchestrator dispatched heal task to {agent}. "
+                   f"Recommended action: check service logs, verify systemd unit status, restart if needed.",
+            risk_status="auto_heal_dispatched",
+            next_action=f"Verify {service} service recovery. Check journalctl for root cause. "
+                       f"Restart with: systemctl restart forex-<service> if not auto-recovered.",
+        )
+
+    if task_type in ("disk_space_cleanup", "disk_emergency_cleanup"):
+        disk_pct = request.get("disk_usage_pct", "unknown")
+        disk_status = request.get("disk_status", "unknown")
+        action = request.get("action", "auto_cleanup")
+        if task_type == "disk_emergency_cleanup":
+            return WorkflowResult(
+                summary=f"EMERGENCY disk cleanup: disk at {disk_pct}% ({disk_status}). "
+                       f"Emergency purge triggered for largest tables. Data retention policies temporarily reduced.",
+                risk_status="disk_emergency_cleanup_triggered",
+                next_action="Verify disk space recovered. Check /api/v1/data-retention/disk-status. "
+                           "Consider adding disk capacity if this recurs.",
+            )
+        return WorkflowResult(
+            summary=f"Auto disk cleanup: disk at {disk_pct}% ({disk_status}). "
+                   f"Data retention cleanup triggered via {action}. Old records will be purged per retention policy.",
+            risk_status="disk_cleanup_triggered",
+            next_action="Monitor disk usage. Cleanup worker should free space within 15 minutes. "
+                       "Check /api/v1/data-retention/disk-status for current status.",
+        )
+
+    if task_type == "disk_space_alert":
+        disk_pct = request.get("disk_usage_pct", "unknown")
+        disk_status = request.get("disk_status", "unknown")
+        return WorkflowResult(
+            summary=f"Watchdog disk alert: disk at {disk_pct}% ({disk_status}). "
+                   f"Auto-cleanup worker has been notified. Monitoring continues.",
+            risk_status="disk_alert_acknowledged",
+            next_action="Continue monitoring. If disk does not recover within 30 minutes, escalate to manual intervention.",
+        )
+
     return WorkflowResult(
         summary=f"{agent} processed queued task type {task_type} in safe workflow mode.",
         risk_status="workflow_complete_no_execution",

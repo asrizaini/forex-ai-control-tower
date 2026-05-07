@@ -172,7 +172,23 @@ def full_health_status() -> dict:
         "status": "ok" if credentials.get("required_runtime_secrets_present") else "missing_required",
         "required_runtime_secrets_present": credentials.get("required_runtime_secrets_present"),
     }
-    return {"healthy": all(item["status"] == "ok" for item in services.values()), "services": services}
+    # Disk space check
+    import shutil as _shutil
+    disk_info: dict = {}
+    try:
+        root_usage = _shutil.disk_usage("/")
+        root_pct = round(root_usage.used / root_usage.total * 100, 1)
+        disk_info["root_disk_pct"] = root_pct
+        disk_info["root_disk_status"] = "ok" if root_pct < 80 else ("warning" if root_pct < 90 else "critical")
+    except OSError:
+        disk_info["root_disk_pct"] = None
+        disk_info["root_disk_status"] = "unknown"
+    services["disk"] = disk_info
+    all_healthy = all(
+        item["status"] == "ok" if isinstance(item, dict) and "status" in item else True
+        for item in services.values()
+    )
+    return {"healthy": all_healthy, "services": services}
 
 
 @router.get("/observability")

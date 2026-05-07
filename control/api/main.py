@@ -29,6 +29,7 @@ from .routes import (
     backtests,
     credentials,
     control_center,
+    data_retention,
     deployments,
     forward_tests,
     llm,
@@ -100,6 +101,7 @@ def create_app() -> FastAPI:
         localization.router,
         mobile.router,
         audit.router,
+        data_retention.router,
     ]:
         app.include_router(router, prefix=API_PREFIX)
 

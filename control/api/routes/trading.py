@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import math
 import secrets
 from datetime import datetime, timedelta
@@ -625,6 +626,8 @@ def pair_summaries(db: Session = Depends(get_db)) -> dict[str, Any]:
     _seed_pairs(db)
     pairs = db.scalars(select(TradingPair).where(TradingPair.enabled.is_(True)).order_by(TradingPair.symbol.asc())).all()
     items = [_build_pair_summary(db, pair) for pair in pairs]
+    # Sanitize to prevent circular reference errors during JSON serialization
+    items = json.loads(json.dumps(items, default=str))
     buckets = {
         "bullish": [item["symbol"] for item in items if item["current_bias"] == "bullish"],
         "bearish": [item["symbol"] for item in items if item["current_bias"] == "bearish"],
@@ -644,7 +647,10 @@ def pair_summary_detail(symbol: str, db: Session = Depends(get_db)) -> dict[str,
     pair = db.scalar(select(TradingPair).where(TradingPair.symbol == symbol.upper()))
     if not pair:
         raise HTTPException(status_code=404, detail="Trading pair not found")
-    return {"status": "ok", "item": _build_pair_summary(db, pair), "updated_at": _iso(_now())}
+    result = _build_pair_summary(db, pair)
+    # Sanitize to prevent circular reference errors during JSON serialization
+    result = json.loads(json.dumps(result, default=str))
+    return {"status": "ok", "item": result, "updated_at": _iso(_now())}
 
 
 @router.get("/signals/records")

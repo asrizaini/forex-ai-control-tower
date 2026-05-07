@@ -1,0 +1,25 @@
+[Unit]
+Description=Forex AI Data Cleanup Worker
+After=network.target forex-control-api.service
+Wants=forex-data-cleanup.timer
+
+[Service]
+Type=oneshot
+User=forex-ai
+Group=forex-ai
+WorkingDirectory=/opt/forex-ai-control-tower
+Environment=FOREX_AI_PROJECT_ROOT=/opt/forex-ai-control-tower
+EnvironmentFile=/etc/forex-ai-control-tower/runtime.env
+ExecStart=/opt/forex-ai-control-tower/venv/bin/python /opt/forex-ai-control-tower/scripts/data_cleanup_worker.py
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=forex-data-cleanup
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/forex-ai-control-tower/runtime /var/log
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

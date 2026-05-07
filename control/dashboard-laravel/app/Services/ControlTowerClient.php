@@ -76,7 +76,7 @@ class ControlTowerClient
     private function buildPoolRequest(string $url, ?string $token): \Closure
     {
         return function ($pool) use ($url, $token) {
-            $request = $pool->timeout(5)->acceptJson()->asJson();
+            $request = $pool->timeout(15)->acceptJson()->asJson();
             if ($token) {
                 $request = $request->withToken($token);
             }
@@ -109,7 +109,7 @@ class ControlTowerClient
 
     private function request(?string $token)
     {
-        $request = Http::timeout(5)->acceptJson()->asJson();
+        $request = Http::timeout(15)->acceptJson()->asJson();
         if ($token) {
             $request = $request->withToken($token);
         }

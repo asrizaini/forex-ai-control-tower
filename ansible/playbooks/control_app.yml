@@ -497,6 +497,64 @@
           [Install]
           WantedBy=multi-user.target
 
+    - name: Copy data cleanup worker script
+      ansible.builtin.copy:
+        src: ../../scripts/data_cleanup_worker.py
+        dest: /opt/forex-ai-control-tower/app/scripts/data_cleanup_worker.py
+        owner: aiops
+        group: aiops
+        mode: "0755"
+
+    - name: Install data cleanup worker systemd service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/forex-data-cleanup.service
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Forex AI Data Cleanup Worker
+          After=network.target forex-control-api.service
+          Wants=forex-data-cleanup.timer
+
+          [Service]
+          Type=oneshot
+          User=aiops
+          Group=aiops
+          WorkingDirectory=/opt/forex-ai-control-tower/app
+          Environment=FOREX_AI_PROJECT_ROOT=/opt/forex-ai-control-tower/app
+          Environment=PYTHONPATH=/opt/forex-ai-control-tower/app
+          EnvironmentFile=-/etc/forex-ai-control-tower/runtime.env
+          Environment=AGENT_THEATER_EVENT_LOG=/opt/forex-ai-control-tower/runtime/agent_theater_events.jsonl
+          Environment=LOKI_PUSH_URL=http://10.10.1.81:3100/loki/api/v1/push
+          PassEnvironment=POSTGRES_PASSWORD DISK_WARNING_PCT DISK_CRITICAL_PCT DISK_EMERGENCY_PCT RETENTION_SIGNAL_RECORDS_DAYS RETENTION_HISTORICAL_CANDLES_DAYS RETENTION_MARKET_SNAPSHOTS_DAYS
+          ExecStart=/opt/forex-ai-control-tower/.venv/bin/python /opt/forex-ai-control-tower/app/scripts/data_cleanup_worker.py
+          StandardOutput=journal
+          StandardError=journal
+          SyslogIdentifier=forex-data-cleanup
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Install data cleanup systemd timer
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/forex-data-cleanup.timer
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Run Forex AI Data Cleanup Worker every 15 minutes
+
+          [Timer]
+          OnBootSec=5min
+          OnUnitActiveSec=15min
+          AccuracySec=1min
+          Persistent=true
+
+          [Install]
+          WantedBy=timers.target
+
     - name: Reload systemd
       ansible.builtin.systemd_service:
         daemon_reload: true
@@ -530,3 +588,19 @@
         name: forex-openclaw-runtime
         state: restarted
         enabled: true
+
+    - name: Start and enable data cleanup timer
+      ansible.builtin.systemd_service:
+        name: forex-data-cleanup.timer
+        state: started
+        enabled: true
+
+    - name: Verify data cleanup timer is active
+      ansible.builtin.command:
+        cmd: systemctl list-timers forex-data-cleanup.timer --no-pager
+      changed_when: false
+      register: cleanup_timer_status
+
+    - name: Show data cleanup timer status
+      ansible.builtin.debug:
+        msg: "{{ cleanup_timer_status.stdout_lines }}"
