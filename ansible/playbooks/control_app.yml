@@ -220,16 +220,33 @@
         group: aiops
         mode: "0755"
 
-    - name: Copy Laravel dashboard application (excluding vendor)
-      ansible.builtin.synchronize:
-        src: ../../control/dashboard-laravel/
-        dest: /opt/forex-ai-control-tower/dashboard-laravel/
-        owner: no
-        group: no
-        rsync_opts:
-          - "--exclude=vendor"
-          - "--exclude=node_modules"
-          - "--exclude=.env"
+    - name: Create Laravel app tarball (excluding vendor and node_modules)
+      ansible.builtin.shell: |
+        cd /workspace/control
+        tar czf /tmp/dashboard-laravel.tar.gz --exclude='vendor' --exclude='node_modules' --exclude='.env' dashboard-laravel/
+      args:
+        executable: /bin/bash
+      delegate_to: localhost
+      run_once: true
+      changed_when: true
+
+    - name: Copy Laravel app tarball
+      ansible.builtin.copy:
+        src: /tmp/dashboard-laravel.tar.gz
+        dest: /tmp/dashboard-laravel.tar.gz
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Extract Laravel app
+      ansible.builtin.shell: |
+        rm -rf /opt/forex-ai-control-tower/dashboard-laravel
+        tar xzf /tmp/dashboard-laravel.tar.gz -C /opt/forex-ai-control-tower/
+        chown -R aiops:aiops /opt/forex-ai-control-tower/dashboard-laravel
+        rm -f /tmp/dashboard-laravel.tar.gz
+      args:
+        executable: /bin/bash
+      changed_when: true
 
     - name: Install Laravel Composer dependencies
       community.general.composer:
