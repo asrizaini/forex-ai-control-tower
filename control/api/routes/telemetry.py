@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from ipaddress import ip_address, ip_network
 from typing import Any
 
@@ -11,6 +10,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
 from ..control_schemas import AccountSnapshotOut, HistoricalCandleOut, MarketSnapshotOut, WorkerTelemetryIn
+from ..credential_store import runtime_value
 from ..db import get_db
 from ..models import AccountSnapshot, HistoricalCandle, MarketSnapshot, TradingPair
 from market_data_quality.analysis import multi_timeframe_summary, price_action_summary, spread_slippage_summary
@@ -33,7 +33,7 @@ def list_resource() -> dict:
 
 
 def _ingest_allowed(request: Request, x_telemetry_token: str | None) -> bool:
-    expected = os.getenv("TELEMETRY_INGEST_TOKEN")
+    expected = runtime_value("TELEMETRY_INGEST_TOKEN")
     if expected:
         return bool(x_telemetry_token) and x_telemetry_token == expected
     client_host = request.client.host if request.client else ""
@@ -158,7 +158,12 @@ def _persist_account_snapshot(db: Session, worker: str, result: dict[str, Any]) 
             trade_allowed=_bool_or_none(account.get("trade_allowed")),
             risk_mode=str(result.get("risk_mode", "monitor_only")),
             auto_execution_enabled=bool(result.get("auto_execution_enabled", False)),
-            payload_json={"account": account, "positions_count": result.get("positions_count", 0)},
+            payload_json={
+                "account": account,
+                "positions_count": result.get("positions_count", 0),
+                "demo_execution_cycle": result.get("demo_execution_cycle", {}),
+                "order_routing": result.get("order_routing"),
+            },
         )
     )
     return 1

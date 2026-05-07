@@ -33,6 +33,21 @@ def test_control_center_sources_workers_and_settings(monkeypatch, tmp_path):
     assert worker_time.endswith("+08:00")
 
 
+def test_notification_worker_runs_when_telegram_is_configured(monkeypatch, tmp_path):
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret")
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test_telegram_bot_token_12345")
+    monkeypatch.setenv("TELEGRAM_ADMIN_CHAT_ID", "123456789")
+    configure_database(f"sqlite:///{tmp_path / 'control_center_notifications.db'}")
+    init_db()
+    client = TestClient(create_app())
+
+    workers = client.get("/api/v1/workers/status")
+    assert workers.status_code == 200
+    notification = next(item for item in workers.json()["workers"] if item["worker_id"] == "notification_worker")
+    assert notification["status"] == "running"
+    assert notification["health_json"]["telegram_ready"] is True
+
+
 def test_control_center_writes_are_admin_and_audited(monkeypatch, tmp_path):
     monkeypatch.setenv("JWT_SECRET_KEY", "test-secret")
     configure_database(f"sqlite:///{tmp_path / 'control_center_write.db'}")

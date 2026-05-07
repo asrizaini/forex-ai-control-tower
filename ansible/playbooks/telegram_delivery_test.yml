@@ -1,0 +1,81 @@
+---
+- name: Telegram delivery test (safe)
+  hosts: control
+  gather_facts: false
+  tasks:
+    - name: Send one Telegram test message using credential store values
+      become: true
+      ansible.builtin.shell: |
+        set -e
+        if [ -f /etc/forex-ai-control-tower/runtime.env ]; then
+          set -a
+          . /etc/forex-ai-control-tower/runtime.env
+          set +a
+        fi
+        PYTHONPATH=/opt/forex-ai-control-tower/app /opt/forex-ai-control-tower/.venv/bin/python - <<'PY'
+        import json
+        import os
+        import urllib.parse
+        import urllib.request
+
+        token = os.getenv("TELEGRAM_BOT_TOKEN")
+        chat_id = os.getenv("TELEGRAM_ADMIN_CHAT_ID")
+
+        if (not token or not chat_id):
+            try:
+                from control.api.db import SessionLocal
+                from control.api.credential_store import get_config_value
+
+                db = SessionLocal()
+                try:
+                    token = token or get_config_value(db, "TELEGRAM_BOT_TOKEN")
+                    chat_id = chat_id or get_config_value(db, "TELEGRAM_ADMIN_CHAT_ID")
+                finally:
+                    db.close()
+            except Exception:
+                pass
+
+        if not token or not chat_id:
+            print(json.dumps({"ok": False, "reason": "missing_telegram_credentials"}))
+            raise SystemExit(0)
+
+        text = "Forex AI Control Tower: Telegram notification delivery test passed (safe probe)."
+        payload = urllib.parse.urlencode(
+            {
+                "chat_id": chat_id,
+                "text": text,
+                "disable_web_page_preview": "true",
+            }
+        ).encode("utf-8")
+
+        req = urllib.request.Request(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            data=payload,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                body = json.loads(resp.read().decode("utf-8", errors="replace"))
+        except Exception as exc:
+            print(json.dumps({"ok": False, "reason": type(exc).__name__}))
+            raise SystemExit(0)
+
+        result = body.get("result", {}) if isinstance(body, dict) else {}
+        print(
+            json.dumps(
+                {
+                    "ok": bool(body.get("ok")) if isinstance(body, dict) else False,
+                    "telegram_ok": bool(body.get("ok")) if isinstance(body, dict) else False,
+                    "message_id": result.get("message_id"),
+                    "chat_id_suffix": str(result.get("chat", {}).get("id", ""))[-4:],
+                }
+            )
+        )
+        PY
+      register: telegram_probe
+      changed_when: false
+
+    - name: Show sanitized probe result
+      ansible.builtin.debug:
+        msg: "{{ telegram_probe.stdout }}"

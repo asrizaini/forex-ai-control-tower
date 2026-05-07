@@ -6,6 +6,8 @@ use App\Services\ControlTowerClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Session;
+use Throwable;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
@@ -28,12 +30,16 @@ class DashboardController extends Controller
         return $this->render($request, 'pages.overview', 'overview', [
             'health' => $this->client->get('/health', null, ['status' => 'unavailable']),
             'apiStatus' => $this->client->get('/api/v1/api/status', null, ['status' => 'unavailable', 'services' => []]),
+            'runtimeStatus' => $this->client->get('/api/v1/system/runtime', null, ['orchestrator' => ['status' => 'down']]),
             'healthStatus' => $this->client->get('/api/v1/system/health/status', null, ['healthy' => false, 'services' => []]),
             'calendarStatus' => $this->client->get('/api/v1/calendar/status', null, ['status' => 'unavailable', 'sources' => []]),
             'newsStatus' => $this->client->get('/api/v1/news/status', null, ['risk_status' => 'unavailable']),
             'workers' => $this->client->get('/api/v1/workers/status', null, ['workers' => []]),
             'pairSummaries' => $this->client->get('/api/v1/pair-summaries', null, ['items' => [], 'summary' => []]),
             'signals' => $this->client->get('/api/v1/signals/summary', null, ['items' => [], 'summary' => []]),
+            'signalRecords' => $this->client->get('/api/v1/signals/records?limit=12', null, ['items' => []]),
+            'accounts' => $this->client->get('/api/v1/accounts/records', null, []),
+            'accountSnapshots' => $this->client->get('/api/v1/telemetry/accounts/latest?limit=5', null, []),
             'readiness' => $this->client->get('/api/v1/system/production-readiness', null, []),
             'auditLogs' => $this->client->get('/api/v1/logs/audit?limit=8', null, ['items' => []]),
         ]);
@@ -51,6 +57,15 @@ class DashboardController extends Controller
     {
         return $this->render($request, 'pages.pair-summary', 'pair-summary', [
             'summaries' => $this->client->get('/api/v1/pair-summaries', null, ['items' => [], 'summary' => []]),
+        ]);
+    }
+
+    public function pairDetail(Request $request, string $symbol): View
+    {
+        $safeSymbol = strtoupper(trim($symbol));
+        return $this->render($request, 'pages.pair-detail', 'pair-summary', [
+            'pairDetail' => $this->client->get('/api/v1/pair-summaries/' . rawurlencode($safeSymbol), null, ['status' => 'not_found']),
+            'symbol' => $safeSymbol,
         ]);
     }
 
@@ -90,8 +105,14 @@ class DashboardController extends Controller
 
     public function riskValidation(Request $request): View
     {
+        $token = $this->optionalToken($request);
         return $this->render($request, 'pages.risk-validation', 'risk-validation', [
             'summaries' => $this->client->get('/api/v1/pair-summaries', null, ['items' => [], 'summary' => []]),
+            'accounts' => $this->client->get('/api/v1/accounts/records', null, []),
+            'accountSnapshots' => $this->client->get('/api/v1/telemetry/accounts/latest?limit=5', null, []),
+            'executions' => $this->client->get('/api/v1/trades/executions?limit=80', null, ['items' => []]),
+            'demoStatus' => $token ? $this->client->get('/api/v1/trades/demo-auto/status', $token, []) : [],
+            'demoActivity' => $token ? $this->client->get('/api/v1/trades/demo-auto/activity?limit=40', $token, ['items' => []]) : ['items' => []],
         ]);
     }
 
@@ -157,6 +178,7 @@ class DashboardController extends Controller
         return $this->render($request, 'pages.news', 'news', [
             'status' => $this->client->get('/api/v1/news/status', null, []),
             'items' => $this->client->get('/api/v1/news/items' . ($query ? '?' . $query : ''), null, ['results' => [], 'total' => 0]),
+            'providerEvents' => $this->client->get('/api/v1/news/events' . ($query ? '?' . $query : ''), null, ['events' => []]),
             'filters' => $request->query(),
         ]);
     }
@@ -173,6 +195,19 @@ class DashboardController extends Controller
     {
         return $this->render($request, 'pages.workers', 'workers', [
             'workers' => $this->client->get('/api/v1/workers/status', null, ['workers' => []]),
+            'agentRuntime' => $this->client->get('/api/v1/agents/runtime-summary', null, [
+                'orchestrator_health' => 'unknown',
+                'queued_tasks' => 0,
+                'running_tasks' => 0,
+                'retrying_tasks' => 0,
+                'failed_tasks' => 0,
+                'completed_tasks' => 0,
+                'stale_agents_count' => 0,
+                'last_failed_task' => null,
+            ]),
+            'runtimeStatus' => $this->client->get('/api/v1/system/runtime', null, [
+                'orchestrator' => ['status' => 'unknown', 'reason' => 'unavailable', 'last_success_run' => null, 'last_failed_run' => null, 'retry_status' => 'unknown'],
+            ]),
         ]);
     }
 
@@ -196,6 +231,7 @@ class DashboardController extends Controller
     {
         return $this->render($request, 'pages.orchestrator-console', 'orchestrator-console', [
             'events' => $this->client->get('/api/v1/agent-theater/events?limit=80&stream=Orchestrator%20Console&agent=Operator&agent=Orchestrator%20Agent', null, ['events' => []]),
+            'orchestratorHealth' => $this->client->get('/api/v1/agent-theater/orchestrator/health', null, []),
         ]);
     }
 
@@ -259,6 +295,26 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function openclaw(Request $request): View
+    {
+        return $this->render($request, 'pages.openclaw', 'openclaw', [
+            'status' => $this->client->get('/api/v1/openclaw/status', null, []),
+            'runtimeHealth' => $this->client->get('/api/v1/openclaw/runtime/health', null, []),
+            'contract' => $this->client->get('/api/v1/openclaw/contract', null, []),
+            'runtime' => $this->client->get('/api/v1/system/runtime', null, []),
+            'allowedTargets' => ['system', 'risk', 'signals', 'workers', 'news', 'accounts', 'pairs'],
+            'allowedPaths' => [
+                '/api/v1/system/runtime',
+                '/api/v1/system/health/status',
+                '/api/v1/workers/status',
+                '/api/v1/news/status',
+                '/api/v1/calendar/status',
+                '/api/v1/signals/summary',
+                '/api/v1/pair-summaries',
+            ],
+        ]);
+    }
+
     public function login(Request $request): RedirectResponse
     {
         $validated = $request->validate([
@@ -278,16 +334,17 @@ class DashboardController extends Controller
         }
 
         $body = $response->json() ?? [];
-        $request->session()->put('control_tower_token', $body['access_token'] ?? '');
-        $request->session()->put('control_tower_user', $validated['user_id']);
         $request->session()->regenerate();
+        $request->session()->put('control_tower_token', $body['access_token'] ?? '');
+        $request->session()->put('control_tower_refresh_token', $body['refresh_token'] ?? '');
+        $request->session()->put('control_tower_user', $validated['user_id']);
 
         return redirect()->route('dashboard.overview')->with('status', 'Logged in.');
     }
 
     public function logout(Request $request): RedirectResponse
     {
-        $request->session()->forget(['control_tower_token', 'control_tower_user']);
+        $request->session()->forget(['control_tower_token', 'control_tower_refresh_token', 'control_tower_user']);
         $request->session()->regenerateToken();
 
         return redirect()->route('dashboard.overview')->with('status', 'Logged out.');
@@ -308,7 +365,7 @@ class DashboardController extends Controller
     public function createTradingPair(Request $request): RedirectResponse
     {
         $token = $this->requireToken($request);
-        $payload = $this->tradingPairPayload($request);
+        $payload = $this->tradingPairCreatePayload($request);
         $response = $this->client->post('/api/v1/trading-pairs', $payload, $token);
 
         return $this->redirectResponse($response, 'Trading pair added.', 'Trading pair create failed.');
@@ -317,7 +374,7 @@ class DashboardController extends Controller
     public function updateTradingPair(Request $request, string $symbol): RedirectResponse
     {
         $token = $this->requireToken($request);
-        $payload = $this->tradingPairPayload($request);
+        $payload = $this->tradingPairUpdatePayload($request);
         $response = $this->client->put('/api/v1/trading-pairs/' . rawurlencode($symbol), $payload, $token);
 
         return $this->redirectResponse($response, 'Trading pair saved.', 'Trading pair update failed.');
@@ -403,12 +460,26 @@ class DashboardController extends Controller
             return back()->with('error', $this->errorMessage($response->json() ?? [], 'Credential reveal failed.'));
         }
         $body = $response->json() ?? [];
+        $source = is_string($body['source'] ?? null) ? $body['source'] : 'credential_store';
+        $sourceLabel = $source === 'runtime_env' ? 'runtime environment' : 'credential manager';
 
         return back()->with('generated_secret', [
             'name' => $name,
             'value' => $body['value'] ?? '',
-            'message' => 'Revealed for this browser session. Audit record created.',
+            'message' => "Revealed from {$sourceLabel} for this browser session. Audit record created.",
         ]);
+    }
+
+    public function migrateRuntimeCredentials(Request $request): RedirectResponse
+    {
+        $token = $this->requireToken($request);
+        $response = $this->client->post('/api/v1/credentials/migrate-runtime', [], $token);
+        if (! $response->successful()) {
+            return back()->with('error', $this->errorMessage($response->json() ?? [], 'Credential migration failed.'));
+        }
+        $body = $response->json() ?? [];
+        $count = (int)($body['migrated_count'] ?? 0);
+        return back()->with('status', "Runtime-to-DB credential migration complete. Migrated {$count} credential(s).");
     }
 
     public function updateDataSource(Request $request, string $sourceId): RedirectResponse
@@ -470,28 +541,98 @@ class DashboardController extends Controller
     public function workerAction(Request $request, string $workerId, string $action): RedirectResponse
     {
         $response = $this->client->post('/api/v1/workers/' . rawurlencode($workerId) . '/' . rawurlencode($action), [], $this->requireToken($request));
-        return $this->redirectResponse($response, 'Worker action queued.', 'Worker action failed.');
+        return $this->redirectResponse($response, 'Worker action applied.', 'Worker action failed.');
+    }
+
+    public function recoverStaleAgents(Request $request): RedirectResponse
+    {
+        $token = $this->requireToken($request);
+        $validated = $request->validate([
+            'stale_after_seconds' => ['nullable', 'integer', 'min:30', 'max:3600'],
+            'queue_watchdog_review' => ['nullable', 'string'],
+        ]);
+        $staleAfter = (int)($validated['stale_after_seconds'] ?? 180);
+        $queueWatchdog = $request->boolean('queue_watchdog_review');
+        $query = http_build_query([
+            'stale_after_seconds' => $staleAfter,
+            'queue_watchdog_review' => $queueWatchdog ? 'true' : 'false',
+        ]);
+        $response = $this->client->post('/api/v1/agents/recover-stale?' . $query, [], $token);
+        if (! $response->successful()) {
+            return back()->with('error', $this->errorMessage($response->json() ?? [], 'Stale recovery failed.'));
+        }
+        $body = $response->json() ?? [];
+        $count = (int)($body['recovered_count'] ?? 0);
+        return back()->with('status', "Stale recovery completed. Recovered {$count} agent states.");
+    }
+
+    public function setDemoTradingMode(Request $request): RedirectResponse
+    {
+        $token = $this->requireToken($request);
+        $validated = $request->validate([
+            'account_id' => ['required', 'string', 'max:80'],
+            'trading_mode' => ['required', 'string', 'in:monitor_only,demo_auto'],
+        ]);
+        $response = $this->client->post('/api/v1/risk/demo-trading-mode', $validated, $token);
+        if (! $response->successful()) {
+            return back()->with('error', $this->errorMessage($response->json() ?? [], 'Unable to update demo trading mode.'));
+        }
+
+        $message = $validated['trading_mode'] === 'demo_auto'
+            ? 'Demo auto-trading mode enabled (still guarded by Execution Guard and approvals).'
+            : 'Demo trading set to monitor_only.';
+        return back()->with('status', $message);
+    }
+
+    public function runDemoExecutionCycle(Request $request): RedirectResponse
+    {
+        $token = $this->requireToken($request);
+        $response = $this->client->post('/api/v1/trades/demo-auto/run', [], $token);
+        if (! $response->successful()) {
+            return back()->with('error', $this->errorMessage($response->json() ?? [], 'Unable to run demo execution cycle.'));
+        }
+        $body = $response->json() ?? [];
+        $sent = (int)($body['sent'] ?? 0);
+        $blocked = (int)($body['blocked'] ?? 0);
+        $failed = (int)($body['failed'] ?? 0);
+        $skipped = (int)($body['skipped'] ?? 0);
+        return back()->with('status', "Demo execution cycle completed. Sent {$sent}, blocked {$blocked}, failed {$failed}, skipped {$skipped}.");
     }
 
     public function sendOrchestratorChat(Request $request): RedirectResponse|JsonResponse
     {
-        $token = $this->requireToken($request);
-        $validated = $request->validate([
-            'message' => ['required', 'string', 'min:1', 'max:800'],
-            'language' => ['required', 'string', 'in:en,ms-MY,auto'],
-        ]);
-        $response = $this->client->post('/api/v1/agent-theater/chat', [
-            'message' => $validated['message'],
-            'language' => $validated['language'],
-            'session_id' => 'laravel-orchestrator-console',
-            'orchestrator_only' => true,
-        ], $token);
+        try {
+            $token = $this->requireToken($request);
+            $validated = $request->validate([
+                'message' => ['required', 'string', 'min:1', 'max:800'],
+                'language' => ['required', 'string', 'in:en,ms-MY,auto'],
+            ]);
+            $response = $this->client->post('/api/v1/agent-theater/chat', [
+                'message' => $validated['message'],
+                'language' => $validated['language'],
+                'session_id' => 'laravel-orchestrator-console',
+                'orchestrator_only' => true,
+            ], $token);
+        } catch (Throwable) {
+            if ($request->expectsJson()) {
+                return response()->json(['ok' => false, 'message' => 'Orchestrator request failed before reaching control API.'], 503);
+            }
+            return back()->with('error', 'Orchestrator request failed before reaching control API.');
+        }
 
         if ($request->expectsJson()) {
             if (! $response->successful()) {
-                return response()->json(['ok' => false, 'message' => $this->errorMessage($response->json() ?? [], 'Orchestrator chat failed.')], 422);
+                $status = in_array($response->status(), [401, 403], true) ? 401 : 422;
+                return response()->json(['ok' => false, 'message' => $this->errorMessage($response->json() ?? [], 'Orchestrator chat failed.')], $status);
             }
-            return response()->json(['ok' => true, 'message' => 'Orchestrator replied.']);
+            $body = $response->json() ?? [];
+            return response()->json([
+                'ok' => true,
+                'message' => 'Orchestrator replied.',
+                'provider' => $body['provider'] ?? null,
+                'fallback_reason' => $body['fallback_reason'] ?? null,
+                'latency_ms' => $body['latency_ms'] ?? null,
+            ]);
         }
 
         return $this->redirectResponse($response, 'Orchestrator replied. The dedicated console feed has been updated.', 'Orchestrator chat failed.');
@@ -522,19 +663,95 @@ class DashboardController extends Controller
         return $this->redirectResponse($response, 'Analysis snapshot seed requested.', 'Analysis seed failed.');
     }
 
+    public function openclawChat(Request $request): RedirectResponse
+    {
+        $token = $this->requireToken($request);
+        $validated = $request->validate([
+            'role' => ['required', 'string', 'in:admin,user'],
+            'language' => ['required', 'string', 'in:en,ms-MY,auto'],
+            'message' => ['required', 'string', 'max:1200'],
+        ]);
+        $response = $this->client->post('/api/v1/openclaw/chat', $validated, $token);
+        if (! $response->successful()) {
+            return back()->with('error', $this->errorMessage($response->json() ?? [], 'OpenClaw chat failed.'));
+        }
+        return back()->with('openclaw_result', $response->json() ?? [])->with('status', 'OpenClaw response received.');
+    }
+
+    public function openclawStatusQuery(Request $request): RedirectResponse
+    {
+        $token = $this->requireToken($request);
+        $validated = $request->validate([
+            'target' => ['required', 'string', 'in:system,risk,signals,workers,news,accounts,pairs'],
+            'language' => ['required', 'string', 'in:en,ms-MY,auto'],
+        ]);
+        $response = $this->client->post('/api/v1/openclaw/status/query', $validated, $token);
+        if (! $response->successful()) {
+            return back()->with('error', $this->errorMessage($response->json() ?? [], 'OpenClaw status query failed.'));
+        }
+        return back()->with('openclaw_result', $response->json() ?? [])->with('status', 'OpenClaw status summary generated.');
+    }
+
+    public function openclawDailySummary(Request $request): RedirectResponse
+    {
+        $token = $this->requireToken($request);
+        $validated = $request->validate([
+            'language' => ['required', 'string', 'in:en,ms-MY,auto'],
+        ]);
+        $response = $this->client->post('/api/v1/openclaw/summary/daily', $validated, $token);
+        if (! $response->successful()) {
+            return back()->with('error', $this->errorMessage($response->json() ?? [], 'OpenClaw daily summary failed.'));
+        }
+        return back()->with('openclaw_result', $response->json() ?? [])->with('status', 'OpenClaw daily summary generated.');
+    }
+
+    public function openclawApprovedApiCall(Request $request): RedirectResponse
+    {
+        $token = $this->requireToken($request);
+        $validated = $request->validate([
+            'path' => ['required', 'string', 'in:/api/v1/system/runtime,/api/v1/system/health/status,/api/v1/workers/status,/api/v1/news/status,/api/v1/calendar/status,/api/v1/signals/summary,/api/v1/pair-summaries'],
+            'reason' => ['nullable', 'string', 'max:300'],
+        ]);
+        $response = $this->client->post('/api/v1/openclaw/api-call', [
+            'path' => $validated['path'],
+            'approved' => true,
+            'reason' => $validated['reason'] ?? '',
+        ], $token);
+        if (! $response->successful()) {
+            return back()->with('error', $this->errorMessage($response->json() ?? [], 'OpenClaw approved API call failed.'));
+        }
+        return back()->with('openclaw_result', $response->json() ?? [])->with('status', 'OpenClaw approved API call completed.');
+    }
+
     private function render(Request $request, string $view, string $active, array $data = []): View
     {
-        $authenticated = (bool) $request->session()->get('control_tower_token');
+        $token = $this->optionalToken($request);
+        $authenticated = $token !== null;
+        if ($authenticated && !app()->runningUnitTests()) {
+            $me = $this->client->get('/api/v1/auth/me', $token, []);
+            if (!isset($me['user_id']) || !is_string($me['user_id']) || $me['user_id'] === '') {
+                $request->session()->forget(['control_tower_token', 'control_tower_refresh_token', 'control_tower_user']);
+                $token = null;
+                $authenticated = false;
+            }
+        }
         if (! $authenticated && $active !== 'login') {
             $view = 'pages.login';
             $active = 'login';
             $data = [];
         }
+        $runtime = $this->client->get('/health', null, [
+            'status' => 'unavailable',
+            'environment' => 'demo',
+            'trading_mode' => 'monitor_only',
+            'live_auto_trading' => false,
+        ]);
 
         return view($view, array_merge($data, [
             'active' => $active,
             'authenticated' => $authenticated,
             'userId' => $request->session()->get('control_tower_user'),
+            'runtime' => $runtime,
             'links' => [
                 'api' => config('control_tower.api_url'),
                 'docs' => config('control_tower.docs_url'),
@@ -543,7 +760,7 @@ class DashboardController extends Controller
         ]));
     }
 
-    private function tradingPairPayload(Request $request): array
+    private function tradingPairCreatePayload(Request $request): array
     {
         $validated = $request->validate([
             'symbol' => ['required', 'string', 'max:40'],
@@ -551,16 +768,47 @@ class DashboardController extends Controller
             'enabled' => ['nullable', 'string'],
             'default_timeframe' => ['required', 'string', 'max:20'],
             'assigned_strategy_id' => ['nullable', 'string', 'max:100'],
+            'additional_timeframes' => ['nullable', 'string', 'max:200'],
         ]);
+        $defaultTimeframe = strtoupper($validated['default_timeframe']);
+        $additionalTimeframes = $this->timeframeList($validated['additional_timeframes'] ?? '', $defaultTimeframe);
         return [
             'symbol' => strtoupper(trim($validated['symbol'])),
             'display_name' => $validated['display_name'] ?: strtoupper(trim($validated['symbol'])),
             'enabled' => $request->boolean('enabled'),
-            'default_timeframe' => strtoupper($validated['default_timeframe']),
+            'default_timeframe' => $defaultTimeframe,
             'assigned_strategy_id' => $validated['assigned_strategy_id'] ?: null,
             'status' => $request->boolean('enabled') ? 'enabled' : 'disabled',
-            'metadata_json' => [],
+            'metadata_json' => [
+                'analysis_timeframes' => $additionalTimeframes,
+            ],
         ];
+    }
+
+    private function tradingPairUpdatePayload(Request $request): array
+    {
+        $validated = $request->validate([
+            'display_name' => ['nullable', 'string', 'max:80'],
+            'enabled' => ['nullable', 'string'],
+            'default_timeframe' => ['nullable', 'string', 'max:20'],
+            'assigned_strategy_id' => ['nullable', 'string', 'max:100'],
+            'additional_timeframes' => ['nullable', 'string', 'max:200'],
+        ]);
+        $defaultTimeframe = !empty($validated['default_timeframe']) ? strtoupper($validated['default_timeframe']) : 'M1';
+        $additionalTimeframes = $this->timeframeList($validated['additional_timeframes'] ?? '', $defaultTimeframe);
+        $payload = [
+            'display_name' => $validated['display_name'] ?: null,
+            'enabled' => $request->boolean('enabled'),
+            'assigned_strategy_id' => $validated['assigned_strategy_id'] ?: null,
+            'status' => $request->boolean('enabled') ? 'enabled' : 'disabled',
+            'metadata_json' => [
+                'analysis_timeframes' => $additionalTimeframes,
+            ],
+        ];
+        if (!empty($validated['default_timeframe'])) {
+            $payload['default_timeframe'] = $defaultTimeframe;
+        }
+        return $payload;
     }
 
     private function agentTheaterQuery(Request $request): string
@@ -587,8 +835,33 @@ class DashboardController extends Controller
     private function requireToken(Request $request): string
     {
         $token = $this->optionalToken($request);
+        if ($token === null && $this->refreshSessionToken($request)) {
+            $token = $this->optionalToken($request);
+        }
         abort_if($token === null, 403, 'Login required.');
         return $token;
+    }
+
+    private function refreshSessionToken(Request $request): bool
+    {
+        $refreshToken = (string) $request->session()->get('control_tower_refresh_token', '');
+        if ($refreshToken === '') {
+            return false;
+        }
+        $response = $this->client->post('/api/v1/auth/refresh', ['refresh_token' => $refreshToken], null);
+        if (! $response->successful()) {
+            $request->session()->forget(['control_tower_token', 'control_tower_refresh_token', 'control_tower_user']);
+            return false;
+        }
+        $body = $response->json() ?? [];
+        if (!is_string($body['access_token'] ?? null) || $body['access_token'] === '') {
+            return false;
+        }
+        $request->session()->put('control_tower_token', $body['access_token']);
+        if (is_string($body['refresh_token'] ?? null) && $body['refresh_token'] !== '') {
+            $request->session()->put('control_tower_refresh_token', $body['refresh_token']);
+        }
+        return true;
     }
 
     private function typedPayload(Request $request, array $strings, array $typed): array
@@ -613,6 +886,20 @@ class DashboardController extends Controller
     private function csv(mixed $value): array
     {
         return array_values(array_filter(array_map(fn ($item) => trim((string) $item), explode(',', (string) $value))));
+    }
+
+    private function timeframeList(string $raw, string $defaultTimeframe): array
+    {
+        $allowed = ['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D1'];
+        $tokens = array_values(array_unique(array_map(
+            fn ($item) => strtoupper(trim((string) $item)),
+            explode(',', $raw)
+        )));
+        $selected = array_values(array_filter($tokens, fn ($item) => in_array($item, $allowed, true)));
+        if (!in_array($defaultTimeframe, $selected, true)) {
+            array_unshift($selected, $defaultTimeframe);
+        }
+        return array_values(array_unique($selected));
     }
 
     private function jsonObject(mixed $value): array
@@ -646,6 +933,10 @@ class DashboardController extends Controller
     private function redirectResponse($response, string $success, string $fallback): RedirectResponse
     {
         if (! $response->successful()) {
+            if (in_array($response->status(), [401, 403], true)) {
+                Session::forget(['control_tower_token', 'control_tower_refresh_token', 'control_tower_user']);
+                return redirect()->route('dashboard')->with('error', 'Session expired. Please login again.');
+            }
             return back()->with('error', $this->errorMessage($response->json() ?? [], $fallback));
         }
         return back()->with('status', $success);
@@ -654,6 +945,17 @@ class DashboardController extends Controller
     private function errorMessage(array $body, string $fallback): string
     {
         $detail = $body['detail'] ?? null;
-        return is_string($detail) ? $detail : $fallback;
+        if (is_string($detail) && $detail !== '') {
+            return $detail;
+        }
+        if (is_array($detail)) {
+            $first = $detail[0] ?? null;
+            if (is_array($first)) {
+                $field = is_array($first['loc'] ?? null) ? implode('.', $first['loc']) : 'request';
+                $msg = is_string($first['msg'] ?? null) ? $first['msg'] : 'invalid input';
+                return "{$field}: {$msg}";
+            }
+        }
+        return $fallback;
     }
 }

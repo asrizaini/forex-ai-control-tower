@@ -6,7 +6,7 @@
         <div><h2>{{ $title }}</h2><p>Rows show every enabled pair, including stale or missing data.</p></div>
         <form method="POST" action="{{ route('analysis.run') }}">@csrf<button type="submit">Refresh Analysis</button></form>
     </div>
-    <div class="table">
+    <div class="table-wrap"><div class="table">
         @forelse(($summaries['items'] ?? []) as $item)
             @php $analysis = $item[$analysisKey] ?? []; @endphp
             <div class="row" style="grid-template-columns:.7fr .6fr .7fr .7fr 2fr">
@@ -19,6 +19,6 @@
         @empty
             <p class="empty">No analysis output yet.</p>
         @endforelse
-    </div>
+    </div></div>
 </section>
 @endsection

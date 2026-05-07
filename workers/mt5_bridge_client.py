@@ -78,9 +78,11 @@ def bridge_symbols() -> dict[str, Any]:
     return _request("/symbols")
 
 
-def bridge_rates(symbol: str) -> dict[str, Any]:
+def bridge_rates(symbol: str, timeframe: str = "M1", count: int = 160) -> dict[str, Any]:
     safe_symbol = urllib.parse.quote(symbol, safe="")
-    return _request(f"/rates/{safe_symbol}")
+    safe_timeframe = urllib.parse.quote(timeframe.upper(), safe="")
+    safe_count = max(10, min(count, 1000))
+    return _request(f"/rates/{safe_symbol}?timeframe={safe_timeframe}&count={safe_count}")
 
 
 def bridge_ticks(symbol: str) -> dict[str, Any]:
@@ -104,5 +106,5 @@ def mask_login(value: Any) -> str:
 
 
 def configured_watchlist() -> list[str]:
-    raw = os.getenv("MARKET_WATCH_SYMBOLS", "EURUSD,XAUUSD,GBPUSD,USDJPY")
+    raw = os.getenv("MARKET_WATCH_SYMBOLS", "EURUSD,GBPUSD,USDJPY,XAUUSD,AUDUSD,USDCAD,USDCHF,NZDUSD")
     return [item.strip().upper() for item in raw.split(",") if item.strip()]

@@ -8,13 +8,16 @@ from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketException, status
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from sqlalchemy import select
 from starlette.responses import RedirectResponse
 from starlette.responses import Response
 
 from agent_theater.renderer import render_event
 
 from .auth import decode_token
-from .db import init_db
+from .credential_store import runtime_bool
+from .db import SessionLocal, init_db
+from .models import Account
 from .observability import JsonAccessLogAndMetricsMiddleware, collect_database_metrics
 from .routes import (
     accounts,
@@ -106,14 +109,32 @@ def create_app() -> FastAPI:
 
     init_db()
 
+    def runtime_context() -> dict[str, object]:
+        environment = "demo"
+        trading_mode = "monitor_only"
+        db = SessionLocal()
+        try:
+            account = db.scalar(
+                select(Account).where(Account.enabled.is_(True)).order_by(Account.created_at.desc()).limit(1)
+            )
+            if account:
+                environment = account.environment
+                trading_mode = account.trading_mode
+        finally:
+            db.close()
+        live_enabled = runtime_bool("ALLOW_LIVE_TRADING", False)
+        live_auto = trading_mode in {"demo_auto", "restricted_live_auto"} and (
+            environment == "demo" or (environment == "production-live" and live_enabled)
+        )
+        return {
+            "environment": environment,
+            "trading_mode": trading_mode,
+            "live_auto_trading": live_auto,
+        }
+
     @app.get("/health", tags=["system"])
     def health() -> dict:
-        return {
-            "status": "ok",
-            "environment": "demo",
-            "trading_mode": "monitor_only",
-            "live_auto_trading": False,
-        }
+        return {"status": "ok", **runtime_context()}
 
     @app.get("/ready", tags=["system"])
     def ready() -> dict:

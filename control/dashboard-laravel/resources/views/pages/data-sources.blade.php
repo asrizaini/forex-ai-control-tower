@@ -3,8 +3,8 @@
 @section('content')
 <section class="grid-3">
     <div class="metric"><span class="eyebrow">Enabled Calendar Sources</span><strong>{{ $calendarStatus['enabled_sources'] ?? 0 }}</strong><span>priority and fallback enabled</span></div>
-    <div class="metric"><span class="eyebrow">Last Success</span><strong>{{ $calendarStatus['last_success_at'] ?? 'none' }}</strong><span>calendar scrape</span></div>
-    <div class="metric"><span class="eyebrow">Last Failure</span><strong>{{ $calendarStatus['last_failure_at'] ?? 'none' }}</strong><span>calendar scrape</span></div>
+    <div class="metric"><span class="eyebrow">Last Success</span><strong data-utc="{{ $calendarStatus['last_success_at'] ?? '' }}">{{ $calendarStatus['last_success_at'] ?? 'none' }}</strong><span>calendar scrape</span></div>
+    <div class="metric"><span class="eyebrow">Last Failure</span><strong data-utc="{{ $calendarStatus['last_failure_at'] ?? '' }}">{{ $calendarStatus['last_failure_at'] ?? 'none' }}</strong><span>calendar scrape</span></div>
 </section>
 <section class="panel">
     <div class="panel-head"><div><h2>Source Configuration</h2><p>Use conservative intervals and source-specific adapters. Direct scraping remains disabled until configured deliberately.</p></div><span class="badge ok">provider pattern</span></div>

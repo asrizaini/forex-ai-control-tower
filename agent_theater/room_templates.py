@@ -13,7 +13,7 @@ def _timestamp() -> str:
     except ZoneInfoNotFoundError:
         timezone = ZoneInfo("Asia/Kuala_Lumpur")
         timezone_name = "Asia/Kuala_Lumpur"
-    return f"{datetime.now(timezone).strftime('%Y-%m-%d %H:%M:%S')} {timezone_name}"
+    return f"{datetime.now(timezone).strftime('%Y-%m-%d %I:%M:%S %p')} GMT+8"
 
 
 def room_seed_events(room_name: str, session_id: str = "room-seed") -> list[dict[str, Any]]:

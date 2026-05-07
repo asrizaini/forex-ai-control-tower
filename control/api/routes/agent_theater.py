@@ -8,7 +8,7 @@ import urllib.error
 import urllib.request
 from ipaddress import ip_address, ip_network
 from pathlib import Path
-from time import time
+from time import perf_counter, time
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request, status
@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..auth import decode_token
+from ..credential_store import runtime_value
 from ..crud import audit
 from ..db import SessionLocal
 from ..models import AgentTask
@@ -43,6 +44,22 @@ SECRET_TEXT_PATTERN = re.compile(
     r"(password|token|secret|api[_-]?key|broker|credential|bearer\s+[a-z0-9._~+/=-]+)",
     re.IGNORECASE,
 )
+
+_ORCHESTRATOR_RUNTIME: dict[str, Any] = {
+    "last_success_at": None,
+    "last_failed_at": None,
+    "last_failed_reason": "",
+    "last_provider": "static",
+    "last_latency_ms": None,
+}
+
+PROVIDER_FAILURE_MESSAGE = "Orchestrator AI provider unavailable. Local LLM (Ollama) is unreachable or failed."
+
+
+def _normalized_provider_mode(raw: str) -> str:
+    value = (raw or "").strip().lower()
+    aliases = {"ollama": "local", "static": "disabled", "openai": "local"}
+    return aliases.get(value, value if value in {"local", "disabled"} else "local")
 
 
 class AgentTheaterEventIn(BaseModel):
@@ -83,7 +100,7 @@ def _timestamp() -> str:
 
 
 def _ingest_allowed(request: Request, x_agent_event_token: str | None) -> bool:
-    expected = os.getenv("AGENT_EVENT_INGEST_TOKEN")
+    expected = runtime_value("AGENT_EVENT_INGEST_TOKEN")
     if expected:
         return bool(x_agent_event_token) and x_agent_event_token == expected
     client_host = request.client.host if request.client else ""
@@ -100,7 +117,7 @@ def _chat_allowed(request: Request, authorization: str | None) -> bool:
         token = authorization.split(" ", 1)[1]
     if decode_token(token):
         return True
-    if os.getenv("ORCHESTRATOR_CHAT_INTERNAL_MODE", "true").lower() != "true":
+    if runtime_value("ORCHESTRATOR_CHAT_INTERNAL_MODE", "true").lower() != "true":
         return False
     client_host = request.client.host if request.client else ""
     try:
@@ -133,10 +150,10 @@ def _sentence_safe_trim(text: str, limit: int = 650) -> str:
 
 
 def _ask_local_llm(message: str, language: str) -> str | None:
-    if os.getenv("ORCHESTRATOR_GENERAL_CHAT_MODE", "static").lower() != "ollama":
-        return None
-    base_url = os.getenv("OLLAMA_REASON_URL", "http://10.10.1.82:11434").rstrip("/")
-    model = os.getenv("ORCHESTRATOR_GENERAL_CHAT_MODEL", "llama3.1:8b")
+    base_url = runtime_value("OLLAMA_REASON_URL", "http://10.10.1.82:11434").rstrip("/")
+    model = runtime_value("ORCHESTRATOR_GENERAL_CHAT_MODEL", "llama3.1:8b")
+    api_style = runtime_value("LOCAL_LLM_API_STYLE", "ollama").lower()
+    api_key = runtime_value("LOCAL_LLM_API_KEY")
     prompt = (
         "You are the Forex AI Control Tower Orchestrator, a safe human-facing assistant. "
         "Answer general questions naturally and helpfully. For trading, deployment, credentials, or system actions, "
@@ -146,6 +163,52 @@ def _ask_local_llm(message: str, language: str) -> str | None:
         "Do not use bullet lists or markdown headings. "
         f"Reply language mode: {language}. Operator message: {message}"
     )
+    timeout_seconds = int(runtime_value("ORCHESTRATOR_LLM_TIMEOUT_SECONDS", "8"))
+    if api_style == "openai_compatible":
+        payload = json.dumps(
+            {
+                "model": model,
+                "input": prompt,
+                "max_output_tokens": 220,
+            }
+        ).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        request = urllib.request.Request(
+            f"{base_url}/v1/responses",
+            data=payload,
+            headers=headers,
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+                body = json.loads(response.read().decode("utf-8"))
+        except (OSError, urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+            return None
+        output_text = body.get("output_text")
+        if isinstance(output_text, str) and output_text.strip():
+            answer = _strip_hidden_reasoning(output_text)
+            return _sentence_safe_trim(answer) if answer else None
+        output_items = body.get("output", [])
+        if isinstance(output_items, list):
+            collected: list[str] = []
+            for item in output_items:
+                if not isinstance(item, dict):
+                    continue
+                content_items = item.get("content", [])
+                if not isinstance(content_items, list):
+                    continue
+                for content in content_items:
+                    if isinstance(content, dict) and content.get("type") == "output_text":
+                        text = str(content.get("text", "")).strip()
+                        if text:
+                            collected.append(text)
+            if collected:
+                answer = _strip_hidden_reasoning(" ".join(collected))
+                return _sentence_safe_trim(answer) if answer else None
+        return None
+
     payload = json.dumps(
         {
             "model": model,
@@ -161,7 +224,6 @@ def _ask_local_llm(message: str, language: str) -> str | None:
         method="POST",
     )
     try:
-        timeout_seconds = int(os.getenv("ORCHESTRATOR_LLM_TIMEOUT_SECONDS", "8"))
         with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
             body = json.loads(response.read().decode("utf-8"))
     except (OSError, urllib.error.URLError, TimeoutError, json.JSONDecodeError):
@@ -304,9 +366,13 @@ def _supporting_agent_events(message: str, language: str, session_id: str) -> li
     return events
 
 
-def _orchestrator_reply(message: str, language: str) -> tuple[str, str]:
+def _orchestrator_reply(message: str, language: str) -> tuple[str, str, str, str | None, int]:
+    started = perf_counter()
+    mode = _normalized_provider_mode(runtime_value("ORCHESTRATOR_GENERAL_CHAT_MODE", "local"))
     lowered = message.lower()
     is_ms = language == "ms-MY"
+    provider = "disabled"
+    fallback_reason: str | None = None
     is_time_question = any(
         word in lowered
         for word in ("time", "date", "today", "now", "current time", "current date", "masa", "tarikh", "hari ini", "sekarang")
@@ -315,13 +381,13 @@ def _orchestrator_reply(message: str, language: str) -> tuple[str, str]:
         if is_ms:
             summary = (
                 f"Masa fx-control sekarang ialah {format_local()}. "
-                "Semua paparan operator dan Agent Theater akan menggunakan zon masa Asia/Kuala_Lumpur."
+                "Semua paparan operator dan Agent Theater menggunakan zon masa GMT+8."
             )
             next_action = "Gunakan halaman Agent Theater dalam dashboard untuk bertanya status masa, sistem, risiko, atau agen."
         else:
             summary = (
                 f"The current fx-control time is {format_local()}. "
-                "Operator-facing API and Agent Theater messages are displayed in Asia/Kuala_Lumpur time."
+                "Operator-facing API and Agent Theater messages are displayed in GMT+8 time."
             )
             next_action = "Use the Agent Theater page in the dashboard for time, system, risk, and agent questions."
     elif any(word in lowered for word in ("who are you", "what are you", "which llm", "what llm", "model are you", "jenis apa", "llm apa", "siapa kamu")):
@@ -369,19 +435,35 @@ def _orchestrator_reply(message: str, language: str) -> tuple[str, str]:
         )
         next_action = "Check /api/v1/news/status for provider freshness, upcoming high-impact events, and the current news halt decision."
     else:
-        llm_answer = _ask_local_llm(message, language)
-        summary = llm_answer or (
-            "I received your message. I can handle general questions, planning, explanations, operator requests, and safe task routing. "
-            "For trading or infrastructure actions, I will coordinate the relevant agent and keep governance, audit, and approval gates in place."
-        )
-        next_action = "Ask a general question, request a system task, or ask me to route work to a specific agent."
-    if is_ms and not is_time_question:
+        llm_answer = None
+        retry_count = max(0, min(3, int(runtime_value("ORCHESTRATOR_LLM_RETRY_COUNT", "1"))))
+        if mode == "local":
+            provider = "local"
+            for _ in range(retry_count + 1):
+                llm_answer = _ask_local_llm(message, language)
+                if llm_answer:
+                    break
+            if llm_answer is None:
+                fallback_reason = "local_unavailable_or_timeout"
+        if mode == "disabled":
+            provider = "disabled"
+            summary = (
+                "AI provider mode is disabled. I can still support system checks, safe routing, logs, and workflow guidance without LLM calls."
+            )
+            next_action = "Enable provider mode local when AI-generated responses are required."
+        elif llm_answer is None:
+            raise RuntimeError(PROVIDER_FAILURE_MESSAGE)
+        else:
+            summary = llm_answer
+            next_action = "Ask a general question, request a system task, or ask me to route work to a specific agent."
+    if is_ms and not is_time_question and provider == "disabled":
         summary = (
             "Saya terima mesej anda. Saya boleh bantu semak status sistem, risiko, agen, dan langkah seterusnya "
             "dalam bentuk ringkasan selamat. Saya tidak akan melangkaui kelulusan admin, Risk Manager, atau Execution Guard."
         )
         next_action = "Nyatakan bahagian yang anda mahu semak: kesihatan sistem, MT5 bridge, strategi, risiko, notifikasi, atau agen."
-    return summary, next_action
+    latency_ms = int((perf_counter() - started) * 1000)
+    return summary, next_action, provider, fallback_reason, latency_ms
 
 
 def _audit_chat(action: str, session_id: str, details: dict[str, Any]) -> None:
@@ -427,6 +509,44 @@ def _queue_agent_task(session_id: str, message: str, language: str) -> str:
         return task_id
     finally:
         db.close()
+
+
+def _provider_status() -> dict[str, Any]:
+    mode = _normalized_provider_mode(runtime_value("ORCHESTRATOR_GENERAL_CHAT_MODE", "local"))
+    ollama_url = runtime_value("OLLAMA_REASON_URL", "http://10.10.1.82:11434").rstrip("/")
+    local_model = runtime_value("ORCHESTRATOR_GENERAL_CHAT_MODEL", "llama3.1:8b")
+    local_api_style = runtime_value("LOCAL_LLM_API_STYLE", "ollama").lower()
+    ollama_ready = False
+    try:
+        health_path = "/v1/models" if local_api_style == "openai_compatible" else "/api/tags"
+        request = urllib.request.Request(f"{ollama_url}{health_path}", method="GET")
+        timeout_seconds = max(2, min(10, int(runtime_value("ORCHESTRATOR_LLM_TIMEOUT_SECONDS", "8"))))
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+            ollama_ready = 200 <= response.status < 400
+    except Exception:
+        ollama_ready = False
+    if mode == "local":
+        active = "local" if ollama_ready else "unavailable"
+    elif mode == "disabled":
+        active = "disabled"
+    else:
+        active = "local" if ollama_ready else "unavailable"
+    return {
+        "mode": mode,
+        "active_provider": active,
+        "providers": {
+            "local": {
+                "configured": bool(ollama_url),
+                "status": "ready" if ollama_ready else "unreachable",
+                "url": ollama_url,
+                "model": local_model,
+                "api_style": local_api_style,
+            },
+            "disabled": {"configured": True, "status": "ready"},
+        },
+        "last_provider": _ORCHESTRATOR_RUNTIME.get("last_provider", "disabled"),
+        "last_latency_ms": _ORCHESTRATOR_RUNTIME.get("last_latency_ms"),
+    }
 
 
 @router.get("/events")
@@ -476,6 +596,20 @@ def list_events(
     }
 
 
+@router.get("/orchestrator/health")
+def orchestrator_health() -> dict[str, Any]:
+    provider = _provider_status()
+    return {
+        "status": "degraded" if _ORCHESTRATOR_RUNTIME.get("last_failed_reason") else "online",
+        "provider": provider,
+        "last_success_at": _ORCHESTRATOR_RUNTIME.get("last_success_at"),
+        "last_failed_at": _ORCHESTRATOR_RUNTIME.get("last_failed_at"),
+        "last_failed_reason": _ORCHESTRATOR_RUNTIME.get("last_failed_reason", ""),
+        "last_provider": _ORCHESTRATOR_RUNTIME.get("last_provider", "static"),
+        "last_latency_ms": _ORCHESTRATOR_RUNTIME.get("last_latency_ms"),
+    }
+
+
 @router.get("/console", response_class=HTMLResponse)
 def orchestrator_console() -> HTMLResponse:
     return HTMLResponse(
@@ -487,115 +621,198 @@ def orchestrator_console() -> HTMLResponse:
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Orchestrator Console</title>
   <style>
-    :root { color-scheme: dark; --bg:#11161c; --panel:#171d24; --line:#29323d; --text:#e7edf5; --muted:#9aa7b7; --accent:#18a88b; --operator:#17352f; }
-    * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 Inter, ui-sans-serif, system-ui, sans-serif; }
-    .wrap { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); gap: 12px; height: 100vh; padding: 12px; }
-    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; min-height: 0; }
-    .composer { padding: 14px; }
-    h1 { font-size: 17px; margin: 0 0 4px; }
-    p { color: var(--muted); margin: 0; }
-    .chips { display: grid; gap: 8px; margin: 14px 0; }
-    button { border: 1px solid var(--line); border-radius: 6px; background: #202832; color: var(--text); cursor: pointer; padding: 9px 10px; text-align: left; }
-    button.primary { align-items: center; background: var(--accent); border: 0; color: #031b16; display: flex; font-weight: 700; justify-content: center; text-align: center; }
-    select, textarea { width: 100%; border: 1px solid var(--line); border-radius: 6px; background: #0f141a; color: var(--text); font: inherit; padding: 10px; }
-    textarea { min-height: 126px; resize: vertical; }
-    label { color: var(--muted); display: grid; gap: 6px; margin-bottom: 10px; }
-    .status { color: var(--muted); font-size: 12px; margin-top: 10px; }
-    .feed { display: grid; gap: 10px; max-height: calc(100vh - 24px); overflow: auto; padding: 12px; }
-    .msg { background: #111820; border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+    :root { color-scheme: dark; --bg:#0d1117; --panel:#161b22; --line:#21262d; --text:#e6edf3; --muted:#8b949e; --accent:#1f6feb; --accent2:#238636; --operator:#0d2818; --orch:#0d1b2a; --border:#30363d; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font: 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
+    .app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+    .topbar { background: var(--panel); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; padding: 10px 16px; flex-shrink: 0; }
+    .topbar h1 { font-size: 16px; font-weight: 600; white-space: nowrap; }
+    .topbar .badge { background: var(--accent2); color: #fff; border-radius: 999px; font-size: 11px; font-weight: 600; padding: 2px 8px; }
+    .topbar .spacer { flex: 1; }
+    .topbar .status-pill { background: #161b22; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: 12px; padding: 4px 10px; display: flex; align-items: center; gap: 6px; }
+    .topbar .status-pill .dot { width: 7px; height: 7px; border-radius: 50%; }
+    .topbar .status-pill .dot.ok { background: var(--accent2); }
+    .topbar .status-pill .dot.warn { background: #d29922; }
+    .topbar .status-pill .dot.err { background: #f85149; }
+    .main { display: flex; flex: 1; min-height: 0; }
+    .sidebar { background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; padding: 14px; width: 340px; min-width: 280px; overflow-y: auto; flex-shrink: 0; }
+    .sidebar h2 { font-size: 14px; font-weight: 600; }
+    .sidebar p { color: var(--muted); font-size: 12px; line-height: 1.4; }
+    .sidebar label { color: var(--muted); display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+    .sidebar select, .sidebar textarea { background: #0d1117; border: 1px solid var(--border); border-radius: 6px; color: var(--text); font: inherit; padding: 8px 10px; width: 100%; }
+    .sidebar textarea { min-height: 100px; resize: vertical; }
+    .sidebar select:focus, .sidebar textarea:focus { border-color: var(--accent); outline: none; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chips button { background: #21262d; border: 1px solid var(--border); border-radius: 6px; color: var(--text); cursor: pointer; font-size: 12px; padding: 6px 10px; text-align: left; transition: background 0.15s; }
+    .chips button:hover { background: #30363d; }
+    .btn-send { background: var(--accent); border: none; border-radius: 6px; color: #fff; cursor: pointer; font-weight: 600; padding: 10px; text-align: center; transition: background 0.15s; width: 100%; }
+    .btn-send:hover { background: #388bfd; }
+    .btn-send:disabled { opacity: 0.5; cursor: not-allowed; }
+    .feed-area { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+    .feed-header { background: var(--panel); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; padding: 8px 16px; flex-shrink: 0; }
+    .feed-header span { color: var(--muted); font-size: 12px; }
+    .feed-header .refresh-ctrl { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+    .feed-header select { background: #0d1117; border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 12px; padding: 3px 6px; }
+    .feed { display: flex; flex-direction: column; gap: 0; flex: 1; overflow-y: auto; padding: 0; }
+    .msg { border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 140px 1fr auto; gap: 10px; padding: 10px 16px; transition: background 0.15s; }
+    .msg:hover { background: #161b22; }
     .msg.operator { background: var(--operator); }
-    .top { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
-    .top strong { color: #7ee2ce; }
-    .top span { color: var(--muted); font-size: 12px; white-space: nowrap; }
-    .meta { color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; margin-top: 9px; }
-    .meta span { border: 1px solid var(--line); border-radius: 999px; padding: 3px 7px; }
-    @media (max-width: 820px) { .wrap { grid-template-columns: 1fr; height: auto; } .feed { max-height: 68vh; } }
+    .msg.orchestrator { background: var(--orch); }
+    .msg .agent { color: #58a6ff; font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .msg .room { color: var(--muted); font-size: 11px; margin-top: 2px; }
+    .msg .body { font-size: 13px; line-height: 1.4; }
+    .msg .body .next { color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .msg .meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 100px; }
+    .msg .meta .time { color: var(--muted); font-size: 11px; white-space: nowrap; }
+    .msg .meta .tags { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+    .msg .meta .tags span { border-radius: 999px; font-size: 10px; padding: 2px 6px; }
+    .msg .meta .tags .ok { background: #0d2818; border: 1px solid #1f6feb33; color: #7ee787; }
+    .msg .meta .tags .warn { background: #2d1f00; border: 1px solid #d2992233; color: #d29922; }
+    .msg .meta .tags .bad { background: #2d0a0a; border: 1px solid #f8514933; color: #f85149; }
+    .msg .meta .tags .neutral { background: #161b22; border: 1px solid var(--border); color: var(--muted); }
+    .empty { color: var(--muted); padding: 40px; text-align: center; }
+    .status-bar { background: var(--panel); border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; padding: 6px 16px; flex-shrink: 0; }
+    @media (max-width: 768px) {
+      .main { flex-direction: column; }
+      .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); max-height: 45vh; }
+      .msg { grid-template-columns: 1fr; }
+      .msg .meta { align-items: flex-start; flex-direction: row; }
+      .msg .meta .tags { justify-content: flex-start; }
+    }
   </style>
 </head>
 <body>
-  <main class="wrap">
-    <section class="panel composer">
+  <div class="app">
+    <header class="topbar">
       <h1>Orchestrator Console</h1>
-      <p>Talk to the Control Tower. Requests are audited and routed through safe agent workflows.</p>
-      <div class="chips">
-        <button type="button" data-prompt="What is the full system status and what should we do next?">Full status</button>
-        <button type="button" data-prompt="Check MT5 bridge readiness and route this to the market data agent.">MT5 readiness</button>
-        <button type="button" data-prompt="Explain what is blocking demo trading activation.">Demo trading blockers</button>
-        <button type="button" data-prompt="I need a general explanation of how this control tower should operate.">General explanation</button>
+      <span class="badge">Ollama</span>
+      <div class="spacer"></div>
+      <div class="status-pill" id="providerPill"><span class="dot ok" id="providerDot"></span><span id="providerLabel">Local LLM: checking...</span></div>
+    </header>
+    <div class="main">
+      <aside class="sidebar">
+        <h2>Talk To Orchestrator</h2>
+        <p>Read-only governed chat. No trade execution or approval bypass. Powered by local Ollama LLM.</p>
+        <form id="chatForm">
+          <label>Language
+            <select id="language"><option value="en">English</option><option value="ms-MY">Bahasa Melayu</option><option value="auto">Auto</option></select>
+          </label>
+          <label>Message
+            <textarea id="message" placeholder="Ask about time, system status, risk, MT5 bridge, strategies, deployment..."></textarea>
+          </label>
+          <button class="btn-send" type="submit" id="sendBtn">Send To Orchestrator</button>
+        </form>
+        <div class="chips">
+          <button type="button" data-prompt="What is the current time and date?">Time & Date</button>
+          <button type="button" data-prompt="What is the full system status?">System Status</button>
+          <button type="button" data-prompt="Summarize today risk posture for demo trading.">Risk Posture</button>
+          <button type="button" data-prompt="What is blocking demo trading activation?">Demo Blockers</button>
+          <button type="button" data-prompt="Explain how this control tower operates safely.">How It Works</button>
+        </div>
+      </aside>
+      <div class="feed-area">
+        <div class="feed-header">
+          <span id="countLabel">0 messages</span>
+          <span id="updatedLabel"></span>
+          <div class="refresh-ctrl">
+            <label style="color:var(--muted);font-size:12px;">Refresh
+              <select id="refreshRate">
+                <option value="1000">1s</option>
+                <option value="2000" selected>2s</option>
+                <option value="5000">5s</option>
+                <option value="10000">10s</option>
+                <option value="0">Paused</option>
+              </select>
+            </label>
+            <button type="button" id="refreshNow" style="background:#21262d;border:1px solid var(--border);border-radius:4px;color:var(--text);cursor:pointer;font-size:12px;padding:3px 8px;">Refresh</button>
+          </div>
+        </div>
+        <div class="feed" id="feed"></div>
       </div>
-      <form id="chatForm">
-        <label>Language
-          <select id="language"><option value="en">English</option><option value="ms-MY">Bahasa Melayu Malaysia</option><option value="auto">Auto</option></select>
-        </label>
-        <label>Message
-          <textarea id="message" placeholder="Ask anything: general questions, system tasks, trading workflow, MT5 bridge, risk, strategy, notifications, deployment..."></textarea>
-        </label>
-        <button class="primary" type="submit">Send To Orchestrator</button>
-      </form>
-      <div class="status" id="status">Ready. Chat cannot bypass approvals, Risk Manager, or Execution Guard.</div>
-    </section>
-    <section class="panel feed" id="feed"></section>
-  </main>
+    </div>
+    <div class="status-bar" id="statusBar">Ready. Chat cannot bypass approvals, Risk Manager, or Execution Guard.</div>
+  </div>
   <script>
     const apiBase = window.location.origin;
-    const wsBase = apiBase.replace(/^http/, 'ws');
     const feed = document.getElementById('feed');
-    const statusEl = document.getElementById('status');
+    const statusBar = document.getElementById('statusBar');
     const messageEl = document.getElementById('message');
     const languageEl = document.getElementById('language');
+    const countLabel = document.getElementById('countLabel');
+    const updatedLabel = document.getElementById('updatedLabel');
+    const providerDot = document.getElementById('providerDot');
+    const providerLabel = document.getElementById('providerLabel');
     let events = [];
+    let refreshTimer = null;
 
-    function escapeHtml(value) {
-      return String(value || '').replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-    }
+    function esc(v) { return String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function riskClass(r) { const s=String(r||'').toLowerCase(); return s.includes('blocked')||s.includes('halt')||s.includes('safe_mode')?'bad':s.includes('waiting')||s.includes('manual')||s.includes('review')?'warn':'ok'; }
 
     function render() {
-      feed.innerHTML = events.slice(-80).reverse().map((event) => `
-        <article class="msg ${event.agent === 'Operator' ? 'operator' : ''}">
-          <div class="top"><strong>${escapeHtml(event.agent)}</strong><span>${escapeHtml(event.stream)} - ${escapeHtml(event.timestamp || '')}</span></div>
-          <div>${escapeHtml(event.summary)}</div>
-          <div class="meta"><span>${escapeHtml(event.result)}</span><span>${escapeHtml(event.risk_status)}</span><span>${escapeHtml(event.next_action)}</span></div>
-        </article>
-      `).join('');
+      countLabel.textContent = events.length + ' messages';
+      if (!events.length) { feed.innerHTML = '<div class="empty">No orchestrator messages yet.</div>'; return; }
+      feed.innerHTML = events.slice(-80).reverse().map(e => {
+        const isOp = e.agent === 'Operator';
+        const agent = e.agent === 'Orchestrator Agent' ? 'Orchestrator' : (e.agent || 'Agent');
+        const risk = e.display?.risk_status || e.risk_status || 'read_only';
+        const rc = riskClass(risk);
+        return `<article class="msg ${isOp?'operator':'orchestrator'}">
+          <div><div class="agent" title="${esc(e.agent)}">${esc(agent)}</div><div class="room">${esc(e.stream||'Orchestrator Console')}</div></div>
+          <div class="body"><div>${esc(e.display?.summary||e.summary||'No summary.')}</div>${e.next_action?`<div class="next">${esc(e.next_action)}</div>`:''}</div>
+          <div class="meta"><div class="time">${esc(e.timestamp||'')}</div><div class="tags"><span class="${rc}">${esc(risk)}</span><span class="neutral">${esc(e.result||'safe_reply')}</span></div></div>
+        </article>`;
+      }).join('');
     }
 
     async function loadEvents() {
-      const response = await fetch(`${apiBase}/api/v1/agent-theater/events?limit=40&stream=Orchestrator%20Console&agent=Operator&agent=Orchestrator%20Agent`);
-      const body = await response.json();
-      events = body.events || [];
-      render();
+      try {
+        const r = await fetch(`${apiBase}/api/v1/agent-theater/events?limit=40&stream=Orchestrator%20Console&agent=Operator&agent=Orchestrator%20Agent`, {headers:{'Accept':'application/json'}});
+        const b = await r.json();
+        events = b.events || [];
+        render();
+        updatedLabel.textContent = 'updated ' + new Date().toLocaleTimeString();
+      } catch(e) { updatedLabel.textContent = 'refresh failed'; }
+    }
+
+    async function loadHealth() {
+      try {
+        const r = await fetch(`${apiBase}/api/v1/agent-theater/orchestrator/health`);
+        const h = await r.json();
+        const p = h.provider || {};
+        const local = p.providers?.local || {};
+        const ok = local.status === 'ready';
+        providerDot.className = 'dot ' + (ok ? 'ok' : 'err');
+        providerLabel.textContent = ok ? `Local LLM: ${local.model||'ollama'}` : 'Local LLM: unreachable';
+      } catch(e) { providerDot.className = 'dot err'; providerLabel.textContent = 'Local LLM: error'; }
     }
 
     async function send(message) {
-      statusEl.textContent = 'Sending to Orchestrator...';
-      const response = await fetch(`${apiBase}/api/v1/agent-theater/chat`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({message, language: languageEl.value, session_id: 'standalone-orchestrator-console', orchestrator_only: true})
-      });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.detail || 'Chat failed');
-      statusEl.textContent = body.next_action || 'Orchestrator replied.';
-      await loadEvents();
+      statusBar.textContent = 'Sending to Orchestrator...';
+      try {
+        const r = await fetch(`${apiBase}/api/v1/agent-theater/chat`, {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({message, language: languageEl.value, session_id:'standalone-orchestrator-console', orchestrator_only:true})
+        });
+        const b = await r.json();
+        if (!r.ok) throw new Error(b.detail||'Chat failed');
+        const lat = Number.isFinite(Number(b.latency_ms)) ? ` in ${b.latency_ms}ms` : '';
+        statusBar.textContent = `Orchestrator replied via ${b.provider||'local'}${lat}.`;
+        await loadEvents();
+      } catch(e) { statusBar.textContent = e.message || 'Unable to reach Orchestrator.'; }
     }
 
-    document.querySelectorAll('[data-prompt]').forEach((button) => {
-      button.addEventListener('click', () => { messageEl.value = button.dataset.prompt; messageEl.focus(); });
+    document.querySelectorAll('[data-prompt]').forEach(b => b.addEventListener('click', () => { messageEl.value = b.dataset.prompt; messageEl.focus(); }));
+    document.getElementById('chatForm').addEventListener('submit', e => { e.preventDefault(); const m=messageEl.value.trim(); if(!m)return; messageEl.value=''; send(m); });
+    document.getElementById('refreshNow').addEventListener('click', () => loadEvents());
+    document.getElementById('refreshRate').addEventListener('change', function() {
+      if(refreshTimer) clearInterval(refreshTimer);
+      const ms = Number(this.value);
+      if(ms>0) refreshTimer = setInterval(loadEvents, ms);
     });
-    document.getElementById('chatForm').addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const message = messageEl.value.trim();
-      if (!message) return;
-      messageEl.value = '';
-      try { await send(message); } catch (error) { statusEl.textContent = error.message || 'Unable to reach Orchestrator.'; }
-    });
-
-    loadEvents().catch(() => { statusEl.textContent = 'Waiting for Agent Theater events.'; });
-    const ws = new WebSocket(`${wsBase}/ws/v1/agent-theater`);
-    ws.onmessage = (message) => {
-      try { events.push(JSON.parse(message.data)); render(); } catch (_) {}
-    };
+    loadEvents(); loadHealth();
+    setInterval(loadHealth, 30000);
+    const ws = new WebSocket(apiBase.replace(/^http/,'ws')+'/ws/v1/agent-theater');
+    ws.onmessage = m => { try { events.push(JSON.parse(m.data)); render(); } catch(_){} };
   </script>
 </body>
 </html>
@@ -632,7 +849,23 @@ def chat_with_orchestrator(
     }
     _append_event(redact(operator_event))
 
-    reply, next_action = _orchestrator_reply(payload.message, payload.language)
+    try:
+        reply, next_action, provider_used, fallback_reason, latency_ms = _orchestrator_reply(payload.message, payload.language)
+        _ORCHESTRATOR_RUNTIME["last_success_at"] = _timestamp()
+        _ORCHESTRATOR_RUNTIME["last_provider"] = provider_used
+        _ORCHESTRATOR_RUNTIME["last_latency_ms"] = latency_ms
+    except Exception as exc:
+        _ORCHESTRATOR_RUNTIME["last_failed_at"] = _timestamp()
+        message = str(exc) if str(exc).strip() else f"{type(exc).__name__}: orchestrator_reply_failed"
+        _ORCHESTRATOR_RUNTIME["last_failed_reason"] = message
+        _audit_chat(
+            "orchestrator_chat_failed",
+            payload.session_id,
+            {"error": type(exc).__name__, "message": message, "language": payload.language, "orchestrator_only": payload.orchestrator_only},
+        )
+        if PROVIDER_FAILURE_MESSAGE in message:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=PROVIDER_FAILURE_MESSAGE) from exc
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Orchestrator is temporarily unavailable. Please retry.") from exc
     if not payload.orchestrator_only:
         for agent_event in _supporting_agent_events(payload.message, payload.language, payload.session_id):
             _append_event(redact(agent_event))
@@ -645,7 +878,15 @@ def chat_with_orchestrator(
         "confidence": 0.86,
         "risk_status": "read_only_no_trade_execution",
         "next_action": next_action,
-        "metadata": {"session_id": payload.session_id, "language": payload.language, "message_type": "orchestrator_reply", "task_id": task_id},
+        "metadata": {
+            "session_id": payload.session_id,
+            "language": payload.language,
+            "message_type": "orchestrator_reply",
+            "task_id": task_id,
+            "provider": provider_used,
+            "fallback_reason": fallback_reason,
+            "latency_ms": latency_ms,
+        },
         "timestamp": _timestamp(),
         "contains_hidden_chain_of_thought": False,
     }
@@ -659,7 +900,15 @@ def chat_with_orchestrator(
             "orchestrator_only": payload.orchestrator_only,
         },
     )
-    return {"accepted": True, "reply": reply, "next_action": next_action, "task_id": task_id}
+    return {
+        "accepted": True,
+        "reply": reply,
+        "next_action": next_action,
+        "task_id": task_id,
+        "provider": provider_used,
+        "fallback_reason": fallback_reason,
+        "latency_ms": latency_ms,
+    }
 
 
 @router.post("/events", status_code=status.HTTP_202_ACCEPTED)

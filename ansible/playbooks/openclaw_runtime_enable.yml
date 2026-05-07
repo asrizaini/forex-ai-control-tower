@@ -1,0 +1,67 @@
+---
+- name: Configure and enable OpenClaw runtime adapter on control node
+  hosts: control
+  become: true
+  vars:
+    runtime_env_path: /etc/forex-ai-control-tower/runtime.env
+    openclaw_runtime_target_url: "{{ openclaw_runtime_url | default('http://10.10.1.81:8600') }}"
+  tasks:
+    - name: Ensure runtime env file exists with protected permissions
+      ansible.builtin.file:
+        path: "{{ runtime_env_path }}"
+        state: touch
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Set OpenClaw enabled flag
+      ansible.builtin.lineinfile:
+        path: "{{ runtime_env_path }}"
+        regexp: "^OPENCLAW_ENABLED="
+        line: "OPENCLAW_ENABLED=true"
+        create: true
+
+    - name: Set OpenClaw runtime URL
+      ansible.builtin.lineinfile:
+        path: "{{ runtime_env_path }}"
+        regexp: "^OPENCLAW_API_URL="
+        line: "OPENCLAW_API_URL={{ openclaw_runtime_target_url }}"
+        create: true
+
+    - name: Ensure OpenClaw runtime token exists
+      ansible.builtin.shell: |
+        set -euo pipefail
+        f="{{ runtime_env_path }}"
+        token="$(grep '^OPENCLAW_API_TOKEN=' "$f" | tail -n 1 | cut -d= -f2- || true)"
+        if [ -n "$token" ]; then
+          exit 0
+        fi
+        new_token="$(python3 - <<'PY'
+        import secrets
+        print(secrets.token_urlsafe(36))
+        PY
+        )"
+        if grep -q '^OPENCLAW_API_TOKEN=' "$f"; then
+          sed -i "s|^OPENCLAW_API_TOKEN=.*|OPENCLAW_API_TOKEN=${new_token}|" "$f"
+        else
+          printf "OPENCLAW_API_TOKEN=%s\n" "$new_token" >> "$f"
+        fi
+      args:
+        executable: /bin/bash
+      changed_when: true
+      no_log: true
+
+    - name: Reload systemd
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+
+    - name: Restart OpenClaw runtime and control services
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        state: restarted
+        enabled: true
+      loop:
+        - forex-openclaw-runtime
+        - forex-control-api
+        - forex-orchestrator
+        - forex-agent-workflow

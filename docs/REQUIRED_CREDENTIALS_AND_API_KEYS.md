@@ -59,19 +59,8 @@ At least one reliable admin channel is required before real manual approval-to-e
 | --- | --- | --- | --- |
 | `TELEGRAM_BOT_TOKEN` | Telegram | Approval requests, alerts | Recommended first notification channel. |
 | `TELEGRAM_ADMIN_CHAT_ID` | Telegram | Admin delivery target | Chat ID is sensitive operational metadata; keep private. |
-| `WHATSAPP_TOKEN` | WhatsApp Business Cloud API | Critical/emergency alerts | Needs Meta app and approved phone number. |
-| `WHATSAPP_PHONE_NUMBER_ID` | WhatsApp Business Cloud API | Sending messages | Pair with `WHATSAPP_TOKEN`. |
-| `SMTP_HOST` | Email | Email reports/critical alerts | Hostname only. |
-| `SMTP_PORT` | Email | Email delivery | Common values: `587` or `465`. |
-| `SMTP_USER` | Email | SMTP login | Often an email address. |
-| `SMTP_PASSWORD` | Email | SMTP login | Use app password where possible. |
-| `SMTP_FROM` | Email | Sender identity | Example: `alerts@your-domain`. |
 | `FCM_PROJECT_ID` | Mobile push | Android/iOS push | Required for mobile push sender. |
 | `FCM_SERVER_KEY` or `FCM_SERVICE_ACCOUNT_JSON` | Mobile push | FCM authentication | Prefer service account JSON through secret manager. |
-| `VAPID_PUBLIC_KEY` | Browser push | Browser notification registration | Public but still manage consistently. |
-| `VAPID_PRIVATE_KEY` | Browser push | Browser push signing | Secret. |
-| `DISCORD_WEBHOOK_URL` | Discord optional | Optional alert mirror | Treat as secret. |
-| `SMS_PROVIDER_TOKEN` | SMS optional | Emergency fallback | Provider-specific. |
 
 ## Paid LLM Providers
 
@@ -81,9 +70,19 @@ Paid providers must be budgeted and approved before use. Local Ollama remains th
 | --- | --- | --- | --- |
 | `OPENAI_API_KEY` | OpenAI | GPT-5 family routing | Set spend limits before enabling paid calls. |
 | `GEMINI_API_KEY` | Google Gemini | Gemini Pro family routing | Set spend limits before enabling paid calls. |
+| `ORCHESTRATOR_GENERAL_CHAT_MODE` | Orchestrator provider routing | `auto`, `openai`, `local`, or `disabled`. |
+| `ORCHESTRATOR_OPENAI_MODEL` | Orchestrator primary model | Example: `gpt-5-mini`. |
+| `ORCHESTRATOR_GENERAL_CHAT_MODEL` | Orchestrator local model | Example: `llama3.1:8b`. |
+| `LOCAL_LLM_API_STYLE` | Local provider adapter | `ollama` or `openai_compatible`. |
+| `LOCAL_LLM_API_KEY` | Optional local API auth | Use only if local endpoint requires bearer auth. |
 | `LLM_DAILY_BUDGET_USD` | Cost Center | Daily spend guard | Required before paid routing. |
 | `LLM_MONTHLY_BUDGET_USD` | Cost Center | Monthly spend guard | Required before paid routing. |
 | `PAID_LLM_APPROVAL_REQUIRED` | Governance | Approval gate | Keep `true` in production. |
+
+Important:
+
+- Backend orchestration uses **OpenAI API key integration**, not ChatGPT website login/session automation.
+- Do not store ChatGPT account usernames/passwords or browser cookies in control-plane credentials.
 
 ## MT5 And Broker Operations
 
@@ -122,11 +121,10 @@ OpenClaw must remain human-facing only. It cannot send orders, read broker passw
 1. Runtime core: `POSTGRES_PASSWORD`, `GRAFANA_ADMIN_PASSWORD`, `JWT_SECRET_KEY`, `EXECUTION_GUARD_SIGNING_KEY`, `BRIDGE_API_TOKEN`.
 2. News: `NEWS_PROVIDER_TYPE=fmp_economic_calendar`, `NEWS_PROVIDER_API_KEY`.
 3. Admin notification: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ADMIN_CHAT_ID`.
-4. Email fallback: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`.
-5. Mobile push: `FCM_PROJECT_ID`, FCM credential.
-6. Paid LLM: `OPENAI_API_KEY`, `GEMINI_API_KEY`, budget variables, governance approval.
-7. Multi-account MT5: account list, terminal paths, bridge ports, broker symbol maps.
-8. Optional WhatsApp/SMS/Discord/OpenClaw after core safety flow is proven.
+4. Mobile push: `FCM_PROJECT_ID`, FCM credential.
+5. Paid LLM: `OPENAI_API_KEY`, `GEMINI_API_KEY`, budget variables, governance approval.
+6. Multi-account MT5: account list, terminal paths, bridge ports, broker symbol maps.
+7. Optional OpenClaw after core safety flow is proven.
 
 ## Validation Commands
 

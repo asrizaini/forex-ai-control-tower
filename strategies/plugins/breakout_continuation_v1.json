@@ -1,0 +1,20 @@
+{
+  "strategy_id": "breakout_continuation_v1",
+  "name": "Breakout Continuation v1",
+  "version": "0.1.0",
+  "owner": "system",
+  "lifecycle": "approved_for_demo_auto",
+  "changelog": ["Added governed breakout continuation profile for multi-timeframe momentum."],
+  "supported_trade_styles": ["breakout", "trend following"],
+  "supported_symbols": ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD"],
+  "supported_timeframes": ["M15", "M30", "H1", "H4"],
+  "entry_rules": ["Breakout above/below recent structure.", "Momentum confirmation required.", "No high-impact news uncertainty."],
+  "exit_rules": ["Trail after breakout confirmation.", "Exit on failed continuation."],
+  "risk_rules": ["Execution Guard required.", "Spread/slippage limits enforced.", "News halt respected."],
+  "news_behavior": "block_on_unknown_high_impact_news",
+  "allowed_users": [],
+  "allowed_accounts": [],
+  "allowed_environments": ["demo"],
+  "test_files": [],
+  "rollback_target": null
+}

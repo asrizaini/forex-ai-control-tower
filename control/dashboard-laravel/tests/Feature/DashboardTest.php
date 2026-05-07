@@ -261,4 +261,5 @@ class DashboardTest extends TestCase
             && $request['session_id'] === 'laravel-orchestrator-console'
             && $request['orchestrator_only'] === true);
     }
+
 }

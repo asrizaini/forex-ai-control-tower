@@ -3,13 +3,17 @@ from __future__ import annotations
 import os
 import urllib.error
 import urllib.request
+import json
 from pathlib import Path
+from datetime import datetime
 
 from fastapi import APIRouter
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 from ..db import SessionLocal
+from ..credential_store import runtime_bool
 from ..models import AgentTask, AuditLog, KillSwitch, MarketSnapshot, NotificationEvent, RiskPolicy, Strategy, StrategyLabJob, TradeApproval, User, Account
 from ..secret_manager import secret_manager_status
 
@@ -21,14 +25,115 @@ def list_resource() -> dict:
     return {"module": "system", "description": "System health, environment, audit, deployment status", "mode": "production-required"}
 
 
+def _effective_runtime_context(db: Session) -> tuple[str, str]:
+    account = db.scalar(select(Account).where(Account.enabled.is_(True)).order_by(Account.created_at.desc()).limit(1))
+    if account:
+        return account.environment, account.trading_mode
+    return "demo", "monitor_only"
+
+
+def _orchestrator_runtime_status() -> dict:
+    event_log = Path(os.getenv("AGENT_THEATER_EVENT_LOG", "/opt/forex-ai-control-tower/runtime/agent_theater_events.jsonl"))
+    if not event_log.exists():
+        return {
+            "status": "down",
+            "reason": "orchestrator_event_log_missing",
+            "last_success_run": None,
+            "last_failed_run": None,
+            "last_failed_reason": "Event log file is missing.",
+        }
+    last_success = None
+    last_failed = None
+    last_failed_reason = None
+    try:
+        lines = event_log.read_text(encoding="utf-8").splitlines()[-600:]
+    except OSError:
+        return {
+            "status": "degraded",
+            "reason": "orchestrator_event_log_unreadable",
+            "last_success_run": None,
+            "last_failed_run": None,
+            "last_failed_reason": "Unable to read orchestrator event log.",
+        }
+    for line in reversed(lines):
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if event.get("agent") != "Orchestrator Agent":
+            continue
+        result = str(event.get("result", "")).lower()
+        timestamp = event.get("timestamp")
+        if result in {"healthy", "coordination_visible", "safe_reply"} and last_success is None:
+            last_success = timestamp
+        if result == "degraded" and last_failed is None:
+            last_failed = timestamp
+            last_failed_reason = event.get("summary")
+        if last_success and last_failed:
+            break
+
+    def _parse_event_time(value: str | None) -> datetime | None:
+        if not value or not isinstance(value, str):
+            return None
+        text = value.strip()
+        try:
+            return datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except Exception:
+            pass
+        for pattern in ("%Y-%m-%d %I:%M:%S %p GMT+8",):
+            try:
+                return datetime.strptime(text, pattern)
+            except ValueError:
+                continue
+        return None
+
+    if last_success:
+        success_dt = _parse_event_time(last_success)
+        failed_dt = _parse_event_time(last_failed)
+        recovered = bool(success_dt and failed_dt and success_dt >= failed_dt)
+        healthy_now = last_failed is None or recovered
+        return {
+            "status": "running" if healthy_now else "degraded",
+            "reason": "healthy_loop" if healthy_now else "intermittent_failures_detected",
+            "last_success_run": last_success,
+            "last_failed_run": last_failed,
+            "last_failed_reason": last_failed_reason,
+        }
+    return {
+        "status": "degraded",
+        "reason": "no_recent_success_events",
+        "last_success_run": None,
+        "last_failed_run": last_failed,
+        "last_failed_reason": last_failed_reason or "No successful orchestrator event found in the recent log window.",
+    }
+
+
 @router.get("/runtime")
 def runtime_status() -> dict:
     event_log = Path(os.getenv("AGENT_THEATER_EVENT_LOG", "/opt/forex-ai-control-tower/runtime/agent_theater_events.jsonl"))
+    db = SessionLocal()
+    try:
+        environment, trading_mode = _effective_runtime_context(db)
+        queued_tasks = db.scalar(select(func.count()).select_from(AgentTask).where(AgentTask.status == "queued")) or 0
+        failed_tasks = db.scalar(select(func.count()).select_from(AgentTask).where(AgentTask.status == "failed")) or 0
+    finally:
+        db.close()
+    runtime_live_enabled = runtime_bool("ALLOW_LIVE_TRADING", False)
+    live_auto = trading_mode in {"demo_auto", "restricted_live_auto"} and (
+        environment == "demo" or (environment == "production-live" and runtime_live_enabled)
+    )
+    orchestrator = _orchestrator_runtime_status()
     return {
-        "environment": "demo",
-        "trading_mode": "monitor_only",
-        "live_auto_trading": False,
+        "environment": environment,
+        "trading_mode": trading_mode,
+        "live_auto_trading": live_auto,
         "orchestrator_event_log_exists": event_log.exists(),
+        "orchestrator": {
+            **orchestrator,
+            "queued_tasks": queued_tasks,
+            "failed_tasks": failed_tasks,
+            "retry_status": "retry_pending" if queued_tasks > 0 and orchestrator.get("status") != "running" else "stable",
+        },
         "agent_theater_event_log": str(event_log),
     }
 
@@ -164,6 +269,7 @@ def production_readiness() -> dict:
                 alertmanager_healthy = 200 <= response.status < 300
         except (OSError, urllib.error.URLError, TimeoutError):
             alertmanager_healthy = False
+        environment, trading_mode = _effective_runtime_context(db)
         gates = {
             "user_account_persistence": users > 0 and accounts > 0,
             "rbac_audit_persistence": True,
@@ -181,7 +287,7 @@ def production_readiness() -> dict:
         }
         blocking = [name for name, passed in gates.items() if not passed]
         all_gates_passed = not blocking
-        runtime_live_enabled = os.getenv("ALLOW_LIVE_TRADING", "false").lower() == "true"
+        runtime_live_enabled = runtime_bool("ALLOW_LIVE_TRADING", False)
         action_by_gate = {
             "user_account_persistence": "Create at least one admin/user account and one MT5 account record.",
             "rbac_audit_persistence": "Verify RBAC and append-only audit persistence.",
@@ -198,8 +304,8 @@ def production_readiness() -> dict:
             "production_live_explicitly_approved": "Explicitly approve production-live only after demo validation reports pass.",
         }
         return {
-            "environment": "demo",
-            "trading_mode": "monitor_only",
+            "environment": environment,
+            "trading_mode": trading_mode,
             "restricted_live_auto_allowed": all_gates_passed and runtime_live_enabled,
             "live_trading_allowed": all_gates_passed and runtime_live_enabled,
             "gates": gates,

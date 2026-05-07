@@ -5,7 +5,7 @@ from typing import Any
 
 from sqlalchemy import select
 
-from .credential_store import decrypt_value
+from .credential_store import decrypt_value, runtime_value
 from .db import SessionLocal
 from .models import CredentialConfig
 
@@ -29,7 +29,7 @@ def secret_manager_status() -> dict[str, Any]:
         }
     finally:
         db.close()
-    required = {name: bool(stored.get(name) or os.getenv(name)) for name in REQUIRED_RUNTIME_SECRETS}
+    required = {name: bool(stored.get(name) or runtime_value(name)) for name in REQUIRED_RUNTIME_SECRETS}
     external = {
         "vault": {"configured": bool(os.getenv("VAULT_ADDR") and os.getenv("VAULT_TOKEN"))},
         "sops": {"configured": bool(os.getenv("SOPS_AGE_KEY"))},

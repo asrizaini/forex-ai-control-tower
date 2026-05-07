@@ -5,13 +5,14 @@ namespace App\Services;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Session;
 
 class ControlTowerClient
 {
     public function get(string $path, ?string $token = null, array $fallback = []): array
     {
         try {
-            $response = $this->request($token)->get($this->url($path));
+            $response = $this->send('GET', $path, [], $token);
         } catch (ConnectionException) {
             return $fallback;
         }
@@ -21,17 +22,40 @@ class ControlTowerClient
 
     public function post(string $path, array $payload = [], ?string $token = null): Response
     {
-        return $this->request($token)->post($this->url($path), $payload);
+        return $this->send('POST', $path, $payload, $token);
     }
 
     public function put(string $path, array $payload = [], ?string $token = null): Response
     {
-        return $this->request($token)->put($this->url($path), $payload);
+        return $this->send('PUT', $path, $payload, $token);
     }
 
     public function delete(string $path, array $payload = [], ?string $token = null): Response
     {
-        return $this->request($token)->delete($this->url($path), $payload);
+        return $this->send('DELETE', $path, $payload, $token);
+    }
+
+    private function send(string $method, string $path, array $payload = [], ?string $token = null, bool $allowRefresh = true): Response
+    {
+        $resolvedToken = $this->resolveToken($token);
+        $request = $this->request($resolvedToken);
+        $url = $this->url($path);
+        $response = match (strtoupper($method)) {
+            'GET' => $request->get($url),
+            'POST' => $request->post($url, $payload),
+            'PUT' => $request->put($url, $payload),
+            'DELETE' => $request->delete($url, $payload),
+            default => $request->send($method, $url, ['json' => $payload]),
+        };
+
+        if ($response->status() === 401 && $allowRefresh && $this->refreshSessionToken()) {
+            return $this->send($method, $path, $payload, $this->resolveToken(null), false);
+        }
+
+        if ($response->status() === 401) {
+            $this->clearSessionToken();
+        }
+        return $response;
     }
 
     private function request(?string $token)
@@ -46,5 +70,49 @@ class ControlTowerClient
     private function url(string $path): string
     {
         return rtrim(config('control_tower.api_url'), '/') . '/' . ltrim($path, '/');
+    }
+
+    private function resolveToken(?string $token): ?string
+    {
+        if ($token) {
+            return $token;
+        }
+        $sessionToken = Session::get('control_tower_token');
+        return is_string($sessionToken) && $sessionToken !== '' ? $sessionToken : null;
+    }
+
+    private function refreshSessionToken(): bool
+    {
+        $refreshToken = Session::get('control_tower_refresh_token');
+        if (!is_string($refreshToken) || $refreshToken === '') {
+            return false;
+        }
+        try {
+            $response = Http::timeout(8)
+                ->acceptJson()
+                ->asJson()
+                ->post($this->url('/api/v1/auth/refresh'), ['refresh_token' => $refreshToken]);
+        } catch (ConnectionException) {
+            return false;
+        }
+        if (!$response->successful()) {
+            return false;
+        }
+        $body = $response->json() ?? [];
+        $accessToken = $body['access_token'] ?? null;
+        $newRefreshToken = $body['refresh_token'] ?? null;
+        if (!is_string($accessToken) || $accessToken === '') {
+            return false;
+        }
+        Session::put('control_tower_token', $accessToken);
+        if (is_string($newRefreshToken) && $newRefreshToken !== '') {
+            Session::put('control_tower_refresh_token', $newRefreshToken);
+        }
+        return true;
+    }
+
+    private function clearSessionToken(): void
+    {
+        Session::forget(['control_tower_token', 'control_tower_refresh_token', 'control_tower_user']);
     }
 }

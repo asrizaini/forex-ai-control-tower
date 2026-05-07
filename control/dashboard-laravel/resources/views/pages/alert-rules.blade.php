@@ -15,7 +15,7 @@
             <label>Currencies<input name="currencies" value="USD,EUR,GBP,JPY"></label>
             <label>Impacts<input name="impacts" value="high"></label>
             <label>Keywords<input name="event_keywords" value="CPI,FOMC,NFP,rate"></label>
-            <label>Delivery targets<input name="delivery_targets" value="dashboard,telegram"></label>
+            <label>Delivery targets<input name="delivery_targets" value="dashboard,telegram,mobile_push"></label>
         </div>
         <button type="submit">Save Rule</button>
     </form>
@@ -31,7 +31,7 @@
 <section class="panel">
     <div class="panel-head"><div><h2>Delivery History</h2><p>Delivery state is tracked to prevent duplicate alerts.</p></div></div>
     @forelse(($history['items'] ?? []) as $item)
-        <div class="row cols-5"><strong>{{ $item['delivery_id'] }}</strong><span>{{ $item['rule_id'] }}</span><span>{{ $item['target'] }}</span><span class="badge {{ $item['status'] === 'sent' ? 'ok' : 'warn' }}">{{ $item['status'] }}</span><span>{{ $item['created_at'] }}</span></div>
+        <div class="row cols-5"><strong>{{ $item['delivery_id'] }}</strong><span>{{ $item['rule_id'] }}</span><span>{{ $item['target'] }}</span><span class="badge {{ $item['status'] === 'sent' ? 'ok' : 'warn' }}">{{ $item['status'] }}</span><span data-utc="{{ $item['created_at'] ?? '' }}">{{ $item['created_at'] }}</span></div>
     @empty
         <p class="empty">No delivery history.</p>
     @endforelse

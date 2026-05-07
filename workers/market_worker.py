@@ -52,15 +52,16 @@ def _freshness_seconds(tick: dict[str, Any]) -> int | None:
     return max(0, int(time.time()) - tick_time)
 
 
-def _symbol_snapshot(symbol: str) -> dict[str, Any]:
-    rates_response = bridge_rates(symbol)
+def _symbol_snapshot(symbol: str, timeframe: str) -> dict[str, Any]:
+    tf = str(timeframe or "M1").upper()
+    rates_response = bridge_rates(symbol, timeframe=tf)
     tick_response = bridge_ticks(symbol)
     rates = rates_response.get("body", {}).get("rates", []) if rates_response.get("ok") else []
     tick = tick_response.get("body", {}).get("tick", {}) if tick_response.get("ok") else {}
     freshness = _freshness_seconds(tick)
     return {
         "symbol": symbol,
-        "timeframe": "M1",
+        "timeframe": tf,
         "rates_ok": bool(rates_response.get("ok")),
         "tick_ok": bool(tick_response.get("ok")),
         "rates_count": len(rates),
@@ -99,16 +100,64 @@ def _enabled_symbols_from_control_plane() -> list[str]:
     return [str(symbol).upper().strip() for symbol in symbols if str(symbol).strip()]
 
 
+def _enabled_pairs_from_control_plane() -> list[dict[str, Any]]:
+    response = request_json("http://10.10.1.81:8000/api/v1/trading-pairs/enabled")
+    if not response.get("ok"):
+        return []
+    items = response.get("body", {}).get("items", [])
+    if not isinstance(items, list):
+        return []
+    pairs: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        symbol = str(item.get("symbol", "")).upper().strip()
+        if not symbol:
+            continue
+        timeframe = str(item.get("default_timeframe", "M1")).upper()
+        configured_timeframes = item.get("configured_timeframes") or []
+        if not isinstance(configured_timeframes, list):
+            configured_timeframes = []
+        cleaned = [str(tf).upper().strip() for tf in configured_timeframes if str(tf).strip()]
+        if timeframe not in cleaned:
+            cleaned.insert(0, timeframe)
+        pairs.append(
+            {
+                "symbol": symbol,
+                "default_timeframe": timeframe,
+                "configured_timeframes": cleaned or [timeframe],
+            }
+        )
+    return pairs
+
+
 def run_market_worker_once() -> dict[str, Any]:
     health = bridge_health()
     symbols_response = bridge_symbols()
     available_symbols = symbols_response.get("body", {}).get("symbols", []) if symbols_response.get("ok") else []
-    watchlist = _enabled_symbols_from_control_plane() or configured_watchlist()
+    enabled_pairs = _enabled_pairs_from_control_plane()
+    watchlist = [item["symbol"] for item in enabled_pairs] or _enabled_symbols_from_control_plane() or configured_watchlist()
     available_lookup = {str(symbol).upper(): str(symbol) for symbol in available_symbols}
     selected_symbols = [available_lookup[symbol] for symbol in watchlist if symbol in available_lookup]
     skipped_symbols = [symbol for symbol in watchlist if symbol not in available_lookup]
-    snapshots = [_symbol_snapshot(symbol) for symbol in selected_symbols]
-    news_statuses = {symbol: _news_status(symbol) for symbol in [item["symbol"] for item in snapshots]}
+    pair_map = {item["symbol"]: item for item in enabled_pairs}
+    snapshots: list[dict[str, Any]] = []
+    for symbol in selected_symbols:
+        configured = pair_map.get(symbol.upper())
+        timeframes = configured.get("configured_timeframes", [configured.get("default_timeframe", "M1")]) if configured else ["M1"]
+        for timeframe in timeframes:
+            snapshots.append(_symbol_snapshot(symbol, timeframe))
+    news_statuses = {symbol: _news_status(symbol) for symbol in sorted({item["symbol"] for item in snapshots})}
+    unique_symbols = sorted({str(item.get("symbol", "")).upper() for item in snapshots if str(item.get("symbol", "")).strip()})
+    timeframe_map: dict[str, list[str]] = {}
+    for item in snapshots:
+        symbol = str(item.get("symbol", "")).upper().strip()
+        timeframe = str(item.get("timeframe", "M1")).upper().strip()
+        if not symbol:
+            continue
+        timeframe_map.setdefault(symbol, [])
+        if timeframe and timeframe not in timeframe_map[symbol]:
+            timeframe_map[symbol].append(timeframe)
     data_quality = "fresh" if snapshots and all(item["feed_fresh"] for item in snapshots if item["tick_ok"]) else "limited"
     bridge_connected = bool(health.get("body", {}).get("mt5_connected")) if health.get("ok") else False
     return {
@@ -118,7 +167,8 @@ def run_market_worker_once() -> dict[str, Any]:
         "bridge_status": health.get("body", {}).get("status", "unknown") if health.get("ok") else health.get("error", "unknown"),
         "symbols_available_count": len(available_symbols),
         "watchlist": watchlist,
-        "symbols_monitored": [item["symbol"] for item in snapshots],
+        "symbols_monitored": unique_symbols,
+        "timeframes_monitored": timeframe_map,
         "symbols_skipped": skipped_symbols,
         "pairs_processed": len(snapshots),
         "stale_pairs": sum(1 for item in snapshots if not item.get("feed_fresh")),

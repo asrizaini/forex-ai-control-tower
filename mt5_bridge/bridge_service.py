@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import os
 import time
+import re
+from numbers import Integral
 from typing import Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from pydantic import BaseModel, Field
 from starlette.responses import Response
@@ -76,6 +78,9 @@ def client() -> MT5Client:
 def mt5_request(order: OrderRequest) -> dict[str, Any]:
     mt5 = client().mt5
     order_type = mt5.ORDER_TYPE_BUY if order.side == "BUY" else mt5.ORDER_TYPE_SELL
+    # MT5 broker validation is strict on comment length/charset.
+    safe_id = re.sub(r"[^A-Za-z0-9_-]", "", order.client_order_id)[:20] or f"{int(time.time())}"
+    comment = f"fxai_{safe_id}"[:31]
     request: dict[str, Any] = {
         "action": mt5.TRADE_ACTION_DEAL,
         "symbol": order.symbol,
@@ -83,10 +88,15 @@ def mt5_request(order: OrderRequest) -> dict[str, Any]:
         "type": order_type,
         "deviation": order.deviation,
         "magic": 810081,
-        "comment": f"forex-ai:{order.client_order_id}",
+        "comment": comment,
         "type_time": mt5.ORDER_TIME_GTC,
         "type_filling": mt5.ORDER_FILLING_IOC,
     }
+    symbol_info = mt5.symbol_info(order.symbol)
+    if symbol_info is not None:
+        filling_mode = getattr(symbol_info, "filling_mode", None)
+        if isinstance(filling_mode, Integral):
+            request["type_filling"] = int(filling_mode)
     if order.price is not None:
         request["price"] = order.price
     if order.sl is not None:
@@ -103,6 +113,32 @@ def require_known_account(account_id: str) -> AccountProfile:
     if not profile.enabled:
         raise HTTPException(status_code=403, detail="MT5 bridge account profile is disabled")
     return profile
+
+
+def order_check_with_fallback(order_request: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    mt5 = client().mt5
+    candidates: list[int] = []
+    for mode in (
+        order_request.get("type_filling"),
+        getattr(mt5, "ORDER_FILLING_RETURN", None),
+        getattr(mt5, "ORDER_FILLING_IOC", None),
+        getattr(mt5, "ORDER_FILLING_FOK", None),
+    ):
+        if isinstance(mode, Integral):
+            normalized = int(mode)
+            if normalized not in candidates:
+                candidates.append(normalized)
+
+    last_result: dict[str, Any] = {"retcode": -1}
+    for mode in candidates:
+        trial = dict(order_request)
+        trial["type_filling"] = mode
+        result = client().order_check(trial)
+        last_result = result
+        # 10030 = unsupported filling mode for this symbol/broker.
+        if int(result.get("retcode", -1)) != 10030:
+            return trial, result
+    return dict(order_request), last_result
 
 
 def refresh_bridge_metrics(connected: bool | None = None) -> None:
@@ -223,9 +259,10 @@ def symbol_info(symbol: str) -> dict[str, Any]:
 
 
 @app.get("/rates/{symbol}", dependencies=[Depends(require_bridge_token)])
-def rates(symbol: str) -> dict[str, Any]:
+def rates(symbol: str, timeframe: str = Query(default="M1"), count: int = Query(default=100, ge=10, le=1000)) -> dict[str, Any]:
     try:
-        return {"symbol": symbol, "timeframe": "M1", "rates": client().rates(symbol)}
+        normalized_timeframe = str(timeframe).upper()
+        return {"symbol": symbol, "timeframe": normalized_timeframe, "rates": client().rates(symbol, normalized_timeframe, count=count)}
     except MT5Unavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
@@ -245,11 +282,12 @@ def order_check(order: OrderRequest) -> dict[str, Any]:
         raise HTTPException(status_code=403, detail="Live trading is disabled")
     try:
         started = time.time()
-        result = client().order_check(mt5_request(order))
+        request_payload = mt5_request(order)
+        resolved_request, result = order_check_with_fallback(request_payload)
         MT5_ORDER_CHECK_LATENCY.observe(time.time() - started)
     except MT5Unavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    checked_orders[order.client_order_id] = result
+    checked_orders[order.client_order_id] = {"result": result, "request": resolved_request}
     MT5_CHECKED_ORDERS.set(len(checked_orders))
     MT5_ORDER_CHECKS.labels(account_id=order.account_id, symbol=order.symbol, retcode=str(result.get("retcode", "unknown"))).inc()
     return {"client_order_id": order.client_order_id, "check_passed": result.get("retcode") == 0, "result": result}
@@ -260,13 +298,21 @@ def order_send(order: OrderRequest, x_execution_guard_token: str | None = Header
     require_known_account(order.account_id)
     if order.live_order and not ALLOW_LIVE_TRADING:
         raise HTTPException(status_code=403, detail="Live trading is disabled")
-    if REQUIRE_ORDER_CHECK and order.client_order_id not in checked_orders:
+    checked_entry: dict[str, Any] | None = None
+    if REQUIRE_ORDER_CHECK:
+        checked_entry = checked_orders.get(order.client_order_id)
+    if REQUIRE_ORDER_CHECK and checked_entry is None:
         raise HTTPException(status_code=409, detail="order_check must run before order_send")
     if not validate_approval_token(x_execution_guard_token):
         raise HTTPException(status_code=403, detail="Execution Guard approval token required")
+    request_payload = mt5_request(order)
+    if checked_entry:
+        cached_request = checked_entry.get("request")
+        if isinstance(cached_request, dict):
+            request_payload = cached_request
     try:
         started = time.time()
-        result = client().order_send(mt5_request(order))
+        result = client().order_send(request_payload)
         MT5_ORDER_SEND_LATENCY.observe(time.time() - started)
     except MT5Unavailable as exc:
         MT5_ORDER_SENDS.labels(account_id=order.account_id, symbol=order.symbol, result="mt5_unavailable").inc()

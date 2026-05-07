@@ -4,7 +4,40 @@
 @php
     $pending = session('pending_generated_credential');
     $revealed = session('generated_secret');
+    $primaryCategories = ['Core Runtime', 'Trading Safety', 'News', 'Notifications', 'Mobile Push', 'OpenClaw', 'MT5 Bridge', 'Paid LLM', 'Auth And Recovery'];
+    $orderedGroups = [];
+    foreach ($primaryCategories as $category) {
+        if (!empty($credentialGroups[$category])) {
+            $orderedGroups[$category] = $credentialGroups[$category];
+        }
+    }
+    foreach (($credentialGroups ?? []) as $category => $items) {
+        if (!isset($orderedGroups[$category])) {
+            $orderedGroups[$category] = $items;
+        }
+    }
 @endphp
+<section class="panel">
+    <div class="panel-head"><div><h2>Storage Model</h2><p>Credentials saved here are encrypted in the control-plane database and persist across page refresh, API restart, and machine reboot.</p></div><span class="badge ok">persistent</span></div>
+    @if($authenticated)
+        <div class="actions" style="margin-top:8px">
+            <form method="POST" action="{{ route('credentials.migrate-runtime') }}">
+                @csrf
+                <button class="secondary small" type="submit">Migrate Runtime Env To DB</button>
+            </form>
+        </div>
+    @endif
+    <div class="row cols-3">
+        <strong>At rest</strong>
+        <span>Encrypted in credential store using service key file.</span>
+        <span class="muted">Secret values are never written to audit logs.</span>
+    </div>
+    <div class="row cols-3">
+        <strong>Runtime fallback</strong>
+        <span>If a value exists in runtime environment, the dashboard syncs and validates it.</span>
+        <span class="muted">Source labels: dashboard_store, runtime_env, runtime_env_fallback.</span>
+    </div>
+</section>
 <section class="panel">
     <div class="panel-head"><div><h2>Admin Security</h2><p>Change the active control-plane admin password.</p></div><span class="badge {{ $authenticated ? 'ok' : 'warn' }}">{{ $authenticated ? 'available' : 'login required' }}</span></div>
     @if($authenticated)
@@ -50,9 +83,13 @@
             <div class="metric"><span class="eyebrow">Missing Required</span><strong>{{ count($credentials['missing_required'] ?? []) }}</strong><span>must be completed</span></div>
             <div class="metric"><span class="eyebrow">Invalid</span><strong>{{ count($credentials['invalid'] ?? []) }}</strong><span>needs correction</span></div>
         </div>
-        @foreach($credentialGroups as $category => $items)
-            <div class="stack" style="margin-top:18px">
-                <h3>{{ $category }}</h3>
+        @foreach($orderedGroups as $category => $items)
+            <details class="panel" style="margin-top:18px;padding:0" open>
+                <summary style="cursor:pointer;list-style:none;padding:16px 18px;border-bottom:1px solid #22344b;display:flex;align-items:center;justify-content:space-between">
+                    <strong>{{ $category }}</strong>
+                    <span class="muted">{{ count($items) }} fields</span>
+                </summary>
+                <div class="stack" style="padding:16px 18px">
                 @foreach($items as $item)
                     @php
                         $fieldType = $item['field_type'] ?? 'text';
@@ -82,7 +119,8 @@
                         </div>
                     </div>
                 @endforeach
-            </div>
+                </div>
+            </details>
         @endforeach
     @endif
 </section>

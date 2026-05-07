@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from ..auth import Principal
 from ..control_schemas import CredentialReveal, CredentialUpdate
 from ..credential_definitions import DEFINITION_BY_NAME, DEFINITIONS, generate_value
-from ..credential_store import decrypt_value, public_status, upsert_config
+from ..credential_store import decrypt_value, get_config_value, migrate_runtime_credentials, public_status, sync_runtime_credentials, upsert_config
 from ..crud import audit
 from ..db import get_db
 from ..dependencies import current_principal
@@ -29,6 +29,8 @@ def catalog(principal: Principal = Depends(current_principal)) -> dict:
 @router.get("/status")
 def status_view(principal: Principal = Depends(current_principal), db: Session = Depends(get_db)) -> dict:
     _require_admin(principal)
+    if sync_runtime_credentials(db):
+        db.commit()
     items = public_status(db)
     missing_required = [item["name"] for item in items if item["required"] and not item["configured"]]
     invalid = [item["name"] for item in items if item["validation_status"] == "invalid"]
@@ -41,6 +43,22 @@ def status_view(principal: Principal = Depends(current_principal), db: Session =
         "healthy": not missing_required and not invalid,
         "notes": "Secret values are masked. Use explicit reveal only when necessary.",
     }
+
+
+@router.post("/migrate-runtime")
+def migrate_runtime(principal: Principal = Depends(current_principal), db: Session = Depends(get_db)) -> dict:
+    _require_admin(principal)
+    migrated = migrate_runtime_credentials(db, principal.user_id)
+    audit(
+        db,
+        principal,
+        "credential_runtime_migrate",
+        "credential_config",
+        "runtime_to_db",
+        {"migrated_count": len(migrated), "names": migrated, "value_logged": False},
+    )
+    db.commit()
+    return {"status": "ok", "migrated_count": len(migrated), "migrated_names": migrated}
 
 
 @router.put("/{name}")
@@ -93,10 +111,13 @@ def reveal_credential(
     _require_admin(principal)
     if not payload.confirm:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Explicit confirmation required")
+    if name not in DEFINITION_BY_NAME:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown credential")
     record = db.query(CredentialConfig).filter(CredentialConfig.name == name).one_or_none()
-    if not record or not record.configured:
+    value = decrypt_value(record.encrypted_value) if record and record.configured else get_config_value(db, name)
+    if not value:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Credential is not configured")
-    value = decrypt_value(record.encrypted_value)
+    source = "dashboard_store" if record and record.configured else "runtime_env"
     audit(db, principal, "credential_reveal", "credential_config", name, {"value_logged": False})
     db.commit()
-    return {"name": name, "value": value, "sensitive": record.sensitive}
+    return {"name": name, "value": value, "sensitive": DEFINITION_BY_NAME[name].sensitive, "source": source}

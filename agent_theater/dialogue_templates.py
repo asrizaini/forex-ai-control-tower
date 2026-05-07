@@ -1,13 +1,45 @@
 from __future__ import annotations
 
+import re
 from typing import Any
+
+
+def _canonical_symbol(value: str) -> str:
+    cleaned = re.sub(r"[^A-Z0-9]", "", value.strip().upper())
+    return cleaned[:6] if len(cleaned) >= 6 else cleaned
 
 
 def market_dialogue(worker_name: str, result: dict[str, Any]) -> list[dict[str, Any]]:
     snapshots = result.get("snapshots", [])
-    primary = snapshots[0] if snapshots else {}
-    monitored = [str(item.get("symbol")) for item in snapshots if isinstance(item, dict) and item.get("symbol")]
+    def _priority(item: dict[str, Any]) -> tuple[int, int, int]:
+        tf = str(item.get("timeframe", "M1")).upper()
+        tf_rank = {"D1": 7, "H4": 6, "H1": 5, "M30": 4, "M15": 3, "M5": 2, "M1": 1}.get(tf, 0)
+        fresh_rank = 1 if item.get("feed_fresh") else 0
+        rates_rank = int(item.get("rates_count", 0))
+        return (fresh_rank, tf_rank, rates_rank)
+    primary = sorted(
+        [item for item in snapshots if isinstance(item, dict)],
+        key=_priority,
+        reverse=True,
+    )[0] if snapshots else {}
+    monitored: list[str] = []
+    timeframe_map: dict[str, set[str]] = {}
+    for item in snapshots:
+        if not isinstance(item, dict) or not item.get("symbol"):
+            continue
+        symbol = _canonical_symbol(str(item.get("symbol")))
+        if not symbol:
+            continue
+        if symbol not in monitored:
+            monitored.append(symbol)
+        tf = str(item.get("timeframe", "M1")).upper()
+        timeframe_map.setdefault(symbol, set()).add(tf)
+    coverage = ", ".join(
+        f"{symbol}({','.join(sorted(timeframe_map.get(symbol, set()))[:4])})"
+        for symbol in monitored
+    )
     symbol = primary.get("symbol", "watchlist")
+    timeframe = str(primary.get("timeframe", "M1"))
     trend = primary.get("trend", "unknown")
     spread = primary.get("spread")
     freshness = primary.get("freshness_seconds")
@@ -17,21 +49,23 @@ def market_dialogue(worker_name: str, result: dict[str, Any]) -> list[dict[str, 
     ema_50 = indicators.get("ema_50")
     if result.get("bridge_connected") and primary and primary.get("feed_fresh") and primary.get("rates_count", 0) > 0:
         market_summary = (
-            f"{len(monitored)} enabled pairs are being processed: {', '.join(monitored)}. Primary view {symbol} is live from MT5 bridge; latest short-term trend reads {trend}; "
+            f"{len(monitored)} enabled pairs are being processed: {', '.join(monitored)}. Timeframe coverage: {coverage}. "
+            f"Primary view {symbol} {timeframe} is live from MT5 bridge; latest short-term trend reads {trend}; "
             f"spread is {spread if spread is not None else 'unknown'} and tick age is {freshness if freshness is not None else 'unknown'} seconds."
         )
         technical_summary = (
-            f"Multi-pair candle snapshots received. Primary {symbol} has {primary.get('rates_count', 0)} M1 candles. "
+            f"Multi-pair candle snapshots received. Primary {symbol} {timeframe} has {primary.get('rates_count', 0)} candles. "
             f"Technical bias is {trend}; EMA20={ema_20 if ema_20 is not None else 'n/a'}, "
             f"EMA50={ema_50 if ema_50 is not None else 'n/a'}, RSI14={rsi_14 if rsi_14 is not None else 'n/a'}. "
-            "No BUY/SELL signal is authorized because strategy governance is still monitor-only."
+            "BUY/SELL setup quality is visible, but execution remains governance-gated."
         )
         market_result = "mt5_market_data_live"
         adapter_status = "connected"
     elif result.get("bridge_connected") and primary:
         market_summary = (
             f"MT5 bridge is reachable for {symbol}, but market data is limited right now across the enabled watchlist. "
-            f"Tick age is {freshness if freshness is not None else 'unknown'} seconds and M1 candles received: {primary.get('rates_count', 0)}."
+            f"Tick age is {freshness if freshness is not None else 'unknown'} seconds and {timeframe} candles received: {primary.get('rates_count', 0)}. "
+            f"Coverage snapshot: {coverage}."
         )
         technical_summary = (
             f"{symbol} does not have enough fresh candles for trusted technical analysis. "
@@ -48,37 +82,44 @@ def market_dialogue(worker_name: str, result: dict[str, Any]) -> list[dict[str, 
         market_result = result.get("status", "degraded")
         adapter_status = "degraded"
     news_statuses = result.get("news_statuses", {})
-    news_status = news_statuses.get(symbol, {}) if isinstance(news_statuses, dict) else {}
-    if news_status and news_status.get("provider_enabled") and news_status.get("provider_fresh"):
-        if news_status.get("news_halt_active"):
-            next_event = news_status.get("next_high_impact_event") or {}
+    status_map = news_statuses if isinstance(news_statuses, dict) else {}
+    selected = [status_map.get(item["symbol"], {}) for item in snapshots if item.get("symbol")]
+    selected = [item for item in selected if isinstance(item, dict) and item]
+    provider_connected = [item for item in selected if item.get("provider_enabled") and item.get("provider_fresh")]
+    halted = [item for item in selected if item.get("news_halt_active")]
+    provider_type = next((item.get("provider_type") for item in provider_connected if item.get("provider_type")), None)
+    if provider_connected:
+        if halted:
+            next_event = halted[0].get("next_high_impact_event") or {}
+            next_minutes = halted[0].get("high_impact_next_minutes", "unknown")
             news_summary = (
-                f"News feed is connected for {symbol}, but I am keeping the halt active. "
-                f"Next high-impact event: {next_event.get('title', 'scheduled event')} in "
-                f"{news_status.get('high_impact_next_minutes', 'unknown')} minutes."
+                f"News feed is live for {len(provider_connected)} pair(s). "
+                f"High-impact halt is active on {len(halted)} pair(s). Next event: {next_event.get('title', 'scheduled event')} in {next_minutes} minutes."
             )
             news_result = "high_impact_halt_active"
             news_confidence = 0.84
         else:
             news_summary = (
-                f"News feed is connected for {symbol}. No high-impact event is inside the configured halt window; "
-                "news-sensitive strategies may continue to risk review."
+                f"News feed is live for {len(provider_connected)} pair(s). "
+                "No high-impact event is inside the configured halt window; news-sensitive strategies can move to risk review."
             )
             news_result = "news_clear"
             news_confidence = 0.86
-        news_sources = [f"news provider: {news_status.get('provider_type', 'configured')}"]
+        news_sources = [f"news provider: {provider_type or 'configured'}", "multi-pair news status"]
         news_connected = True
-        news_next_action = "Keep feeding news status into Execution Guard inputs before any signal is approved."
+        news_next_action = "Continue feeding pair-level news risk into Execution Guard before any signal is approved."
+        news_risk_status = "news_safe_mode" if halted else "news_clear"
     else:
         news_summary = (
-            f"News feed is not verified for {symbol}. "
+            "News feed is not verified for the enabled pair set. "
             "I am keeping news-sensitive strategies halted until the provider is enabled, fresh, and audited."
         )
         news_result = "pending_or_stale_adapter"
         news_confidence = 0.55
         news_sources = ["news provider status", "safe halt policy"]
         news_connected = False
-        news_next_action = "Configure NEWS_PROVIDER_TYPE with a reviewed calendar file or HTTPS provider URL, then verify /api/v1/news/status."
+        news_next_action = "Configure NEWS_PROVIDER_TYPE and NEWS_PROVIDER_API_KEY, then verify /api/v1/news/status."
+        news_risk_status = "news_safe_mode"
     return [
         {
             "agent": "Market Data Agent",
@@ -100,7 +141,7 @@ def market_dialogue(worker_name: str, result: dict[str, Any]) -> list[dict[str, 
             "confidence": 0.78 if adapter_status == "connected" else 0.62 if adapter_status == "limited" else 0.56,
             "risk_status": "no_execution_requested",
             "next_action": "Build indicator and multi-timeframe confirmation before any demo signal proposal.",
-            "metadata": {"worker": worker_name, "message_type": "human_dialogue", "signal_authorized": True, "symbols_monitored": monitored},
+            "metadata": {"worker": worker_name, "message_type": "human_dialogue", "signal_authorized": False, "symbols_monitored": monitored},
         },
         {
             "agent": "News Agent",
@@ -109,13 +150,15 @@ def market_dialogue(worker_name: str, result: dict[str, Any]) -> list[dict[str, 
             "input_sources": news_sources,
             "result": news_result,
             "confidence": news_confidence,
-            "risk_status": news_status.get("risk_status", "news_safe_mode") if news_status else "news_safe_mode",
+            "risk_status": news_risk_status,
             "next_action": news_next_action,
             "metadata": {
                 "worker": worker_name,
                 "message_type": "human_dialogue",
                 "news_feed_connected": news_connected,
-                "provider_type": news_status.get("provider_type") if news_status else None,
+                "provider_type": provider_type,
+                "pairs_with_news_status": len(selected),
+                "pairs_halted_by_news": len(halted),
             },
         },
     ]
@@ -123,15 +166,18 @@ def market_dialogue(worker_name: str, result: dict[str, Any]) -> list[dict[str, 
 
 def strategy_risk_dialogue(worker_name: str, result: dict[str, Any]) -> list[dict[str, Any]]:
     account = result.get("account", {})
+    cycle = result.get("demo_execution_cycle", {}) if isinstance(result.get("demo_execution_cycle"), dict) else {}
+    sent = int(cycle.get("sent", 0))
+    blocked = int(cycle.get("blocked", 0))
+    failed = int(cycle.get("failed", 0))
     if result.get("bridge_connected") and account:
         risk_summary = (
             f"MT5 demo account {account.get('login_masked', '***')} on {account.get('server', 'unknown')} is visible. "
             f"Equity is {account.get('equity', 'unknown')} {account.get('currency', '')}; drawdown is {account.get('drawdown_pct', 'unknown')}%. "
-            f"Open positions: {result.get('positions_count', 0)}. Auto execution remains disabled."
+            f"Open positions: {result.get('positions_count', 0)}. Demo cycle result: sent {sent}, blocked {blocked}, failed {failed}."
         )
         execution_summary = (
-            "Execution bridge is reachable, but I am not sending orders. "
-            "Order flow still requires strategy approval, risk policy, manual approval, order_check, and Execution Guard token."
+            "Execution bridge is reachable. Demo execution cycle can send orders only when strategy, risk, order_check, and Execution Guard checks all pass."
         )
         risk_confidence = 0.92
     else:
@@ -175,7 +221,7 @@ def strategy_risk_dialogue(worker_name: str, result: dict[str, Any]) -> list[dic
         {
             "agent": "Notification Agent",
             "stream": "Live Chat View",
-            "summary": "Notification channels are not connected yet. I will not claim Telegram, WhatsApp, mobile push, or email delivery until credentials and channel tests pass.",
+            "summary": "Notification channels are not connected yet. I will not claim Telegram or mobile push delivery until credentials and channel tests pass.",
             "input_sources": ["notification hub scaffold"],
             "result": "pending_adapter",
             "confidence": 0.6,

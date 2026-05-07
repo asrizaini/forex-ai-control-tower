@@ -8,15 +8,17 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from agent_theater.loki import push_event
 
 
 ENDPOINTS = (
     ("Control API", "http://10.10.1.81:8000/health"),
-    ("Dashboard", "http://10.10.1.81:5173/"),
+    ("Dashboard", "http://10.10.1.81:5173/healthz"),
     ("Grafana", "http://10.10.1.81:3000/api/health"),
     ("Prometheus", "http://10.10.1.81:9090/-/healthy"),
     ("Qdrant", "http://10.10.1.81:6333/"),
@@ -49,7 +51,12 @@ def _stop(_signum: int, _frame: object) -> None:
 
 
 def _utc_timestamp() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    timezone_name = os.getenv("APP_TIMEZONE") or os.getenv("TZ") or "Asia/Kuala_Lumpur"
+    try:
+        timezone = ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        timezone = ZoneInfo("Asia/Kuala_Lumpur")
+    return f"{datetime.now(timezone).strftime('%Y-%m-%d %I:%M:%S %p')} GMT+8"
 
 
 def _check_http(name: str, url: str, timeout_seconds: int = 5) -> dict[str, Any]:

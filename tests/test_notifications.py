@@ -22,6 +22,7 @@ def test_notification_routing_and_quiet_hours():
 
 def test_notification_event_api(monkeypatch, tmp_path):
     monkeypatch.setenv("JWT_SECRET_KEY", "unit-test-jwt-key")
+    monkeypatch.setenv("APP_TIMEZONE", "Asia/Kuala_Lumpur")
     configure_database(f"sqlite:///{tmp_path / 'notifications.db'}")
     init_db()
     app = create_app()
@@ -41,6 +42,7 @@ def test_notification_event_api(monkeypatch, tmp_path):
     body = event.json()
     assert body["language"] == "ms-MY"
     assert body["status"] in {"queued", "pending_channel_configuration"}
+    assert body["created_at"].endswith("+08:00")
 
     events = client.get("/api/v1/notifications/events").json()
     assert events[0]["notification_type"] == "approval_request"

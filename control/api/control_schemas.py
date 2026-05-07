@@ -30,6 +30,14 @@ class AccountCreate(BaseModel):
     trading_mode: str = "monitor_only"
 
 
+class AccountUpdate(BaseModel):
+    display_name: str | None = Field(default=None, min_length=1, max_length=160)
+    environment: str | None = None
+    account_group: str | None = None
+    trading_mode: str | None = None
+    enabled: bool | None = None
+
+
 class AccountOut(AccountCreate):
     id: int
     enabled: bool
@@ -229,6 +237,11 @@ class RiskPolicyOut(RiskPolicyCreate):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class DemoTradingModeRequest(BaseModel):
+    account_id: str = Field(min_length=1, max_length=80)
+    trading_mode: str = Field(pattern="^(monitor_only|demo_auto)$")
 
 
 class ExecutionGuardCheckRequest(BaseModel):

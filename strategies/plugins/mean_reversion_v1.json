@@ -1,0 +1,20 @@
+{
+  "strategy_id": "mean_reversion_v1",
+  "name": "Mean Reversion v1",
+  "version": "0.1.0",
+  "owner": "system",
+  "lifecycle": "approved_for_demo_auto",
+  "changelog": ["Added governed mean-reversion profile for demo auto execution."],
+  "supported_trade_styles": ["intraday", "mean reversion"],
+  "supported_symbols": ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD"],
+  "supported_timeframes": ["M5", "M15", "M30", "H1"],
+  "entry_rules": ["Price stretches away from mean band.", "RSI confirmation required.", "No high-impact news uncertainty."],
+  "exit_rules": ["Exit at mean/band target.", "Force exit on risk gate change."],
+  "risk_rules": ["Execution Guard required.", "Account risk policy required.", "News halt respected."],
+  "news_behavior": "block_on_unknown_high_impact_news",
+  "allowed_users": [],
+  "allowed_accounts": [],
+  "allowed_environments": ["demo"],
+  "test_files": [],
+  "rollback_target": null
+}

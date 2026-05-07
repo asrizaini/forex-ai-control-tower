@@ -27,8 +27,12 @@
     .room-strip button{background:#162233;border-color:#2d4058;color:#cfdae8;font-size:12px;min-height:30px;padding:5px 8px}
     .feed-status{align-items:center;color:#90a3b8;display:flex;font-size:12px;gap:10px;justify-content:space-between}
     .compact-feed{background:#0b1119;border:1px solid #233044;border-radius:8px;display:grid;max-height:calc(100vh - 360px);min-height:480px;overflow:auto}
-    .feed-row{border-bottom:1px solid #1c2a3a;display:grid;gap:14px;grid-template-columns:230px minmax(0,1fr) 190px;padding:9px 12px}
+    .feed-row{border-bottom:1px solid #1c2a3a;display:grid;gap:14px;grid-template-columns:230px minmax(0,1fr) 190px;padding:9px 12px;position:relative}
     .feed-row:hover{background:#111a26}
+    .feed-row::before{border-radius:0 2px 2px 0;content:'';height:74%;left:0;position:absolute;top:13%;width:3px}
+    .feed-row.state-ok::before{background:#4ad2a6}
+    .feed-row.state-warn::before{background:#f3c46d}
+    .feed-row.state-bad::before{background:#ff6f86}
     .feed-agent{color:#76e1cd;font-weight:850;line-height:1.2;white-space:normal}
     .feed-room{color:#8fa3ba;font-size:12px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .feed-summary{color:#e6edf6;font-size:13px;line-height:1.35}
@@ -36,6 +40,9 @@
     .feed-time{color:#91a4b8;font-size:11px;text-align:right;white-space:nowrap}
     .feed-tags{display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end;margin-top:5px}
     .feed-tags span{background:#121f2d;border:1px solid #293b52;border-radius:999px;color:#a9b8ca;font-size:10px;padding:3px 6px}
+    .feed-tags .tag-ok{background:#123728;border-color:#1f5d42;color:#79e4bc}
+    .feed-tags .tag-warn{background:#3a2d12;border-color:#765922;color:#ffd17a}
+    .feed-tags .tag-bad{background:#3f1522;border-color:#7e3344;color:#ff8ca0}
     .empty-dark{color:#91a4b8;padding:28px;text-align:center}
     .theater-links{display:flex;gap:8px;justify-content:flex-end}
     @media(max-width:1150px){.feed-toolbar{grid-template-columns:1fr 1fr}.feed-actions,.theater-links{justify-content:flex-start}.feed-row{grid-template-columns:1fr}.feed-time{text-align:left}.feed-tags{justify-content:flex-start}.compact-feed{max-height:none}}
@@ -126,6 +133,30 @@
         return event.display?.risk_status || event.risk_status || 'guarded';
     }
 
+    function formatTimestamp(value) {
+        if (!value) return '';
+        if (String(value).includes('GMT+8')) return value;
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return value;
+        return parsed.toLocaleString('en-US', {
+            timeZone: 'Asia/Kuala_Lumpur',
+            hour12: true,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+        }) + ' GMT+8';
+    }
+
+    function riskClass(riskStatus) {
+        const value = String(riskStatus || '').toLowerCase();
+        if (value.includes('blocked') || value.includes('halt') || value.includes('safe_mode')) return 'bad';
+        if (value.includes('stale') || value.includes('waiting') || value.includes('manual')) return 'warn';
+        return 'ok';
+    }
+
     function renderFeed(events) {
         countEl.textContent = events.length;
         if (!events.length) {
@@ -133,7 +164,7 @@
             return;
         }
         feedEl.innerHTML = events.map((event) => `
-            <article class="feed-row">
+            <article class="feed-row state-${riskClass(eventRisk(event))}">
                 <div>
                     <div class="feed-agent">${escapeHtml(event.agent || 'Agent')}</div>
                     <div class="feed-room">${escapeHtml(event.stream || 'Live Chat View')}</div>
@@ -143,8 +174,8 @@
                     ${event.next_action ? `<div class="feed-next">${escapeHtml(event.next_action)}</div>` : ''}
                 </div>
                 <div>
-                    <div class="feed-time">${escapeHtml(event.timestamp || '')}</div>
-                    <div class="feed-tags"><span>${escapeHtml(eventRisk(event))}</span><span>${escapeHtml(event.result || 'observed')}</span></div>
+                    <div class="feed-time">${escapeHtml(formatTimestamp(event.timestamp || ''))}</div>
+                    <div class="feed-tags"><span class="tag-${riskClass(eventRisk(event))}">${escapeHtml(eventRisk(event))}</span><span>${escapeHtml(event.result || 'observed')}</span></div>
                 </div>
             </article>
         `).join('');
@@ -159,7 +190,7 @@
         if (!response.ok) throw new Error('Feed refresh failed');
         const body = await response.json();
         renderFeed([...(body.events || [])].reverse());
-        lastUpdatedEl.textContent = `updated ${new Date().toLocaleTimeString()}`;
+        lastUpdatedEl.textContent = `updated ${formatTimestamp(new Date().toISOString())}`;
     }
 
     function scheduleRefresh() {

@@ -13,7 +13,7 @@
 <section class="panel">
     <div class="panel-head"><div><h2>Audit Log</h2><p>Configuration changes, worker actions, alert tests, and credential updates are audited.</p></div></div>
     @forelse(($logs['items'] ?? []) as $log)
-        <div class="row cols-5"><strong>{{ $log['action'] }}</strong><span>{{ $log['actor'] }}</span><span>{{ $log['resource_type'] }}</span><span>{{ $log['resource_id'] }}</span><span>{{ $log['created_at'] }}</span></div>
+        <div class="row cols-5"><strong>{{ $log['action'] }}</strong><span>{{ $log['actor'] }}</span><span>{{ $log['resource_type'] }}</span><span>{{ $log['resource_id'] }}</span><span data-utc="{{ $log['created_at'] ?? '' }}">{{ $log['created_at'] }}</span></div>
     @empty
         <p class="empty">No audit records found.</p>
     @endforelse

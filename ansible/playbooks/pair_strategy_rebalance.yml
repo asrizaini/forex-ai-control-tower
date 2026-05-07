@@ -1,0 +1,54 @@
+---
+- name: Rebalance pair strategies and timeframes in runtime DB
+  hosts: control
+  become: true
+  tasks:
+    - name: Apply strategy/timeframe defaults for all seeded trading pairs
+      ansible.builtin.shell: |
+        set -euo pipefail
+        export POSTGRES_PASSWORD="$(systemctl show-environment | sed -n 's/^POSTGRES_PASSWORD=//p')"
+        cd /opt/forex-ai-control-tower/app
+        /opt/forex-ai-control-tower/.venv/bin/python - <<'PY'
+        from sqlalchemy import select
+        from control.api.db import SessionLocal, database_url
+        from control.api.models import TradingPair
+
+        mapping = {
+            "EURUSD": ("trend_pullback_v1", "M1", True),
+            "GBPUSD": ("mean_reversion_v1", "M5", True),
+            "USDJPY": ("breakout_continuation_v1", "M15", True),
+            "XAUUSD": ("trend_pullback_v1", "M5", True),
+            "AUDUSD": ("mean_reversion_v1", "M5", True),
+            "NZDUSD": ("breakout_continuation_v1", "M15", True),
+            "USDCAD": ("breakout_continuation_v1", "M15", True),
+            "USDCHF": ("mean_reversion_v1", "M5", True),
+        }
+
+        db = SessionLocal()
+        try:
+            mode = "postgres" if database_url().startswith("postgresql") else "sqlite"
+            changed = 0
+            rows = list(db.scalars(select(TradingPair)))
+            for row in rows:
+                cfg = mapping.get(row.symbol)
+                if not cfg:
+                    continue
+                strategy_id, timeframe, enabled = cfg
+                row.assigned_strategy_id = strategy_id
+                row.default_timeframe = timeframe
+                row.enabled = enabled
+                row.status = "enabled" if enabled else "disabled"
+                metadata = row.metadata_json or {}
+                metadata["analysis_timeframes"] = ["M1", "M5", "M15", "M30", "H1", "H4", "D1"]
+                metadata["source"] = metadata.get("source") or "runtime_strategy_rebalance"
+                row.metadata_json = metadata
+                changed += 1
+            db.commit()
+            print(f"db_mode={mode}")
+            print(f"rebalanced_pairs={changed}")
+        finally:
+            db.close()
+        PY
+      args:
+        executable: /bin/bash
+      changed_when: true

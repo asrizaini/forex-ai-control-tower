@@ -19,6 +19,14 @@ Log in with an admin account, then use the **Control Plane** area and **Credenti
 - Supports explicit show/reveal and copy actions for operators who have admin permission.
 - Writes audit records for save, generate, and reveal actions without recording secret values.
 - Stores sensitive values encrypted on the fx-control machine.
+- Supports one-click migration of existing runtime environment secrets into the encrypted DB store.
+
+## Important Provider Security Boundary
+
+- The orchestrator supports backend AI providers through **API-based integration only**.
+- Supported primary provider: **OpenAI API key** (`OPENAI_API_KEY`).
+- Supported fallback provider: **local LLM endpoint** (`OLLAMA_REASON_URL`) with `LOCAL_LLM_API_STYLE` set to `ollama` or `openai_compatible`.
+- **Not supported**: ChatGPT website login automation, browser session cookie scraping, or storing ChatGPT account username/password for backend orchestration.
 
 ## Storage
 
@@ -38,7 +46,14 @@ The file is owned by `root:aiops` and readable by the API service group only. Do
 
 ## Bootstrap Notes
 
-The API still needs its boot credentials to start safely after reboot, including database access and JWT signing. Those values are already persisted on fx-control by the production runtime deployment. The dashboard is now the operator-facing source for updating and validating ongoing credentials such as FMP, Telegram, WhatsApp, FCM, SMTP, broker bridge tokens, LLM keys, notification providers, and trading configuration values.
+The API still needs its boot credentials to start safely after reboot, including database access and JWT signing. Those values are already persisted on fx-control by the production runtime deployment. The dashboard is now the operator-facing source for updating and validating ongoing credentials such as FMP, Telegram, mobile push (FCM), broker bridge tokens, LLM keys, notification providers, OpenClaw integration values, and trading configuration values.
+
+To move existing runtime variables into DB-backed encrypted storage, use:
+
+- Dashboard: `Credentials & Secrets` -> `Migrate Runtime Env To DB`
+- API (admin token required): `POST /api/v1/credentials/migrate-runtime`
+
+This migration copies values that exist in runtime env but are not yet configured in DB. Secret values are never logged.
 
 For changes that affect a service at process startup, update the value in the dashboard, then use the deployment/runtime apply workflow to restart the relevant service during a maintenance window.
 

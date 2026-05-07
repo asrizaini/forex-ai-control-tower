@@ -58,9 +58,29 @@ class MT5Client:
             raise MT5Unavailable(f"MT5 symbol info unavailable for {symbol}: {self.mt5.last_error()}")
         return _json_safe(info._asdict())
 
-    def rates(self, symbol: str, timeframe: int | None = None, count: int = 100) -> list[dict[str, Any]]:
+    def _resolve_timeframe(self, timeframe: str | int | None) -> int:
+        if timeframe is None:
+            return self.mt5.TIMEFRAME_M1
+        if isinstance(timeframe, int):
+            return timeframe
+        key = str(timeframe).strip().upper()
+        mapping = {
+            "M1": "TIMEFRAME_M1",
+            "M5": "TIMEFRAME_M5",
+            "M15": "TIMEFRAME_M15",
+            "M30": "TIMEFRAME_M30",
+            "H1": "TIMEFRAME_H1",
+            "H4": "TIMEFRAME_H4",
+            "D1": "TIMEFRAME_D1",
+        }
+        attr = mapping.get(key)
+        if not attr:
+            return self.mt5.TIMEFRAME_M1
+        return int(getattr(self.mt5, attr, self.mt5.TIMEFRAME_M1))
+
+    def rates(self, symbol: str, timeframe: str | int | None = None, count: int = 100) -> list[dict[str, Any]]:
         self.require_connection()
-        tf = timeframe or self.mt5.TIMEFRAME_M1
+        tf = self._resolve_timeframe(timeframe)
         rates = self.mt5.copy_rates_from_pos(symbol, tf, 0, count)
         if rates is None:
             return []

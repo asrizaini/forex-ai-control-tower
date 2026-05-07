@@ -3,10 +3,13 @@
 use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/healthz', fn () => response()->json(['status' => 'ok', 'service' => 'laravel-dashboard']));
+
 Route::get('/', [DashboardController::class, 'loginPage'])->name('dashboard');
 Route::get('/overview', [DashboardController::class, 'overview'])->name('dashboard.overview');
 Route::get('/trading-pairs', [DashboardController::class, 'tradingPairs'])->name('dashboard.trading-pairs');
 Route::get('/pair-summary', [DashboardController::class, 'pairSummary'])->name('dashboard.pair-summary');
+Route::get('/pairs/{symbol}', [DashboardController::class, 'pairDetail'])->name('dashboard.pair-detail');
 Route::get('/signals', [DashboardController::class, 'signals'])->name('dashboard.signals');
 Route::get('/strategy', [DashboardController::class, 'strategy'])->name('dashboard.strategy');
 Route::get('/candle-analysis', [DashboardController::class, 'candleAnalysis'])->name('dashboard.candle-analysis');
@@ -29,6 +32,7 @@ Route::get('/monitoring', [DashboardController::class, 'monitoring'])->name('das
 Route::get('/api-status', [DashboardController::class, 'apiStatus'])->name('dashboard.api-status');
 Route::get('/logs', [DashboardController::class, 'logs'])->name('dashboard.logs');
 Route::get('/settings', [DashboardController::class, 'settings'])->name('dashboard.settings');
+Route::get('/openclaw', [DashboardController::class, 'openclaw'])->name('dashboard.openclaw');
 
 Route::post('/login', [DashboardController::class, 'login'])->name('login');
 Route::post('/logout', [DashboardController::class, 'logout'])->name('logout');
@@ -38,6 +42,7 @@ Route::post('/trading-pairs/{symbol}', [DashboardController::class, 'updateTradi
 Route::post('/analysis/run', [DashboardController::class, 'runAnalysis'])->name('analysis.run');
 Route::post('/testing/backtests/run', [DashboardController::class, 'runBacktest'])->name('testing.backtests.run');
 Route::post('/credentials/discard-generated', [DashboardController::class, 'discardGeneratedCredential'])->name('credentials.discard-generated');
+Route::post('/credentials/migrate-runtime', [DashboardController::class, 'migrateRuntimeCredentials'])->name('credentials.migrate-runtime');
 Route::post('/credentials/{name}', [DashboardController::class, 'updateCredential'])->name('credentials.update');
 Route::post('/credentials/{name}/generate', [DashboardController::class, 'generateCredential'])->name('credentials.generate');
 Route::post('/credentials/{name}/apply-generated', [DashboardController::class, 'applyGeneratedCredential'])->name('credentials.apply-generated');
@@ -48,7 +53,14 @@ Route::post('/calendar/scrape', [DashboardController::class, 'scrapeCalendar'])-
 Route::post('/alert-rules/{ruleId}', [DashboardController::class, 'updateAlertRule'])->name('alert-rules.update');
 Route::post('/alert-rules/{ruleId}/test', [DashboardController::class, 'testAlertRule'])->name('alert-rules.test');
 Route::post('/workers/{workerId}/{action}', [DashboardController::class, 'workerAction'])->name('workers.action');
+Route::post('/workers/recover-stale', [DashboardController::class, 'recoverStaleAgents'])->name('workers.recover-stale');
+Route::post('/demo-trading/mode', [DashboardController::class, 'setDemoTradingMode'])->name('demo-trading.mode');
+Route::post('/demo-trading/run-cycle', [DashboardController::class, 'runDemoExecutionCycle'])->name('demo-trading.run-cycle');
 Route::post('/agent-theater/chat', [DashboardController::class, 'sendOrchestratorChat'])->name('agent-theater.chat');
 Route::post('/agent-theater/rooms/{roomName}/seed', [DashboardController::class, 'seedAgentRoom'])->name('agent-theater.rooms.seed');
 Route::post('/settings/{settingKey}', [DashboardController::class, 'updateSetting'])->name('settings.update');
 Route::post('/analysis/{analysisType}/seed', [DashboardController::class, 'seedAnalysis'])->name('analysis.seed');
+Route::post('/openclaw/chat', [DashboardController::class, 'openclawChat'])->name('openclaw.chat');
+Route::post('/openclaw/status-query', [DashboardController::class, 'openclawStatusQuery'])->name('openclaw.status-query');
+Route::post('/openclaw/daily-summary', [DashboardController::class, 'openclawDailySummary'])->name('openclaw.daily-summary');
+Route::post('/openclaw/api-call', [DashboardController::class, 'openclawApprovedApiCall'])->name('openclaw.api-call');

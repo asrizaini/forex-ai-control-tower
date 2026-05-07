@@ -14,7 +14,7 @@
 <section class="panel">
     <div class="panel-head"><div><h2>Events</h2><p>{{ $events['total'] ?? 0 }} records. Daily, weekly, monthly, and custom range views use these filters.</p></div></div>
     @forelse(($events['results'] ?? []) as $event)
-        <div class="row cols-5"><strong>{{ $event['event_name'] }}</strong><span>{{ $event['currency'] }} · {{ $event['impact'] }}</span><span>{{ $event['event_time_utc'] }}</span><span>{{ $event['actual'] ?: '-' }} / {{ $event['forecast'] ?: '-' }} / {{ $event['previous'] ?: '-' }}</span><span>{{ $event['source'] }}</span></div>
+        <div class="row cols-5"><strong>{{ $event['event_name'] }}</strong><span>{{ $event['currency'] }} · {{ $event['impact'] }}</span><span data-utc="{{ $event['event_time_utc'] ?? '' }}">{{ $event['event_time_utc'] }}</span><span>{{ $event['actual'] ?: '-' }} / {{ $event['forecast'] ?: '-' }} / {{ $event['previous'] ?: '-' }}</span><span>{{ $event['source'] }}</span></div>
     @empty
         <p class="empty">No calendar events stored yet. Enable a source and run the calendar worker/manual scrape.</p>
     @endforelse

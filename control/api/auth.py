@@ -3,12 +3,12 @@ from __future__ import annotations
 import base64
 import hmac
 import json
-import os
 import time
 from dataclasses import dataclass
 from hashlib import sha256
 from typing import Any
 
+from .credential_store import runtime_value
 
 @dataclass(frozen=True)
 class Principal:
@@ -18,7 +18,7 @@ class Principal:
 
 
 def _secret() -> bytes | None:
-    value = os.getenv("JWT_SECRET_KEY")
+    value = runtime_value("JWT_SECRET_KEY")
     return value.encode() if value else None
 
 

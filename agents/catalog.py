@@ -30,7 +30,7 @@ AGENT_CATALOG: tuple[AgentCatalogEntry, ...] = (
     AgentCatalogEntry("Watchdog Agent", "Tracks service/watchdog readiness.", "operational_monitor", "read_only", "System health integration is active via orchestrator."),
     AgentCatalogEntry("Account Manager Agent", "Tracks account-management tasks.", "operational_monitor", "governed", "Account mutations require RBAC."),
     AgentCatalogEntry("Account Router Agent", "Tracks account-routing readiness.", "operational_monitor", "governed", "Execution routing remains disabled."),
-    AgentCatalogEntry("Notification Agent", "Tracks notification adapter readiness.", "operational_monitor", "adapter_pending", "Telegram/WhatsApp/email credentials not configured."),
+    AgentCatalogEntry("Notification Agent", "Tracks notification adapter readiness.", "operational", "telegram_active", "Telegram delivery is active; mobile push is optional and pending FCM setup."),
     AgentCatalogEntry("Localization Agent", "Tracks bilingual workflow readiness.", "operational_monitor", "read_only", "Locale foundations exist."),
     AgentCatalogEntry("Security Review Agent", "Tracks security review tasks.", "operational_monitor", "read_only", "Security review remains required before live trading."),
     AgentCatalogEntry("Deployment Agent", "Tracks deployment/rollback tasks.", "operational_monitor", "governed", "Deployments require backup/changelog/rollback records."),
@@ -39,7 +39,7 @@ AGENT_CATALOG: tuple[AgentCatalogEntry, ...] = (
     AgentCatalogEntry("Broker Compatibility Agent", "Tracks broker compatibility readiness.", "operational_monitor", "read_only", "Broker checks are later roadmap."),
     AgentCatalogEntry("Market Data Quality Agent", "Tracks feed-quality readiness.", "operational_monitor", "read_only", "Telemetry freshness is live."),
     AgentCatalogEntry("Post-Trade Review Agent", "Tracks post-trade review readiness.", "operational_monitor", "read_only", "No closed trade workflow active yet."),
-    AgentCatalogEntry("OpenClaw Gateway Agent", "Tracks optional OpenClaw gateway.", "disabled_by_default", "restricted", "OpenClaw remains human-facing only."),
+    AgentCatalogEntry("OpenClaw Gateway Agent", "Tracks optional OpenClaw gateway.", "operational_optional", "restricted", "OpenClaw runtime is active and remains human-facing only."),
     AgentCatalogEntry("Agent Theater Event Formatter", "Formats safe human-readable events.", "operational", "redacted_output_only", "Hidden reasoning and secrets are not exposed."),
 )
 

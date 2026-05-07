@@ -92,6 +92,9 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Login-first Laravel dashboard shell; unauthenticated users only see secure login.
 - `[x]` Protected multi-page dashboard navigation for Overview, Trading Pairs, Pair Summary, Signals, Strategy, Technical Analysis, Fundamental Analysis, Candle Analysis, Trend Analysis, Risk Validation, Testing/Backtesting, Workers/Agents, Logs, and Settings.
 - `[x]` Trading pair enable/disable, timeframe, and strategy assignment UI.
+- `[x]` Trading pair save payload normalized to dictionary JSON for `metadata_json` (fixes intermittent pair-save validation errors).
+- `[x]` Credential runtime reads moved to DB-driven resolver (`runtime_value`) with env fallback for restart safety.
+- `[x]` Credentials dashboard now supports explicit runtime-env to encrypted-DB migration action.
 - `[x]` Pair summary dashboard with freshness, candle, trend, bias, signal, fundamental, and risk summaries.
 - `[x]` Signal dashboard with monitor-only generated signal records across all enabled pairs.
 - `[x]` Testing/backtesting dashboard with pair, timeframe, strategy, and date-range inputs.
@@ -125,7 +128,10 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Agent permissions and tool policy enforcement.
 - `[x]` Production orchestrator decision loop for health, task routing, and safe agent workflow orchestration; executable trading remains approval-gated under Execution Guard/Risk sections.
 - `[x]` Signal, Strategy, Technical Analysis, Fundamental Analysis, Market Analysis, Pair Summary, Candle Analysis, Trend Detection, Risk Validation, and Testing/Backtesting agents now expose running/ready state through worker status and dashboard/API summaries.
-- `[x]` Notification Agent remains clearly marked `waiting_channels` until notification credentials and delivery tests are configured.
+- `[x]` Notification Agent is active (`running`) with Telegram delivery channel enabled; mobile push remains optional/pending until FCM credentials are configured.
+- `[x]` Agent runtime summary API (`/api/v1/agents/runtime-summary`) and Workers dashboard runtime cards now show queue depth, retries/failures, stale heartbeat counts, and last failed task context.
+- `[x]` Manual stale-agent recovery endpoint (`POST /api/v1/agents/recover-stale`) wired into Workers dashboard with optional watchdog task queueing.
+- `[x]` Worker start/stop/restart actions now apply immediately in control-plane runtime status and are audit-recorded.
 
 ## Agent Theater / AI Trading Room
 
@@ -147,6 +153,7 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` Boardroom Mode with executive status, risk posture, and security review summaries.
 - `[x]` Strategy War Room with strategy, backtest, and promotion gate summaries.
 - `[x]` Account Routing Room with account router, risk manager, and execution guard summaries.
+- `[x]` Orchestrator health probe now uses Laravel `/healthz`, preventing false dashboard-down degradations in runtime status.
 
 ## Execution Guard And Risk
 
@@ -261,7 +268,7 @@ This checklist tracks the original full-system prompt. The current deployment is
 
 - `[x]` Notification hub scaffold.
 - `[x]` Escalation matrix documented and exposed through API.
-- `[!]` Telegram integration readiness checks; delivery adapter is held pending token and live test.
+- `[x]` Telegram integration readiness checks and live delivery test passed.
 - `[!]` WhatsApp Business Cloud API readiness checks; delivery adapter is held pending token and live test.
 - `[!]` Mobile push readiness checks; delivery adapter is held pending FCM credentials and live test.
 - `[!]` Email SMTP readiness checks; delivery adapter is held pending SMTP credentials and live test.
@@ -289,8 +296,10 @@ This checklist tracks the original full-system prompt. The current deployment is
 - `[x]` OpenClaw gateway scaffold.
 - `[x]` Disabled by default.
 - `[x]` Allowed actions file.
-- `[!]` Real OpenClaw bridge; safety API bridge exists, external OpenClaw runtime adapter is held until OpenClaw runtime is installed and reviewed.
-- `[!]` Admin/user chat workflows through Orchestrator/Agent Theater; direct OpenClaw runtime chat adapter is held until OpenClaw runtime is approved.
+- `[x]` Governed OpenClaw API bridge with status, chat, status-query, daily summary, and approved read-only API bridge actions.
+- `[x]` External OpenClaw runtime adapter deployed on `fx-control` (`forex-openclaw-runtime`) and wired to `OPENCLAW_API_URL=http://10.10.1.81:8600` with persistent runtime secrets.
+- `[x]` Admin/user governed chat workflows exposed through dedicated OpenClaw gateway endpoints and dashboard page.
+- `[x]` OpenClaw runtime health probe endpoint (`/api/v1/openclaw/runtime/health`) and policy contract endpoint (`/api/v1/openclaw/contract`) added for operator validation.
 - `[x]` Approval-only API action layer.
 - `[x]` Safety policy tests.
 

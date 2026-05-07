@@ -8,7 +8,7 @@
     </div>
     @forelse(($snapshots['items'] ?? []) as $snapshot)
         <div class="panel" style="box-shadow:none;margin-bottom:12px">
-            <div class="row cols-5"><strong>{{ $snapshot['symbol'] ?: 'global' }}</strong><span>{{ $snapshot['timeframe'] ?: '-' }}</span><span>{{ $snapshot['status'] }}</span><span>confidence {{ $snapshot['confidence'] ?? '-' }}</span><span>{{ $snapshot['created_at'] }}</span></div>
+            <div class="row cols-5"><strong>{{ $snapshot['symbol'] ?: 'global' }}</strong><span>{{ $snapshot['timeframe'] ?: '-' }}</span><span>{{ $snapshot['status'] }}</span><span>confidence {{ $snapshot['confidence'] ?? '-' }}</span><span data-utc="{{ $snapshot['created_at'] ?? '' }}">{{ $snapshot['created_at'] }}</span></div>
             <p>{{ $snapshot['summary'] }}</p>
         </div>
     @empty

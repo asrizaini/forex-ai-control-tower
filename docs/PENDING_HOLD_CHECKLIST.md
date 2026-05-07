@@ -52,9 +52,10 @@ This checklist contains roadmap items that should not be marked complete until e
   - Reason: Paid providers must be budgeted, approved, and secrets must be configured without exposure.
   - Solution: Configure keys through secret manager, set daily/monthly budgets, require approval above threshold, run mock-to-paid comparison tests.
 
-- `[!]` External OpenClaw runtime bridge.
-  - Reason: OpenClaw is optional and disabled by default; runtime is not installed/reviewed here.
-  - Solution: Install reviewed OpenClaw runtime, allow only approved human-facing actions, test no shell/trade/secret access, keep MT5 execution forbidden.
+- `[~]` External OpenClaw runtime hardening and contract expansion.
+  - Status: Runtime adapter is deployed and active on `http://10.10.1.81:8600` behind token auth and policy-gated forwarding.
+  - Reason held: Current runtime is intentionally minimal safe adapter; advanced OpenClaw skills/tooling contracts are not yet added.
+  - Solution: Add reviewed runtime capabilities incrementally, keep deny-by-default action policy, and re-run gateway safety regression tests after each capability.
 
 ## Dashboard And UX Holds
 

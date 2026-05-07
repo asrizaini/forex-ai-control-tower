@@ -41,8 +41,8 @@ PHRASE_MAP_MS_MY = {
     "No live setup is under review. When Strategy Agent proposes a demo signal, I will check score, rationale, duplicate risk, and approval requirements.": (
         "Tiada setup live sedang disemak. Apabila Strategy Agent mencadangkan signal demo, saya akan semak skor, rasional, risiko pendua, dan keperluan kelulusan."
     ),
-    "Notification channels are not connected yet. I will not claim Telegram, WhatsApp, mobile push, or email delivery until credentials and channel tests pass.": (
-        "Saluran notifikasi belum disambungkan. Saya tidak akan menganggap Telegram, WhatsApp, mobile push, atau email berjaya sehingga kredensial dan ujian saluran lulus."
+    "Notification channels are not connected yet. I will not claim Telegram or mobile push delivery until credentials and channel tests pass.": (
+        "Saluran notifikasi belum disambungkan. Saya tidak akan menganggap Telegram atau mobile push berjaya sehingga kredensial dan ujian saluran lulus."
     ),
 }
 
@@ -74,14 +74,14 @@ def _display_timestamp(value: Any) -> str:
             parsed = datetime.fromisoformat(text[:-1] + "+00:00")
         except ValueError:
             return text
-        return parsed.astimezone(_app_timezone()).strftime("%Y-%m-%d %H:%M:%S Asia/Kuala_Lumpur")
+        return parsed.astimezone(_app_timezone()).strftime("%Y-%m-%d %I:%M:%S %p GMT+8")
     try:
         parsed = datetime.fromisoformat(text)
     except ValueError:
         return text
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
-    return parsed.astimezone(_app_timezone()).strftime("%Y-%m-%d %H:%M:%S Asia/Kuala_Lumpur")
+    return parsed.astimezone(_app_timezone()).strftime("%Y-%m-%d %I:%M:%S %p GMT+8")
 
 
 def render_event(event: dict[str, Any], language: str = "en") -> dict[str, Any]:

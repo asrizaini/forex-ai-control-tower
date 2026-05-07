@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -17,15 +16,16 @@ from ..crud import audit
 from ..db import get_db
 from ..dependencies import current_principal
 from ..permissions import has_permission
+from ..credential_store import runtime_value
 
 router = APIRouter(prefix="/prelive", tags=["prelive"])
 
 
 def _bridge_request(path: str) -> dict[str, Any]:
-    token = os.getenv("BRIDGE_API_TOKEN")
+    token = runtime_value("BRIDGE_API_TOKEN")
     if not token:
         raise HTTPException(status_code=503, detail="BRIDGE_API_TOKEN is not configured")
-    url = f"{os.getenv('MT5_BRIDGE_URL', 'http://10.10.1.86:8501').rstrip('/')}{path}"
+    url = f"{runtime_value('MT5_BRIDGE_URL', 'http://10.10.1.86:8501').rstrip('/')}{path}"
     request = urllib.request.Request(url, headers={"X-Bridge-Token": token})
     try:
         with urllib.request.urlopen(request, timeout=15) as response:
@@ -58,7 +58,23 @@ def broker_compatibility_check(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     _require_admin(principal)
-    requested = [item.strip().upper() for item in (symbols or ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD"]) if item.strip()]
+    requested = [
+        item.strip().upper()
+        for item in (
+            symbols
+            or [
+                "EURUSD",
+                "GBPUSD",
+                "USDJPY",
+                "XAUUSD",
+                "AUDUSD",
+                "USDCAD",
+                "USDCHF",
+                "NZDUSD",
+            ]
+        )
+        if item.strip()
+    ]
     available = set(_bridge_request("/symbols").get("symbols", []))
     results: list[dict[str, Any]] = []
     for symbol in requested:

@@ -377,7 +377,13 @@ def _load_provider_events() -> tuple[str, list[NewsEvent], str | None]:
     if _PROVIDER_CACHE["value"] is not None and _PROVIDER_CACHE["expires_at"] > now:
         return _PROVIDER_CACHE["value"]
     provider_type = _config("NEWS_PROVIDER_TYPE", "disabled").lower().strip()
-    if _config("NEWS_PROVIDER_ENABLED", "false").lower() != "true":
+    enabled_raw = _config("NEWS_PROVIDER_ENABLED", "").strip().lower()
+    provider_enabled = (
+        True if enabled_raw in {"true", "1", "yes", "on"}
+        else False if enabled_raw in {"false", "0", "no", "off"}
+        else bool(_config("NEWS_PROVIDER_API_KEY", "")) and provider_type not in {"", "disabled"}
+    )
+    if not provider_enabled:
         return provider_type, [], "NEWS_PROVIDER_ENABLED is false"
     if provider_type in {"manual_json", "file"}:
         path = _config("NEWS_CALENDAR_FILE", "")
@@ -426,9 +432,15 @@ def evaluate_news_status(symbol: str | None = None) -> dict[str, Any]:
             provider_type, events, error = "forex_factory_xml_fallback", fallback_events, None
     now = _utcnow()
     high_impact_window = int(_config("NEWS_HIGH_IMPACT_WINDOW_MINUTES", "45"))
+    high_impact_cooldown = int(_config("NEWS_HIGH_IMPACT_COOLDOWN_MINUTES", "90"))
     stale_after_minutes = int(_config("NEWS_STALE_AFTER_MINUTES", "720"))
     relevant_currencies = _currencies_for_symbol(symbol)
-    provider_enabled = _config("NEWS_PROVIDER_ENABLED", "false").lower() == "true"
+    enabled_raw = _config("NEWS_PROVIDER_ENABLED", "").strip().lower()
+    provider_enabled = (
+        True if enabled_raw in {"true", "1", "yes", "on"}
+        else False if enabled_raw in {"false", "0", "no", "off"}
+        else bool(_config("NEWS_PROVIDER_API_KEY", "")) and provider_type not in {"", "disabled"}
+    )
 
     relevant_events = [
         event
@@ -440,15 +452,32 @@ def evaluate_news_status(symbol: str | None = None) -> dict[str, Any]:
         for event in relevant_events
         if event.impact in HIGH_IMPACT_LEVELS and now <= event.event_time <= now + timedelta(minutes=high_impact_window)
     ]
+    active_halt_events = []
+    for event in relevant_events:
+        if event.impact not in HIGH_IMPACT_LEVELS:
+            continue
+        window_start = event.event_time - timedelta(minutes=high_impact_window)
+        window_end = event.event_time + timedelta(minutes=high_impact_cooldown)
+        if window_start <= now <= window_end:
+            active_halt_events.append((event, window_start, window_end))
     future_high = [event for event in relevant_events if event.impact in HIGH_IMPACT_LEVELS and event.event_time >= now]
     next_high = future_high[0] if future_high else None
     last_event = max(events, key=lambda item: item.event_time, default=None)
     provider_fresh = bool(events) and last_event is not None and last_event.event_time >= now - timedelta(minutes=stale_after_minutes)
     fail_safe = (not provider_enabled) or bool(error) or not provider_fresh
-    halt_active = fail_safe or bool(upcoming_high)
+    halt_active = fail_safe or bool(upcoming_high) or bool(active_halt_events)
     high_impact_next_minutes = None
     if next_high:
         high_impact_next_minutes = max(0, int((next_high.event_time - now).total_seconds() / 60))
+
+    safe_resume_at: datetime | None = None
+    safe_resume_in_minutes: int | None = None
+    if active_halt_events:
+        safe_resume_at = max(item[2] for item in active_halt_events)
+        safe_resume_in_minutes = max(0, int((safe_resume_at - now).total_seconds() / 60))
+    elif next_high:
+        safe_resume_at = next_high.event_time + timedelta(minutes=high_impact_cooldown)
+        safe_resume_in_minutes = max(0, int((safe_resume_at - now).total_seconds() / 60))
 
     if not provider_enabled:
         note = "News provider is disabled; news-sensitive trading remains halted."
@@ -456,6 +485,8 @@ def evaluate_news_status(symbol: str | None = None) -> dict[str, Any]:
         note = "News provider is configured but not healthy; news-sensitive trading remains halted."
     elif not provider_fresh:
         note = "News provider has no fresh events; news-sensitive trading remains halted."
+    elif active_halt_events:
+        note = "A high-impact event cooldown window is active; trading remains temporarily halted."
     elif upcoming_high:
         note = "High-impact event is inside the configured halt window."
     else:
@@ -469,6 +500,7 @@ def evaluate_news_status(symbol: str | None = None) -> dict[str, Any]:
         "provider_error": error,
         "relevant_currencies": sorted(relevant_currencies),
         "high_impact_window_minutes": high_impact_window,
+        "high_impact_cooldown_minutes": high_impact_cooldown,
         "high_impact_next_minutes": high_impact_next_minutes,
         "news_halt_active": halt_active,
         "risk_status": "news_safe_mode" if halt_active else "news_clear",
@@ -476,6 +508,17 @@ def evaluate_news_status(symbol: str | None = None) -> dict[str, Any]:
         "relevant_events_count": len(relevant_events),
         "upcoming_high_impact_events": [event.to_dict() for event in upcoming_high[:10]],
         "next_high_impact_event": next_high.to_dict() if next_high else None,
+        "active_halt_events": [
+            {
+                **event.to_dict(),
+                "window_start": window_start.isoformat().replace("+00:00", "Z"),
+                "window_end": window_end.isoformat().replace("+00:00", "Z"),
+                "minutes_to_resume": max(0, int((window_end - now).total_seconds() / 60)),
+            }
+            for event, window_start, window_end in active_halt_events[:10]
+        ],
+        "safe_resume_at": safe_resume_at.isoformat().replace("+00:00", "Z") if safe_resume_at else None,
+        "safe_resume_in_minutes": safe_resume_in_minutes,
         "note": note,
     }
 

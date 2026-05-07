@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..auth import Principal
-from ..control_schemas import AccountCreate, AccountOut
+from ..control_schemas import AccountCreate, AccountOut, AccountUpdate
 from ..crud import audit
 from ..db import get_db
 from ..dependencies import current_principal
@@ -40,6 +40,29 @@ def create_account(payload: AccountCreate, principal: Principal = Depends(curren
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(status_code=409, detail="Account already exists") from exc
+    db.refresh(account)
+    return account
+
+
+@router.put("/records/{account_id}", response_model=AccountOut)
+def update_account(
+    account_id: str,
+    payload: AccountUpdate,
+    principal: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+) -> Account:
+    if not has_permission(principal.role, "accounts:write"):
+        raise HTTPException(status_code=403, detail="Permission denied")
+    account = db.scalar(select(Account).where(Account.account_id == account_id).limit(1))
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    updates = payload.model_dump(exclude_unset=True)
+    if updates.get("environment") == "production-live":
+        raise HTTPException(status_code=400, detail="production-live account update requires dedicated governance workflow")
+    for key, value in updates.items():
+        setattr(account, key, value)
+    audit(db, principal, "update", "account", account_id, {"fields": sorted(list(updates.keys()))})
+    db.commit()
     db.refresh(account)
     return account
 

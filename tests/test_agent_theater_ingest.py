@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 
 from control.api.db import configure_database, init_db
 from control.api.main import create_app
+from control.api.routes import agent_theater as agent_theater_route
 
 
 def test_agent_theater_ingest_redacts_nested_secrets(monkeypatch, tmp_path):
@@ -60,9 +61,9 @@ def test_orchestrator_chat_reports_kuala_lumpur_time(monkeypatch, tmp_path):
     )
 
     assert response.status_code == 202
-    assert "Asia/Kuala_Lumpur" in response.json()["reply"]
+    assert "GMT+8" in response.json()["reply"]
     events = client.get("/api/v1/agent-theater/events").json()["events"]
-    assert all("Asia/Kuala_Lumpur" in event["timestamp"] for event in events)
+    assert all("GMT+8" in event["timestamp"] for event in events)
 
 
 def test_agent_theater_converts_legacy_z_timestamps_and_filters_agents(monkeypatch, tmp_path):
@@ -83,7 +84,7 @@ def test_agent_theater_converts_legacy_z_timestamps_and_filters_agents(monkeypat
     assert body["agents"] == ["Orchestrator Agent", "Risk Manager"]
     assert len(body["events"]) == 1
     assert body["events"][0]["agent"] == "Orchestrator Agent"
-    assert body["events"][0]["timestamp"] == "2026-05-04 23:46:22 Asia/Kuala_Lumpur"
+    assert body["events"][0]["timestamp"] == "2026-05-04 11:46:22 PM GMT+8"
 
 
 def test_orchestrator_only_chat_does_not_publish_supporting_agent_events(monkeypatch, tmp_path):
@@ -205,3 +206,77 @@ def test_room_seed_creates_multi_agent_transcripts(monkeypatch, tmp_path):
     assert "Security Review Agent" in agents
     assert "Backtest Agent" in agents
     assert "Account Router Agent" in agents
+
+
+def test_orchestrator_local_llm_success(monkeypatch, tmp_path):
+    event_log = tmp_path / "events.jsonl"
+    monkeypatch.setenv("AGENT_THEATER_EVENT_LOG", str(event_log))
+    monkeypatch.setenv("ORCHESTRATOR_GENERAL_CHAT_MODE", "local")
+    monkeypatch.setattr(agent_theater_route, "_ask_local_llm", lambda message, language: "Local LLM success reply.")
+    configure_database(f"sqlite:///{tmp_path / 'control_local_success.db'}")
+    init_db()
+    app = create_app()
+    client = TestClient(app, client=("10.10.1.50", 12345))
+    response = client.post("/api/v1/agent-theater/chat", json={"message": "general question", "language": "en", "session_id": "local-ok"})
+    assert response.status_code == 202
+    body = response.json()
+    assert body["provider"] == "local"
+    assert body["reply"] == "Local LLM success reply."
+
+
+def test_orchestrator_local_failure_returns_clear_error(monkeypatch, tmp_path):
+    event_log = tmp_path / "events.jsonl"
+    monkeypatch.setenv("AGENT_THEATER_EVENT_LOG", str(event_log))
+    monkeypatch.setenv("ORCHESTRATOR_GENERAL_CHAT_MODE", "local")
+    monkeypatch.setattr(agent_theater_route, "_ask_local_llm", lambda message, language: None)
+    configure_database(f"sqlite:///{tmp_path / 'control_local_fail.db'}")
+    init_db()
+    app = create_app()
+    client = TestClient(app, client=("10.10.1.50", 12345))
+    response = client.post("/api/v1/agent-theater/chat", json={"message": "general question", "language": "en", "session_id": "providers-fail"})
+    assert response.status_code == 503
+    assert "Local LLM" in response.json()["detail"] or "unavailable" in response.json()["detail"]
+
+
+def test_orchestrator_local_only_mode(monkeypatch, tmp_path):
+    event_log = tmp_path / "events.jsonl"
+    monkeypatch.setenv("AGENT_THEATER_EVENT_LOG", str(event_log))
+    monkeypatch.setenv("ORCHESTRATOR_GENERAL_CHAT_MODE", "local")
+    monkeypatch.setattr(agent_theater_route, "_ask_local_llm", lambda message, language: "Local mode response.")
+    configure_database(f"sqlite:///{tmp_path / 'control_local_only.db'}")
+    init_db()
+    app = create_app()
+    client = TestClient(app, client=("10.10.1.50", 12345))
+    response = client.post("/api/v1/agent-theater/chat", json={"message": "general question", "language": "en", "session_id": "local-only"})
+    assert response.status_code == 202
+    assert response.json()["provider"] == "local"
+    assert response.json()["reply"] == "Local mode response."
+
+
+def test_orchestrator_disabled_mode(monkeypatch, tmp_path):
+    event_log = tmp_path / "events.jsonl"
+    monkeypatch.setenv("AGENT_THEATER_EVENT_LOG", str(event_log))
+    monkeypatch.setenv("ORCHESTRATOR_GENERAL_CHAT_MODE", "disabled")
+    configure_database(f"sqlite:///{tmp_path / 'control_disabled_mode.db'}")
+    init_db()
+    app = create_app()
+    client = TestClient(app, client=("10.10.1.50", 12345))
+    response = client.post("/api/v1/agent-theater/chat", json={"message": "general question", "language": "en", "session_id": "disabled"})
+    assert response.status_code == 202
+    body = response.json()
+    assert body["provider"] == "disabled"
+    assert "disabled" in body["reply"].lower()
+
+
+def test_orchestrator_health_does_not_expose_secrets(monkeypatch, tmp_path):
+    event_log = tmp_path / "events.jsonl"
+    monkeypatch.setenv("AGENT_THEATER_EVENT_LOG", str(event_log))
+    app = create_app()
+    client = TestClient(app)
+    response = client.get("/api/v1/agent-theater/orchestrator/health")
+    assert response.status_code == 200
+    payload = response.json()
+    assert "local" in payload["provider"]["providers"]
+    serialized = str(payload)
+    assert "super-secret-key" not in serialized
+    assert "password" not in serialized.lower()
