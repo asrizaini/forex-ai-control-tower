@@ -196,25 +196,21 @@
       when: credential_store_key.stdout is defined and credential_store_key.stdout | length > 0
       no_log: true
 
-    - name: Ensure PHP is installed
-      ansible.builtin.apt:
-        name:
-          - php8.2-cli
-          - php8.2-mbstring
-          - php8.2-xml
-          - php8.2-curl
-          - php8.2-zip
-          - php8.2-sqlite3
-        state: present
-        update_cache: true
-      ignore_errors: true
-
-    - name: Ensure PHP is installed (fallback generic)
+    - name: Add PHP PPA and install PHP
       ansible.builtin.shell: |
-        which php || (apt-get update && apt-get install -y php-cli php-mbstring php-xml php-curl php-zip php-sqlite3)
+        set -euo pipefail
+        if ! command -v php &>/dev/null; then
+          apt-get update -qq
+          apt-get install -y software-properties-common
+          add-apt-repository -y ppa:ondrej/php 2>/dev/null || true
+          apt-get update -qq
+          apt-get install -y php-cli php-mbstring php-xml php-curl php-zip php-sqlite3 composer
+        fi
+        php -v | head -1
       args:
         executable: /bin/bash
-      when: false
+      register: php_install
+      changed_when: "'PHP' in php_install.stdout"
 
     - name: Create Laravel dashboard directory
       ansible.builtin.file:
@@ -224,13 +220,16 @@
         group: aiops
         mode: "0755"
 
-    - name: Copy Laravel dashboard application
-      ansible.builtin.copy:
+    - name: Copy Laravel dashboard application (excluding vendor)
+      ansible.builtin.synchronize:
         src: ../../control/dashboard-laravel/
         dest: /opt/forex-ai-control-tower/dashboard-laravel/
-        owner: aiops
-        group: aiops
-        mode: preserve
+        owner: no
+        group: no
+        rsync_opts:
+          - "--exclude=vendor"
+          - "--exclude=node_modules"
+          - "--exclude=.env"
 
     - name: Install Laravel Composer dependencies
       community.general.composer:
@@ -239,6 +238,8 @@
         no_dev: true
         prefer_dist: true
       become_user: aiops
+      environment:
+        COMPOSER_ALLOW_SUPERUSER: "1"
       ignore_errors: true
 
     - name: Set Laravel dashboard environment
