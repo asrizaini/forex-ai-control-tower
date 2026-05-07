@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, func, desc
 from sqlalchemy.orm import Session
 
-from ..auth import current_principal
 from ..models import SignalRecord, get_db
 
 router = APIRouter(prefix="/signals", tags=["signals"])

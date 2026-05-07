@@ -249,14 +249,14 @@
       changed_when: true
 
     - name: Install Laravel Composer dependencies
-      community.general.composer:
-        command: install
-        working_dir: /opt/forex-ai-control-tower/dashboard-laravel
-        no_dev: true
-        prefer_dist: true
+      ansible.builtin.shell: |
+        cd /opt/forex-ai-control-tower/dashboard-laravel
+        if [ ! -d vendor ]; then
+          composer install --no-dev --prefer-dist --no-interaction 2>&1 || echo "composer install skipped"
+        fi
       become_user: aiops
-      environment:
-        COMPOSER_ALLOW_SUPERUSER: "1"
+      args:
+        executable: /bin/bash
       ignore_errors: true
 
     - name: Set Laravel dashboard environment
@@ -291,6 +291,8 @@
           php artisan key:generate --force 2>/dev/null || echo "key:generate skipped"
         fi
       become_user: aiops
+      args:
+        executable: /bin/bash
       ignore_errors: true
 
     - name: Set Laravel directory permissions
@@ -303,6 +305,32 @@
       loop:
         - /opt/forex-ai-control-tower/dashboard-laravel/storage
         - /opt/forex-ai-control-tower/dashboard-laravel/bootstrap/cache
+
+    - name: Create SQLite database
+      ansible.builtin.shell: |
+        touch /opt/forex-ai-control-tower/dashboard-laravel/database/database.sqlite
+        chown aiops:aiops /opt/forex-ai-control-tower/dashboard-laravel/database/database.sqlite
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Run Laravel migrations
+      ansible.builtin.shell: |
+        cd /opt/forex-ai-control-tower/dashboard-laravel
+        php artisan migrate --force 2>&1
+      become_user: aiops
+      args:
+        executable: /bin/bash
+      ignore_errors: true
+
+    - name: Cache Laravel config
+      ansible.builtin.shell: |
+        cd /opt/forex-ai-control-tower/dashboard-laravel
+        php artisan config:cache 2>&1
+      become_user: aiops
+      args:
+        executable: /bin/bash
+      ignore_errors: true
 
     - name: Create Python virtual environment
       ansible.builtin.command:
