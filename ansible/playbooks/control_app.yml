@@ -196,21 +196,95 @@
       when: credential_store_key.stdout is defined and credential_store_key.stdout | length > 0
       no_log: true
 
-    - name: Create dashboard web directory
+    - name: Ensure PHP is installed
+      ansible.builtin.apt:
+        name:
+          - php8.2-cli
+          - php8.2-mbstring
+          - php8.2-xml
+          - php8.2-curl
+          - php8.2-zip
+          - php8.2-sqlite3
+        state: present
+        update_cache: true
+      ignore_errors: true
+
+    - name: Ensure PHP is installed (fallback generic)
+      ansible.builtin.shell: |
+        which php || (apt-get update && apt-get install -y php-cli php-mbstring php-xml php-curl php-zip php-sqlite3)
+      args:
+        executable: /bin/bash
+      when: false
+
+    - name: Create Laravel dashboard directory
       ansible.builtin.file:
-        path: /opt/forex-ai-control-tower/dashboard
+        path: /opt/forex-ai-control-tower/dashboard-laravel
         state: directory
         owner: aiops
         group: aiops
         mode: "0755"
 
-    - name: Copy built dashboard assets
+    - name: Copy Laravel dashboard application
       ansible.builtin.copy:
-        src: ../../control/dashboard/dist/
-        dest: /opt/forex-ai-control-tower/dashboard/
+        src: ../../control/dashboard-laravel/
+        dest: /opt/forex-ai-control-tower/dashboard-laravel/
         owner: aiops
         group: aiops
         mode: preserve
+
+    - name: Install Laravel Composer dependencies
+      community.general.composer:
+        command: install
+        working_dir: /opt/forex-ai-control-tower/dashboard-laravel
+        no_dev: true
+        prefer_dist: true
+      become_user: aiops
+      ignore_errors: true
+
+    - name: Set Laravel dashboard environment
+      ansible.builtin.copy:
+        dest: /opt/forex-ai-control-tower/dashboard-laravel/.env
+        owner: aiops
+        group: aiops
+        mode: "0640"
+        content: |
+          APP_NAME="Forex AI Control Tower"
+          APP_ENV=production
+          APP_KEY=
+          APP_DEBUG=false
+          APP_URL=http://10.10.1.81:5173
+          APP_LOCALE=en
+          APP_FALLBACK_LOCALE=en
+          LOG_CHANNEL=stderr
+          LOG_LEVEL=warning
+          DB_CONNECTION=sqlite
+          SESSION_DRIVER=file
+          SESSION_LIFETIME=120
+          CACHE_STORE=file
+          QUEUE_CONNECTION=sync
+          CONTROL_TOWER_API_URL=http://10.10.1.81:8000
+          CONTROL_TOWER_DOCS_URL=http://10.10.1.81:8000/docs
+          CONTROL_TOWER_GRAFANA_URL=http://10.10.1.81:3000
+
+    - name: Generate Laravel application key
+      ansible.builtin.shell: |
+        cd /opt/forex-ai-control-tower/dashboard-laravel
+        if grep -q 'APP_KEY=$' .env || ! grep -q 'APP_KEY=base64' .env; then
+          php artisan key:generate --force 2>/dev/null || echo "key:generate skipped"
+        fi
+      become_user: aiops
+      ignore_errors: true
+
+    - name: Set Laravel directory permissions
+      ansible.builtin.file:
+        path: "{{ item }}"
+        owner: aiops
+        group: aiops
+        recurse: true
+        mode: "ug+rwx,o+rx"
+      loop:
+        - /opt/forex-ai-control-tower/dashboard-laravel/storage
+        - /opt/forex-ai-control-tower/dashboard-laravel/bootstrap/cache
 
     - name: Create Python virtual environment
       ansible.builtin.command:
@@ -359,7 +433,7 @@
         mode: "0644"
         content: |
           [Unit]
-          Description=Forex AI Control Tower Dashboard
+          Description=Forex AI Control Tower Dashboard (Laravel)
           After=network-online.target
           Wants=network-online.target
 
@@ -367,8 +441,9 @@
           Type=simple
           User=aiops
           Group=aiops
-          WorkingDirectory=/opt/forex-ai-control-tower/dashboard
-          ExecStart=/usr/bin/python3 -m http.server 5173 --bind 0.0.0.0 --directory /opt/forex-ai-control-tower/dashboard
+          WorkingDirectory=/opt/forex-ai-control-tower/dashboard-laravel
+          ExecStart=/usr/bin/php artisan serve --host=0.0.0.0 --port=5173
+          Environment=PHP_CLI_SERVER_WORKERS=4
           Restart=always
           RestartSec=5
           NoNewPrivileges=true
@@ -386,11 +461,11 @@
         state: restarted
         enabled: true
 
-    - name: Stop and disable legacy React dashboard
+    - name: Start and enable Laravel dashboard
       ansible.builtin.systemd_service:
         name: forex-dashboard
-        state: stopped
-        enabled: false
+        state: restarted
+        enabled: true
 
     - name: Start and enable orchestrator runtime
       ansible.builtin.systemd_service:
