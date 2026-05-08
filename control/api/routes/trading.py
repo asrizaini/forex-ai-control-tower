@@ -269,9 +269,30 @@ def _latest_signal(db: Session, symbol: str, timeframe: str) -> SignalRecord | N
     )
 
 
+def _strip_signal_refs(obj: Any, depth: int = 0) -> Any:
+    """Recursively strip 'signal' keys from dicts to break circular references in analysis_json."""
+    if depth > 15:
+        return "<truncated>"
+    if isinstance(obj, dict):
+        return {str(k): _strip_signal_refs(v, depth + 1) for k, v in obj.items() if k != "signal"}
+    if isinstance(obj, (list, tuple)):
+        return [_strip_signal_refs(item, depth + 1) for item in obj]
+    if isinstance(obj, (str, int, float, bool)) or obj is None:
+        return obj
+    if hasattr(obj, "isoformat"):
+        return obj.isoformat()
+    return str(obj)
+
+
 def _signal_dict(signal: SignalRecord | None) -> dict[str, Any]:
     if not signal:
         return {"direction": "no signal", "signal_status": "no_signal", "confidence": 0.0, "timestamp": None, "freshness_status": "missing"}
+    # Avoid including analysis_json directly as it may contain a circular
+    # reference back to this signal (the summary stored in analysis_json
+    # includes a "signal" key which references this same record).
+    analysis = signal.analysis_json
+    if isinstance(analysis, dict):
+        analysis = _strip_signal_refs(analysis)
     return {
         "signal_id": signal.signal_id,
         "pair": signal.symbol,
@@ -288,7 +309,7 @@ def _signal_dict(signal: SignalRecord | None) -> dict[str, Any]:
         "freshness_status": signal.freshness_status,
         "signal_status": signal.signal_status,
         "timestamp": _iso(signal.created_at),
-        "analysis": signal.analysis_json,
+        "analysis": analysis,
     }
 
 
@@ -421,7 +442,7 @@ def _store_analysis_snapshot(db: Session, analysis_type: str, summary: dict[str,
             status=str(summary.get("final_conclusion", "Incomplete")).lower(),
             summary=str(summary.get(f"{analysis_type}_summary", summary.get("technical_summary", ""))),
             inputs_json={"pair_summary": True, "news_status": summary.get("news_status", {})},
-            output_json=summary,
+            output_json=_strip_signal_refs(summary),
         )
     )
 
@@ -496,7 +517,7 @@ def _generate_signal_for_summary(db: Session, summary: dict[str, Any], strategy_
         reason=reason,
         blockers=blockers,
         risk_notes=summary["risk_summary"],
-        analysis_json=summary,
+        analysis_json=_strip_signal_refs(summary),
     )
     db.add(signal)
     return signal
