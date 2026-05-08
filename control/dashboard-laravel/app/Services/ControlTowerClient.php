@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
@@ -44,16 +45,25 @@ class ControlTowerClient
     {
         $resolvedToken = $this->resolveToken($token);
         $baseUrl = rtrim(config('control_tower.api_url'), '/');
-        $pending = [];
+        $urls = [];
         foreach ($requests as $key => $path) {
             if (str_starts_with((string) $key, '__fallback_') || !is_string($path)) {
                 continue;
             }
-            $url = $baseUrl . '/' . ltrim($path, '/');
-            $pending[$key] = $this->buildPoolRequest($url, $resolvedToken);
+            $urls[$key] = $baseUrl . '/' . ltrim($path, '/');
         }
         try {
-            $responses = Http::pool($pending);
+            $responses = Http::pool(function (Pool $pool) use ($urls, $resolvedToken) {
+                $pending = [];
+                foreach ($urls as $key => $url) {
+                    $request = $pool->timeout(15)->acceptJson()->asJson();
+                    if ($resolvedToken) {
+                        $request = $request->withToken($resolvedToken);
+                    }
+                    $pending[$key] = $request->get($url);
+                }
+                return $pending;
+            });
         } catch (\Throwable) {
             $responses = [];
         }
@@ -71,17 +81,6 @@ class ControlTowerClient
             }
         }
         return $results;
-    }
-
-    private function buildPoolRequest(string $url, ?string $token): \Closure
-    {
-        return function ($pool) use ($url, $token) {
-            $request = $pool->timeout(15)->acceptJson()->asJson();
-            if ($token) {
-                $request = $request->withToken($token);
-            }
-            return $request->get($url);
-        };
     }
 
     private function send(string $method, string $path, array $payload = [], ?string $token = null, bool $allowRefresh = true): Response

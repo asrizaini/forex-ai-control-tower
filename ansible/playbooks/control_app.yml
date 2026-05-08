@@ -240,8 +240,16 @@
 
     - name: Extract Laravel app
       ansible.builtin.shell: |
+        # Preserve vendor directory if it exists
+        if [ -d /opt/forex-ai-control-tower/dashboard-laravel/vendor ]; then
+          mv /opt/forex-ai-control-tower/dashboard-laravel/vendor /tmp/dashboard-vendor-backup
+        fi
         rm -rf /opt/forex-ai-control-tower/dashboard-laravel
         tar xzf /tmp/dashboard-laravel.tar.gz -C /opt/forex-ai-control-tower/
+        # Restore vendor directory if it was preserved
+        if [ -d /tmp/dashboard-vendor-backup ]; then
+          mv /tmp/dashboard-vendor-backup /opt/forex-ai-control-tower/dashboard-laravel/vendor
+        fi
         chown -R aiops:aiops /opt/forex-ai-control-tower/dashboard-laravel
         rm -f /tmp/dashboard-laravel.tar.gz
       args:
