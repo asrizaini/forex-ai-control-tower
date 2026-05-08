@@ -6,6 +6,7 @@ ROLE_PERMISSIONS = {
         "accounts:write",
         "strategies:approve",
         "trades:approve",
+        "risk:read",
         "risk:write",
         "system:halt",
         "system:write",
