@@ -54,15 +54,13 @@ class ControlTowerClient
         }
         try {
             $responses = Http::pool(function (Pool $pool) use ($urls, $resolvedToken) {
-                $pending = [];
                 foreach ($urls as $key => $url) {
-                    $request = $pool->timeout(15)->acceptJson()->asJson();
+                    $request = $pool->as($key)->timeout(15)->acceptJson();
                     if ($resolvedToken) {
                         $request = $request->withToken($resolvedToken);
                     }
-                    $pending[$key] = $request->get($url);
+                    $request->get($url);
                 }
-                return $pending;
             });
         } catch (\Throwable) {
             $responses = [];
