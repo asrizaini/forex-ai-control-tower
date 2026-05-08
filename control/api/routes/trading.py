@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -621,8 +622,8 @@ def run_analysis(db: Session = Depends(get_db), principal=Depends(current_princi
     return {"status": "completed", "pairs_processed": len(rows), "items": summaries}
 
 
-def _safe_serialize(obj: Any) -> Any:
-    """Serialize an object to a JSON-compatible structure, handling circular refs and non-serializable types."""
+def _safe_serialize(obj: Any) -> str:
+    """Serialize an object to a JSON string, handling circular refs and non-serializable types."""
     import sys
 
     class _DefaultEncoder(json.JSONEncoder):
@@ -640,43 +641,41 @@ def _safe_serialize(obj: Any) -> Any:
     old_limit = sys.getrecursionlimit()
     try:
         sys.setrecursionlimit(max(old_limit, 5000))
-        result = json.loads(json.dumps(obj, cls=_DefaultEncoder))
+        return json.dumps(obj, cls=_DefaultEncoder)
     except (RecursionError, ValueError, TypeError):
-        # Fallback: aggressive serialization that replaces unserializable objects with strings
-        result = json.loads(json.dumps(obj, default=str))
+        return json.dumps(obj, default=str)
     finally:
         sys.setrecursionlimit(old_limit)
-    return result
 
 
 @router.get("/pair-summaries")
-def pair_summaries(db: Session = Depends(get_db)) -> dict[str, Any]:
+def pair_summaries(db: Session = Depends(get_db)) -> JSONResponse:
     _seed_pairs(db)
     pairs = db.scalars(select(TradingPair).where(TradingPair.enabled.is_(True)).order_by(TradingPair.symbol.asc())).all()
     items = [_build_pair_summary(db, pair) for pair in pairs]
-    items = _safe_serialize(items)
     buckets = {
-        "bullish": [item["symbol"] for item in items if item["current_bias"] == "bullish"],
-        "bearish": [item["symbol"] for item in items if item["current_bias"] == "bearish"],
-        "neutral": [item["symbol"] for item in items if item["current_bias"] == "neutral"],
-        "conflicting": [item["symbol"] for item in items if item["final_conclusion"] == "Wait"],
-        "stale": [item["symbol"] for item in items if item["data_freshness_status"] == "stale"],
-        "no_valid_signal": [item["symbol"] for item in items if item["signal_status"] in {"no_signal", "hold", "stale"}],
-        "blocked": [item["symbol"] for item in items if item["signal_status"] == "blocked" or item["final_conclusion"] == "Blocked"],
-        "missing_data": [item["symbol"] for item in items if item["candle_analysis"].get("missing_candles")],
+        "bullish": [item["symbol"] for item in items if item.get("current_bias") == "bullish"],
+        "bearish": [item["symbol"] for item in items if item.get("current_bias") == "bearish"],
+        "neutral": [item["symbol"] for item in items if item.get("current_bias") == "neutral"],
+        "conflicting": [item["symbol"] for item in items if item.get("final_conclusion") == "Wait"],
+        "stale": [item["symbol"] for item in items if item.get("data_freshness_status") == "stale"],
+        "no_valid_signal": [item["symbol"] for item in items if item.get("signal_status") in {"no_signal", "hold", "stale"}],
+        "blocked": [item["symbol"] for item in items if item.get("signal_status") == "blocked" or item.get("final_conclusion") == "Blocked"],
+        "missing_data": [item["symbol"] for item in items if isinstance(item.get("candle_analysis"), dict) and item["candle_analysis"].get("missing_candles")],
     }
-    return {"items": items, "summary": buckets, "updated_at": _iso(_now())}
+    payload = {"items": items, "summary": buckets, "updated_at": _iso(_now())}
+    return JSONResponse(content=json.loads(_safe_serialize(payload)))
 
 
 @router.get("/pair-summaries/{symbol}")
-def pair_summary_detail(symbol: str, db: Session = Depends(get_db)) -> dict[str, Any]:
+def pair_summary_detail(symbol: str, db: Session = Depends(get_db)) -> JSONResponse:
     _seed_pairs(db)
     pair = db.scalar(select(TradingPair).where(TradingPair.symbol == symbol.upper()))
     if not pair:
         raise HTTPException(status_code=404, detail="Trading pair not found")
     result = _build_pair_summary(db, pair)
-    result = _safe_serialize(result)
-    return {"status": "ok", "item": result, "updated_at": _iso(_now())}
+    payload = {"status": "ok", "item": result, "updated_at": _iso(_now())}
+    return JSONResponse(content=json.loads(_safe_serialize(payload)))
 
 
 @router.get("/signals/records")
