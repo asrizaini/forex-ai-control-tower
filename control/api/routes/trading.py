@@ -621,13 +621,34 @@ def run_analysis(db: Session = Depends(get_db), principal=Depends(current_princi
     return {"status": "completed", "pairs_processed": len(rows), "items": summaries}
 
 
+def _safe_serialize(obj: Any, _seen: set | None = None) -> Any:
+    """Recursively serialize an object, replacing circular references with placeholders."""
+    if _seen is None:
+        _seen = set()
+    obj_id = id(obj)
+    if obj_id in _seen:
+        return f"<circular:{type(obj).__name__}>"
+    if isinstance(obj, dict):
+        _seen.add(obj_id)
+        return {str(k): _safe_serialize(v, _seen) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        _seen.add(obj_id)
+        return [_safe_serialize(item, _seen) for item in obj]
+    if isinstance(obj, (str, int, float, bool)) or obj is None:
+        return obj
+    try:
+        json.dumps(obj)
+        return obj
+    except (TypeError, ValueError, OverflowError):
+        return str(obj)
+
+
 @router.get("/pair-summaries")
 def pair_summaries(db: Session = Depends(get_db)) -> dict[str, Any]:
     _seed_pairs(db)
     pairs = db.scalars(select(TradingPair).where(TradingPair.enabled.is_(True)).order_by(TradingPair.symbol.asc())).all()
     items = [_build_pair_summary(db, pair) for pair in pairs]
-    # Sanitize to prevent circular reference errors during JSON serialization
-    items = json.loads(json.dumps(items, default=str))
+    items = _safe_serialize(items)
     buckets = {
         "bullish": [item["symbol"] for item in items if item["current_bias"] == "bullish"],
         "bearish": [item["symbol"] for item in items if item["current_bias"] == "bearish"],
@@ -648,8 +669,7 @@ def pair_summary_detail(symbol: str, db: Session = Depends(get_db)) -> dict[str,
     if not pair:
         raise HTTPException(status_code=404, detail="Trading pair not found")
     result = _build_pair_summary(db, pair)
-    # Sanitize to prevent circular reference errors during JSON serialization
-    result = json.loads(json.dumps(result, default=str))
+    result = _safe_serialize(result)
     return {"status": "ok", "item": result, "updated_at": _iso(_now())}
 
 
