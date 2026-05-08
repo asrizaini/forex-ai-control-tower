@@ -62,7 +62,11 @@ class ControlTowerClient
                     $request->get($url);
                 }
             });
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            \Log::error('ControlTowerClient getPool failed', [
+                'error' => get_class($e) . ': ' . $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             $responses = [];
         }
         $results = [];
@@ -75,6 +79,11 @@ class ControlTowerClient
             if ($response instanceof Response && $response->successful()) {
                 $results[$key] = $response->json() ?? $fallback;
             } else {
+                \Log::warning('ControlTowerClient getPool fallback used', [
+                    'key' => $key,
+                    'response_type' => is_object($response) ? get_class($response) : gettype($response),
+                    'response_status' => $response instanceof Response ? $response->status() : 'N/A',
+                ]);
                 $results[$key] = $fallback;
             }
         }
