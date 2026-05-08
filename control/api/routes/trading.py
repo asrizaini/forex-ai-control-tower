@@ -621,26 +621,32 @@ def run_analysis(db: Session = Depends(get_db), principal=Depends(current_princi
     return {"status": "completed", "pairs_processed": len(rows), "items": summaries}
 
 
-def _safe_serialize(obj: Any, _seen: set | None = None) -> Any:
-    """Recursively serialize an object, replacing circular references with placeholders."""
-    if _seen is None:
-        _seen = set()
-    obj_id = id(obj)
-    if obj_id in _seen:
-        return f"<circular:{type(obj).__name__}>"
-    if isinstance(obj, dict):
-        _seen.add(obj_id)
-        return {str(k): _safe_serialize(v, _seen) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
-        _seen.add(obj_id)
-        return [_safe_serialize(item, _seen) for item in obj]
-    if isinstance(obj, (str, int, float, bool)) or obj is None:
-        return obj
+def _safe_serialize(obj: Any) -> Any:
+    """Serialize an object to a JSON-compatible structure, handling circular refs and non-serializable types."""
+    import sys
+
+    class _DefaultEncoder(json.JSONEncoder):
+        def default(self, o: Any) -> Any:
+            if hasattr(o, "isoformat"):
+                return o.isoformat()
+            if hasattr(o, "to_dict"):
+                return o.to_dict()
+            if hasattr(o, "model_dump"):
+                return o.model_dump(mode="json")
+            if hasattr(o, "__dict__"):
+                return {str(k): v for k, v in o.__dict__.items() if not k.startswith("_")}
+            return str(o)
+
+    old_limit = sys.getrecursionlimit()
     try:
-        json.dumps(obj)
-        return obj
-    except (TypeError, ValueError, OverflowError):
-        return str(obj)
+        sys.setrecursionlimit(max(old_limit, 5000))
+        result = json.loads(json.dumps(obj, cls=_DefaultEncoder))
+    except (RecursionError, ValueError, TypeError):
+        # Fallback: aggressive serialization that replaces unserializable objects with strings
+        result = json.loads(json.dumps(obj, default=str))
+    finally:
+        sys.setrecursionlimit(old_limit)
+    return result
 
 
 @router.get("/pair-summaries")
